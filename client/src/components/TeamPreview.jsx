@@ -98,11 +98,11 @@ const TeamPreview = () => {
 								className="inline-flex items-center gap-2 px-5 py-2 rounded-full bg-gradient-to-r from-purple-500/30 to-pink-500/30 border border-purple-500/40 text-purple-200 text-base font-semibold shadow-lg backdrop-blur-md"
 								whileHover={{ scale: 1.08 }}
 							>
-								Overview Of Our Team
+								Meet Our Core Team
 							</motion.span>
 							<p className="text-gray-300 text-lg sm:text-xl max-w-2xl mx-auto leading-relaxed">
-								A diverse team of creators, thinkers, and builders working together
-								to shape the future.
+								The driving force behind Syntax. A diverse team of leaders, mentors,
+								and builders working together to shape our future.
 							</p>
 						</motion.div>
 					</div>
@@ -217,8 +217,8 @@ const TeamPreview = () => {
 								boxShadow: '0 20px 40px rgba(139, 92, 246, 0.3)',
 							}}
 							whileTap={{ scale: 0.95 }}
-							className="group relative px-8 py-4 bg-gradient-to-r from-purple-600 via-pink-600 to-cyan-600 rounded-full font-semibold text-white text-lg shadow-2xl overflow-hidden"
-							disabled="true"
+							className="group relative px-8 py-4 bg-gradient-to-r from-purple-600 via-pink-600 to-cyan-600 rounded-full font-semibold text-white text-lg shadow-2xl overflow-hidden disabled:opacity-50 disabled:cursor-not-allowed"
+							disabled={true}
 						>
 							<span className="relative z-10 flex items-center gap-3">
 								Explore Full Team
@@ -257,6 +257,163 @@ const TeamPreview = () => {
 							/>
 						</motion.button>
 					</motion.div>
+				</div>
+			</div>
+
+			{/* Footer Section */}
+			<div className="bg-gray-900 py-16">
+				<div className="max-w-7xl mx-auto px-4">
+					<div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-10 mb-16">
+						{/* Brand column */}
+						<div className="lg:col-span-2">
+							<div className="flex items-center gap-3 mb-6">
+								<h3 className="text-white font-bold text-2xl bg-gradient-to-r from-blue-300 to-indigo-300 bg-clip-text text-transparent">
+									Syntax Club
+								</h3>
+							</div>
+
+							<p className="text-blue-200 mb-8 max-w-md leading-relaxed">
+								Empowering the next generation of innovators through hands-on
+								projects, mentorship, and a vibrant community. Join us in shaping
+								the future of technology and creativity.
+							</p>
+
+							<motion.a
+								href="https://www.instagram.com/syntaxclub/"
+								target="_blank"
+								rel="noopener noreferrer"
+								className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-gradient-to-r from-purple-500 to-pink-500 text-white font-semibold shadow-md hover:shadow-lg transition-shadow"
+							>
+								Instagram
+								<motion.svg
+									className="w-5 h-5"
+									fill="none"
+									stroke="currentColor"
+									viewBox="0 0 24 24"
+									animate={{ x: [0, 5, 0] }}
+									transition={{
+										duration: 1.5,
+										repeat: Infinity,
+										ease: 'easeInOut',
+									}}
+								>
+									<path
+										strokeLinecap="round"
+										strokeLinejoin="round"
+										strokeWidth={2}
+										d="M17 8l4 4m0 0l-4 4m4-4H3"
+									/>
+								</motion.svg>
+							</motion.a>
+						</div>
+
+						{/* Links columns */}
+						<div className="grid grid-cols-2 gap-8 lg:col-span-3">
+							<div>
+								<h4 className="text-white font-semibold mb-4">Quick Links</h4>
+								<ul className="space-y-2">
+									<li>
+										<motion.a
+											href="/about"
+											className="text-blue-300 hover:text-white transition-colors"
+										>
+											About Us
+										</motion.a>
+									</li>
+									<li>
+										<motion.a
+											href="/team"
+											className="text-blue-300 hover:text-white transition-colors"
+										>
+											Our Team
+										</motion.a>
+									</li>
+									<li>
+										<motion.a
+											href="/projects"
+											className="text-blue-300 hover:text-white transition-colors"
+										>
+											Projects
+										</motion.a>
+									</li>
+									<li>
+										<motion.a
+											href="/contact"
+											className="text-blue-300 hover:text-white transition-colors"
+										>
+											Contact
+										</motion.a>
+									</li>
+								</ul>
+							</div>
+
+							<div>
+								<h4 className="text-white font-semibold mb-4">Resources</h4>
+								<ul className="space-y-2">
+									<li>
+										<motion.a
+											href="/blog"
+											className="text-blue-300 hover:text-white transition-colors"
+										>
+											Blog
+										</motion.a>
+									</li>
+									<li>
+										<motion.a
+											href="/faq"
+											className="text-blue-300 hover:text-white transition-colors"
+										>
+											FAQ
+										</motion.a>
+									</li>
+									<li>
+										<motion.a
+											href="/terms"
+											className="text-blue-300 hover:text-white transition-colors"
+										>
+											Terms of Service
+										</motion.a>
+									</li>
+									<li>
+										<motion.a
+											href="/privacy"
+											className="text-blue-300 hover:text-white transition-colors"
+										>
+											Privacy Policy
+										</motion.a>
+									</li>
+								</ul>
+							</div>
+						</div>
+					</div>
+
+					<div className="pt-8 border-t border-white/10 flex flex-col md:flex-row justify-between items-center gap-4">
+						<p className="text-blue-300 text-center md:text-left">
+							© 2024 Syntax Club. All rights reserved.
+						</p>
+
+						<div className="flex flex-wrap gap-6 justify-center md:justify-end">
+							{footerLinks.map((section, index) => (
+								<div key={index} className="text-sm">
+									<h4 className="text-white font-semibold mb-2">
+										{section.title}
+									</h4>
+									<ul className="space-y-1">
+										{section.links.map((link, linkIndex) => (
+											<li key={linkIndex}>
+												<motion.a
+													href={link.url}
+													className="text-blue-300 hover:text-white transition-colors"
+												>
+													{link.label}
+												</motion.a>
+											</li>
+										))}
+									</ul>
+								</div>
+							))}
+						</div>
+					</div>
 				</div>
 			</div>
 		</div>
