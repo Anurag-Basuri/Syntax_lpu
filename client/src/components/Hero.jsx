@@ -1,6 +1,5 @@
 import React from 'react';
 import { motion } from 'framer-motion';
-import Logo from '../assets/logo.png';
 import { useNavigate } from 'react-router-dom';
 
 const Hero = () => {
@@ -8,19 +7,9 @@ const Hero = () => {
 
 	return (
 		<section className="min-h-screen flex flex-col justify-center items-center px-4 relative overflow-hidden">
-			{/* Background with logo pattern */}
-			<div className="absolute inset-0 z-0 opacity-10 pointer-events-none">
-				<div
-					className="absolute inset-0"
-					style={{
-						backgroundImage: `url(${Logo})`,
-						backgroundSize: '30%',
-						backgroundPosition: 'center',
-						backgroundRepeat: 'repeat',
-						opacity: 0.2,
-					}}
-				></div>
-				<div className="absolute inset-0 bg-gradient-to-b from-transparent via-slate-900/50 to-slate-900"></div>
+			{/* Background Gradient */}
+			<div className="absolute inset-0 z-0 opacity-50 pointer-events-none">
+				<div className="absolute inset-0 bg-gradient-to-b from-transparent via-slate-900/50 to-[#1a1f3a]"></div>
 			</div>
 
 			{/* Floating particles */}
@@ -64,11 +53,11 @@ const Hero = () => {
 					>
 						<div className="flex items-center justify-center gap-4">
 							<span className="text-5xl md:text-6xl lg:text-7xl font-extrabold tracking-widest bg-gradient-to-r from-indigo-400 via-blue-400 to-purple-500 bg-clip-text text-transparent drop-shadow-lg animate-gradient-x">
-								VIBRANTA
+								SYNTAX
 							</span>
 						</div>
 						<div className="text-sm md:text-base font-light text-indigo-300 tracking-wide mt-1">
-							Empowering creators, dreamers, and doers to shape the future together.
+							The official coding and development club of our institution.
 						</div>
 					</motion.div>
 
@@ -78,11 +67,9 @@ const Hero = () => {
 						animate={{ opacity: 1, y: 0 }}
 						transition={{ delay: 0.5, duration: 0.8 }}
 					>
-						<div className="font-serif italic text-white mb-3">
-							Where Innovation Meets
-						</div>
+						<div className="font-serif italic text-white mb-3">Where Logic Meets</div>
 						<div className="bg-gradient-to-r from-blue-300 via-indigo-400 to-purple-400 bg-clip-text text-transparent">
-							Collective Brilliance
+							Creative Code
 						</div>
 					</motion.h1>
 
@@ -92,7 +79,7 @@ const Hero = () => {
 						animate={{ opacity: 1 }}
 						transition={{ delay: 0.7, duration: 0.8 }}
 					>
-						A community of visionaries building tomorrow through collaboration,
+						A community of developers building tomorrow through collaboration,
 						creativity, and transformative technology.
 					</motion.p>
 				</motion.div>
@@ -129,29 +116,29 @@ const Hero = () => {
 					</motion.button>
 
 					{/* <motion.button
-						whileHover={{
-							scale: 1.05,
-							backgroundColor: 'rgba(255, 255, 255, 0.08)',
-						}}
-						whileTap={{ scale: 0.95 }}
-						className="px-6 py-3 md:px-8 md:py-4 bg-white/5 backdrop-blur-lg border border-indigo-500/30 rounded-xl font-medium text-base md:text-lg flex items-center gap-2 transition-all"
-						onClick={() => navigate('/event')}
-					>
-						<svg
-							className="w-5 h-5"
-							fill="none"
-							stroke="currentColor"
-							viewBox="0 0 24 24"
-						>
-							<path
-								strokeLinecap="round"
-								strokeLinejoin="round"
-								strokeWidth={2}
-								d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"
-							/>
-						</svg>
-						Explore Events
-					</motion.button> */}
+                        whileHover={{
+                            scale: 1.05,
+                            backgroundColor: 'rgba(255, 255, 255, 0.08)',
+                        }}
+                        whileTap={{ scale: 0.95 }}
+                        className="px-6 py-3 md:px-8 md:py-4 bg-white/5 backdrop-blur-lg border border-indigo-500/30 rounded-xl font-medium text-base md:text-lg flex items-center gap-2 transition-all"
+                        onClick={() => navigate('/event')}
+                    >
+                        <svg
+                            className="w-5 h-5"
+                            fill="none"
+                            stroke="currentColor"
+                            viewBox="0 0 24 24"
+                        >
+                            <path
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                strokeWidth={2}
+                                d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"
+                            />
+                        </svg>
+                        Explore Events
+                    </motion.button> */}
 				</motion.div>
 			</div>
 
