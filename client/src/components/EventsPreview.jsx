@@ -413,145 +413,172 @@ const UpcomingEventShowcase = () => {
 
 	// Desktop layout
 	return (
-		<section className="py-24 px-4 relative z-10 bg-transparent min-h-[60vh] overflow-hidden">
-			{/* Decorative elements */}
-			<div className="absolute top-1/4 left-1/4 w-64 h-64 bg-indigo-600/10 rounded-full blur-3xl -z-10"></div>
-			<div className="absolute bottom-1/3 right-1/4 w-72 h-72 bg-purple-600/10 rounded-full blur-3xl -z-10"></div>
+		<section className="py-24 px-4 relative z-10 overflow-hidden">
+			{/* Background elements */}
+			<div className="absolute inset-0 -z-10">
+				<div className="absolute inset-0 bg-gradient-to-br from-indigo-900/20 to-purple-900/30 backdrop-blur-2xl"></div>
+				<div className="absolute top-1/4 left-1/4 w-64 h-64 bg-indigo-600/10 rounded-full blur-3xl animate-pulse-slow"></div>
+				<div className="absolute bottom-1/3 right-1/4 w-72 h-72 bg-purple-600/10 rounded-full blur-3xl animate-pulse-slow"></div>
+			</div>
 
-			<div className="max-w-5xl mx-auto relative z-10">
-				{/* Header */}
+			<div className="max-w-7xl mx-auto">
 				<motion.div
+					initial={{ opacity: 0, y: 20 }}
+					animate={inView ? { opacity: 1, y: 0 } : {}}
+					transition={{ duration: 0.6 }}
 					className="text-center mb-16"
-					initial={{ opacity: 0, y: -20 }}
-					animate={{ opacity: 1, y: 0 }}
-					transition={{ duration: 0.8 }}
 				>
-					<div className="flex items-center justify-center gap-2 mb-4">
-						<Sparkles className="w-6 h-6 text-yellow-400 animate-pulse" />
-						<span className="text-yellow-400 font-semibold tracking-wide uppercase">
-							Next Event
-						</span>
-						<Sparkles className="w-6 h-6 text-yellow-400 animate-pulse" />
-					</div>
-					<h1 className="text-4xl md:text-5xl font-extrabold mb-4 bg-gradient-to-r from-blue-300 via-purple-300 to-pink-300 bg-clip-text text-transparent drop-shadow-lg">
-						{event.title}
-					</h1>
+					<h2 className="text-4xl md:text-5xl font-extrabold mb-4 bg-gradient-to-r from-purple-400 to-pink-500 bg-clip-text text-transparent tracking-tight">
+						Upcoming Events
+					</h2>
+					<p className="text-xl text-purple-200 max-w-2xl mx-auto">
+						Join us for exciting workshops, hackathons, and networking events.
+					</p>
 				</motion.div>
 
-				{/* Main Event Card */}
 				<motion.div
 					ref={ref}
 					variants={containerVariants}
 					initial="hidden"
 					animate={inView ? 'visible' : 'hidden'}
-					whileHover={{ scale: 1.01, boxShadow: '0 25px 50px rgba(99, 102, 241, 0.2)' }}
-					className="bg-gradient-to-br from-blue-900/60 to-purple-900/60 backdrop-blur-xl border border-white/20 rounded-3xl overflow-hidden shadow-2xl flex flex-col md:flex-row items-stretch"
+					className="grid grid-cols-1 lg:grid-cols-2 gap-8"
 				>
-					{/* Poster */}
-					{poster && poster.url && (
-						<motion.div
-							variants={itemVariants}
-							className="md:w-2/5 flex items-center justify-center bg-gradient-to-br from-blue-800/40 to-purple-800/40 relative overflow-hidden"
-						>
-							<img
-								src={poster.url}
-								alt={event.title}
-								className="object-cover w-full h-full min-h-[300px] rounded-l-3xl"
-							/>
-						</motion.div>
-					)}
+					{/* Event Card */}
+					<motion.div variants={itemVariants} className="relative group">
+						<div className="bg-gradient-to-br from-indigo-900/30 to-purple-900/40 backdrop-blur-xl border border-white/10 rounded-3xl p-6 md:p-8 shadow-2xl shadow-indigo-900/20 overflow-hidden transition-all duration-300 group-hover:border-white/20 group-hover:shadow-indigo-900/40">
+							{/* Decorative elements */}
+							<div className="absolute top-0 right-0 w-32 h-32 bg-indigo-600/10 rounded-bl-full backdrop-blur-sm transition-all duration-300 group-hover:scale-125" />
+							<div className="absolute bottom-0 left-0 w-24 h-24 bg-purple-600/10 rounded-tr-full backdrop-blur-sm transition-all duration-300 group-hover:scale-125" />
 
-					{/* Event Info */}
-					<motion.div
-						variants={itemVariants}
-						className="flex-1 p-8 flex flex-col justify-between"
-					>
-						<ExpandableText
-							text={event.description}
-							maxChars={200}
-							className="mb-6 text-blue-100/90 text-base leading-relaxed"
-						/>
-						<div>
-							<div className="grid grid-cols-2 gap-4 mb-6">
-								<div className="flex items-start gap-3">
-									<div className="p-2 bg-blue-800/30 rounded-lg">
-										<Calendar className="w-5 h-5 text-blue-400" />
+							<div className="relative z-10">
+								<div className="flex items-center gap-3 mb-6">
+									<div className="w-12 h-12 rounded-full bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center shadow-lg">
+										<svg
+											className="w-6 h-6 text-white"
+											fill="none"
+											stroke="currentColor"
+											viewBox="0 0 24 24"
+										>
+											<path
+												strokeLinecap="round"
+												strokeLinejoin="round"
+												strokeWidth={2}
+												d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"
+											/>
+										</svg>
 									</div>
-									<div>
-										<div className="text-blue-300 text-sm font-semibold">
-											Date
-										</div>
-										<div className="text-white">{dateStr}</div>
+									<h3 className="text-2xl md:text-3xl font-bold bg-gradient-to-r from-indigo-300 to-purple-300 bg-clip-text text-transparent">
+										{event?.title || 'Upcoming Event'}
+									</h3>
+								</div>
+
+								<p className="text-base md:text-lg text-indigo-100 leading-relaxed mb-6">
+									{event?.description ||
+										'Exciting event coming soon! Stay tuned for more details.'}
+								</p>
+
+								<div className="flex flex-col sm:flex-row gap-4 mb-6">
+									<div className="flex items-center gap-2 text-indigo-200">
+										<svg
+											className="w-5 h-5"
+											fill="none"
+											stroke="currentColor"
+											viewBox="0 0 24 24"
+										>
+											<path
+												strokeLinecap="round"
+												strokeLinejoin="round"
+												strokeWidth={2}
+												d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"
+											/>
+										</svg>
+										<span className="text-sm md:text-base">{dateStr}</span>
+									</div>
+									<div className="flex items-center gap-2 text-indigo-200">
+										<svg
+											className="w-5 h-5"
+											fill="none"
+											stroke="currentColor"
+											viewBox="0 0 24 24"
+										>
+											<path
+												strokeLinecap="round"
+												strokeLinejoin="round"
+												strokeWidth={2}
+												d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"
+											/>
+										</svg>
+										<span className="text-sm md:text-base">{timeStr}</span>
 									</div>
 								</div>
-								<div className="flex items-start gap-3">
-									<div className="p-2 bg-purple-800/30 rounded-lg">
-										<Clock className="w-5 h-5 text-purple-400" />
-									</div>
-									<div>
-										<div className="text-blue-300 text-sm font-semibold">
-											Time
-										</div>
-										<div className="text-white">{timeStr}</div>
-									</div>
-								</div>
-								<div className="flex items-start gap-3">
-									<div className="p-2 bg-pink-800/30 rounded-lg">
-										<MapPin className="w-5 h-5 text-pink-400" />
-									</div>
-									<div>
-										<div className="text-blue-300 text-sm font-semibold">
-											Venue
-										</div>
-										<div className="text-white">{event.venue}</div>
-									</div>
-								</div>
-								<div className="flex items-start gap-3">
-									<div className="p-2 bg-yellow-800/30 rounded-lg">
-										<Ticket className="w-4 h-4 text-cyan-400" />
-									</div>
-									<div>
-										<div className="text-blue-300 text-sm font-semibold">
-											Tickets
-										</div>
-										<div className="text-white">{slots}</div>
-									</div>
-								</div>
-								{event.sponsor && event.sponsor !== 'Not Applicable' && (
-									<div className="flex items-start gap-3">
-										<div className="p-2 bg-indigo-800/30 rounded-lg">
-											<Star className="w-5 h-5 text-indigo-400" />
-										</div>
-										<div>
-											<div className="text-blue-300 text-sm font-semibold">
-												Sponsor
-											</div>
-											<div className="text-white">{event.sponsor}</div>
-										</div>
-									</div>
-								)}
+
+								<motion.button
+									whileHover={{ scale: 1.05 }}
+									whileTap={{ scale: 0.95 }}
+									className="w-full sm:w-auto px-6 py-3 bg-gradient-to-r from-indigo-600 to-purple-600 rounded-xl font-semibold text-white shadow-lg transition-all"
+									onClick={() => navigate('/event')}
+								>
+									Learn More
+								</motion.button>
 							</div>
-
-							{event.organizer && (
-								<div className="flex items-center gap-3 mb-6 p-3 bg-blue-900/30 rounded-xl">
-									<div className="text-blue-300 font-medium">Organized by:</div>
-									<div className="text-white">{event.organizer}</div>
-								</div>
-							)}
 						</div>
+					</motion.div>
 
-						<div className="flex gap-4">
-							<motion.button
-								whileHover={{
-									scale: 1.06,
-									backgroundColor: 'rgba(99,102,241,0.18)',
-								}}
-								whileTap={{ scale: 0.97 }}
-								className="flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-indigo-600 to-purple-600 border border-indigo-400/30 rounded-xl font-semibold text-white transition-all duration-300 shadow-lg"
-								onClick={() => navigate(`/event`)}
-							>
-								More Info <ArrowRight className="w-5 h-5" />
-							</motion.button>
+					{/* Poster Section */}
+					<motion.div variants={itemVariants} className="relative group">
+						<div className="bg-gradient-to-br from-purple-900/30 to-pink-900/40 backdrop-blur-xl border border-white/10 rounded-3xl p-6 md:p-8 shadow-2xl shadow-purple-900/20 overflow-hidden transition-all duration-300 group-hover:border-white/20 group-hover:shadow-purple-900/40">
+							{/* Decorative elements */}
+							<div className="absolute top-0 right-0 w-32 h-32 bg-purple-600/10 rounded-bl-full backdrop-blur-sm transition-all duration-300 group-hover:scale-125" />
+							<div className="absolute bottom-0 left-0 w-24 h-24 bg-pink-600/10 rounded-tr-full backdrop-blur-sm transition-all duration-300 group-hover:scale-125" />
+
+							<div className="relative z-10">
+								<div className="flex items-center gap-3 mb-6">
+									<div className="w-12 h-12 rounded-full bg-gradient-to-br from-purple-500 to-pink-600 flex items-center justify-center shadow-lg">
+										<svg
+											className="w-6 h-6 text-white"
+											fill="none"
+											stroke="currentColor"
+											viewBox="0 0 24 24"
+										>
+											<path
+												strokeLinecap="round"
+												strokeLinejoin="round"
+												strokeWidth={2}
+												d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"
+											/>
+										</svg>
+									</div>
+									<h3 className="text-2xl md:text-3xl font-bold bg-gradient-to-r from-purple-300 to-pink-300 bg-clip-text text-transparent">
+										Event Poster
+									</h3>
+								</div>
+
+								<div className="aspect-video bg-gradient-to-br from-indigo-900/50 to-purple-900/50 rounded-2xl overflow-hidden shadow-lg">
+									{event?.images?.[0] ? (
+										<img
+											src={event.images[0]}
+											alt="Event Poster"
+											className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
+										/>
+									) : (
+										<div className="w-full h-full flex items-center justify-center text-indigo-300">
+											<svg
+												className="w-16 h-16"
+												fill="none"
+												stroke="currentColor"
+												viewBox="0 0 24 24"
+											>
+												<path
+													strokeLinecap="round"
+													strokeLinejoin="round"
+													strokeWidth={2}
+													d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"
+												/>
+											</svg>
+										</div>
+									)}
+								</div>
+							</div>
 						</div>
 					</motion.div>
 				</motion.div>
