@@ -4,15 +4,10 @@ import { useNavigate } from 'react-router-dom';
 
 const Hero = () => {
 	const navigate = useNavigate();
-
-	// Lightweight particles (reduced count for performance on mobile)
 	const dots = Array.from({ length: 8 });
 
 	return (
 		<section className="relative min-h-[80vh] md:min-h-screen px-4 py-16 flex items-center bg-transparent">
-			{/* Transparent background (no overlays) */}
-
-			{/* Subtle floating particles */}
 			{dots.map((_, i) => (
 				<motion.span
 					key={i}
@@ -32,17 +27,16 @@ const Hero = () => {
 			))}
 
 			<div className="relative z-[1] w-full max-w-6xl mx-auto text-center">
-				{/* Top badge */}
+				{/* Top badge (neutral, no college/org names) */}
 				<motion.div
 					initial={{ opacity: 0, y: 8 }}
 					animate={{ opacity: 1, y: 0 }}
 					transition={{ duration: 0.5 }}
 					className="inline-flex items-center mx-auto mb-6 rounded-full border border-white/10 bg-white/5 backdrop-blur-md px-3 py-1.5 text-xs md:text-sm text-indigo-200"
 				>
-					Student Organization • Lovely Professional University
+					Multidisciplinary • Community of builders
 				</motion.div>
 
-				{/* Brand name */}
 				<motion.h1
 					initial={{ opacity: 0, y: 10, scale: 0.98 }}
 					animate={{ opacity: 1, y: 0, scale: 1 }}
@@ -54,17 +48,15 @@ const Hero = () => {
 					</span>
 				</motion.h1>
 
-				{/* Short descriptor */}
 				<motion.p
 					initial={{ opacity: 0, y: 8 }}
 					animate={{ opacity: 1, y: 0 }}
 					transition={{ duration: 0.6, delay: 0.05 }}
 					className="text-sm sm:text-base md:text-lg text-indigo-200/90"
 				>
-					A multidisciplinary student organization at Lovely Professional University.
+					A multidisciplinary community for creators and technologists.
 				</motion.p>
 
-				{/* Mission */}
 				<motion.div
 					initial={{ opacity: 0, y: 12 }}
 					animate={{ opacity: 1, y: 0 }}
@@ -72,8 +64,8 @@ const Hero = () => {
 					className="mt-6 space-y-4 max-w-3xl mx-auto text-indigo-100"
 				>
 					<p className="text-base sm:text-lg leading-relaxed">
-						We bring together students from every department — not just computer science
-						— to collaborate, innovate, and grow together.
+						We bring together people across disciplines to collaborate, innovate, and
+						grow.
 					</p>
 
 					<div className="rounded-2xl border border-white/10 bg-white/5 backdrop-blur-md p-4 sm:p-5 text-left">
@@ -81,9 +73,9 @@ const Hero = () => {
 							Our Mission
 						</p>
 						<ul className="list-disc pl-5 space-y-2 text-sm sm:text-base">
-							<li>Students learn, build, and lead through real experiences.</li>
-							<li>Ideas evolve into impactful projects and events.</li>
-							<li>Everyone gains hands-on exposure beyond classroom learning.</li>
+							<li>Learn by building and leading real initiatives.</li>
+							<li>Turn ideas into impactful projects and events.</li>
+							<li>Gain hands-on exposure beyond traditional classes.</li>
 						</ul>
 					</div>
 
@@ -92,7 +84,6 @@ const Hero = () => {
 					</p>
 				</motion.div>
 
-				{/* CTAs */}
 				<motion.div
 					initial={{ opacity: 0, y: 14 }}
 					animate={{ opacity: 1, y: 0 }}
@@ -120,7 +111,6 @@ const Hero = () => {
 					</motion.button>
 				</motion.div>
 
-				{/* Scroll indicator */}
 				<motion.div
 					className="mt-10 flex justify-center"
 					initial={{ opacity: 0 }}

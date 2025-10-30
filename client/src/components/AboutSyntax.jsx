@@ -39,14 +39,14 @@ const AboutSyntax = () => {
 				>
 					<span className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-white/5 border border-white/10 text-indigo-200 text-xs sm:text-sm backdrop-blur-md">
 						<Users2 className="w-4 h-4" />
-						Multidisciplinary • Student-led • LPU
+						Multidisciplinary • Community • Open to all
 					</span>
 					<h2 className="mt-5 text-3xl sm:text-4xl md:text-5xl font-extrabold tracking-tight bg-gradient-to-r from-indigo-200 via-blue-200 to-purple-200 bg-clip-text text-transparent">
 						What is Syntax?
 					</h2>
 					<p className="mt-4 text-indigo-200/90 max-w-3xl mx-auto text-sm sm:text-base">
-						We bring together students from every department — not just computer science
-						— to collaborate, innovate, and grow together.
+						We bring together people across disciplines to collaborate, innovate, and
+						grow.
 					</p>
 				</motion.div>
 
@@ -139,9 +139,9 @@ const AboutSyntax = () => {
 							<h3 className="text-2xl font-bold text-white">Why We Formed Syntax</h3>
 						</div>
 						<p className="text-indigo-100/90 text-sm sm:text-base">
-							We started Syntax with a vision to empower students beyond academics — a
-							space to experiment, innovate, and express ideas freely, supported by a
-							community of doers.
+							We started Syntax to empower peers beyond academics — a space to
+							experiment, initiate, and express ideas freely, supported by a community
+							of doers.
 						</p>
 					</motion.div>
 
@@ -158,7 +158,7 @@ const AboutSyntax = () => {
 						<ul className="list-disc pl-5 space-y-2 text-indigo-100 text-sm sm:text-base">
 							<li>Bridge the gap between theory and real-world implementation.</li>
 							<li>
-								Help students discover strengths — technical, managerial, or
+								Help members discover strengths — technical, managerial, or
 								creative.
 							</li>
 							<li>Build a driven, supportive network working toward shared goals.</li>
