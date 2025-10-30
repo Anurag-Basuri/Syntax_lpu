@@ -7,26 +7,25 @@ import TeamPreview from '../components/TeamPreview.jsx';
 import Testimonials from '../components/Testimonials.jsx';
 import Footer from '../components/Footer.jsx';
 import Logo from '../assets/logo.png';
-import AboutSyntax from '../components/AboutSyntax.jsx'; // NEW
+import AboutSyntax from '../components/AboutSyntax.jsx';
 
 const Home = () => {
 	return (
 		<div className="relative min-h-screen bg-gradient-to-b from-[#0a0e17] to-[#1a1f3a] text-white overflow-x-hidden">
 			{/* Fixed background elements */}
 			<div className="fixed inset-0 z-0 overflow-hidden pointer-events-none">
-				{/* Grid */}
 				<div className="absolute inset-0 bg-grid-white/[0.03] bg-[length:20px_20px]" />
 				{/* Logo: optimized for long, white PNG */}
 				<motion.div
 					className="absolute inset-0 flex items-start justify-center pt-[12vh] md:pt-[14vh] lg:pt-[16vh]"
 					initial={{ opacity: 0, scale: 0.95 }}
-					animate={{ opacity: 0.06, scale: 1 }}
+					animate={{ opacity: 0.04, scale: 1 }}
 					transition={{ duration: 1.2, ease: 'easeOut' }}
 				>
 					<img
 						src={Logo}
-						alt="Syntax Club Logo"
-						className="w-[85vw] max-w-[900px] md:w-[70vw] md:max-w-[820px] h-auto object-contain"
+						alt="Syntax Logo"
+						className="w-[90vw] max-w-[980px] md:w-[72vw] md:max-w-[860px] h-auto object-contain"
 						loading="eager"
 						decoding="async"
 					/>
