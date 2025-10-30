@@ -16,18 +16,18 @@ const Home = () => {
 				{/* Grid */}
 				<div className="absolute inset-0 bg-grid-white/[0.03] bg-[length:20px_20px]" />
 				{/* Logo */}
-				<div
-					className="absolute inset-0"
-					style={{
-						backgroundImage: `url(${Logo})`,
-						backgroundSize: 'contain',
-						backgroundPosition: 'center 15vh',
-						backgroundRepeat: 'no-repeat',
-						opacity: 0.04,
-						width: '80%',
-						left: '10%',
-					}}
-				/>
+				<motion.div
+					className="absolute inset-0 flex items-center justify-center"
+					initial={{ opacity: 0, scale: 0.8 }}
+					animate={{ opacity: 0.06, scale: 1 }}
+					transition={{ duration: 1.5, ease: 'easeOut' }}
+				>
+					<img
+						src={Logo}
+						alt="Syntax Club Logo"
+						className="w-full max-w-md md:max-w-lg lg:max-w-xl h-auto object-contain"
+					/>
+				</motion.div>
 				{/* Blur shapes */}
 				<div className="absolute top-1/4 left-1/4 w-80 h-80 rounded-full bg-blue-500/10 filter blur-3xl animate-pulse-slow" />
 				<div className="absolute top-1/3 right-1/4 w-64 h-64 rounded-full bg-indigo-500/15 filter blur-3xl animate-pulse-slow" />
