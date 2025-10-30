@@ -34,10 +34,10 @@ const Footer = () => {
 	return (
 		<footer className="pt-24 pb-12 px-4 relative z-10 overflow-hidden bg-transparent">
 			{/* Background elements */}
-			<div className="absolute inset-0 -z-10 pointer-events-none">
-				<div className="absolute bottom-0 left-0 w-full h-full bg-gradient-to-t from-blue-900/20 to-indigo-900/0 backdrop-blur-2xl"></div>
-				<div className="absolute top-1/3 left-1/4 w-64 h-64 bg-blue-600/10 rounded-full blur-3xl"></div>
-				<div className="absolute top-1/2 right-1/4 w-72 h-72 bg-indigo-600/10 rounded-full blur-3xl"></div>
+			<div className="absolute inset-0 -z-10">
+				<div className="absolute inset-0 bg-gradient-to-t from-slate-900/50 to-transparent"></div>
+				<div className="absolute top-1/4 left-1/4 w-64 h-64 bg-indigo-600/5 rounded-full blur-3xl animate-pulse-slow"></div>
+				<div className="absolute bottom-1/3 right-1/4 w-72 h-72 bg-purple-600/5 rounded-full blur-3xl animate-pulse-slow"></div>
 			</div>
 
 			<div className="max-w-6xl mx-auto">
@@ -56,19 +56,16 @@ const Footer = () => {
 						</p>
 
 						{/* Social links */}
-						<div className="flex gap-4 mb-8">
+						<div className="flex gap-4">
 							{socialLinks.map((social, index) => (
 								<motion.a
 									key={index}
 									href={social.url}
 									target="_blank"
 									rel="noopener noreferrer"
-									className="w-10 h-10 rounded-full bg-blue-900/20 backdrop-blur-sm border border-white/10 flex items-center justify-center hover:bg-blue-800/30 transition-colors"
-									whileHover={{
-										y: -5,
-										backgroundColor: 'rgba(99, 102, 241, 0.2)',
-									}}
-									whileTap={{ scale: 0.9 }}
+									whileHover={{ scale: 1.1, y: -2 }}
+									whileTap={{ scale: 0.95 }}
+									className="w-10 h-10 rounded-full bg-white/10 backdrop-blur-sm border border-white/20 flex items-center justify-center text-blue-300 hover:text-white hover:bg-white/20 transition-all duration-300"
 									aria-label={social.name}
 								>
 									{social.icon}
@@ -77,9 +74,47 @@ const Footer = () => {
 						</div>
 					</div>
 
-					{/* Empty columns for spacing */}
-					<div></div>
-					<div></div>
+					{/* Quick Links */}
+					<div>
+						<h4 className="text-white font-semibold mb-6 text-lg relative inline-block">
+							Quick Links
+							<div className="absolute bottom-0 left-0 w-full h-0.5 bg-gradient-to-r from-blue-500 to-indigo-500"></div>
+						</h4>
+						<ul className="space-y-4 text-blue-200">
+							<li>
+								<button
+									onClick={() => navigate('/event')}
+									className="hover:text-blue-400 transition-colors"
+								>
+									Events
+								</button>
+							</li>
+							<li>
+								<button
+									onClick={() => navigate('/team')}
+									className="hover:text-blue-400 transition-colors"
+								>
+									Team
+								</button>
+							</li>
+							<li>
+								<button
+									onClick={() => navigate('/contact')}
+									className="hover:text-blue-400 transition-colors"
+								>
+									Contact
+								</button>
+							</li>
+							<li>
+								<button
+									onClick={() => navigate('/socials')}
+									className="hover:text-blue-400 transition-colors"
+								>
+									Socials
+								</button>
+							</li>
+						</ul>
+					</div>
 
 					{/* Contact column */}
 					<div>
@@ -87,7 +122,7 @@ const Footer = () => {
 							Contact Us
 							<div className="absolute bottom-0 left-0 w-full h-0.5 bg-gradient-to-r from-blue-500 to-indigo-500"></div>
 						</h4>
-						<ul className="space-y-5 text-blue-200">
+						<ul className="space-y-4 text-blue-200">
 							<li className="flex items-start gap-3">
 								<a
 									href="mailto:syntax.helpdesk@gmail.com"
@@ -109,12 +144,14 @@ const Footer = () => {
 											/>
 										</svg>
 									</div>
-									<span>syntax.helpdesk@gmail.com</span>
+									<span className="text-sm">syntax.helpdesk@gmail.com</span>
 								</a>
 							</li>
 							<li className="flex items-start gap-3">
 								<a
-									href="tel:+919771072294"
+									href="https://maps.google.com/?q=Your+Institution+Address"
+									target="_blank"
+									rel="noopener noreferrer"
 									className="flex items-start gap-3 hover:text-blue-400 transition-colors"
 								>
 									<div className="w-8 h-8 rounded-full bg-blue-900/20 backdrop-blur-sm border border-white/10 flex items-center justify-center flex-shrink-0">
@@ -129,11 +166,17 @@ const Footer = () => {
 												strokeLinecap="round"
 												strokeLinejoin="round"
 												strokeWidth={2}
-												d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z"
+												d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"
+											/>
+											<path
+												strokeLinecap="round"
+												strokeLinejoin="round"
+												strokeWidth={2}
+												d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"
 											/>
 										</svg>
 									</div>
-									<span>+91 9771072294</span>
+									<span className="text-sm">Your Institution Address</span>
 								</a>
 							</li>
 						</ul>
@@ -162,32 +205,14 @@ const Footer = () => {
 
 			{/* Floating elements */}
 			<motion.div
-				className="absolute bottom-20 right-20 w-16 h-16 rounded-full bg-gradient-to-r from-blue-600/20 to-indigo-600/20 blur-xl -z-10"
-				animate={{
-					y: [0, -20, 0],
-					rotate: [0, 20, 0],
-				}}
-				transition={{
-					duration: 8,
-					repeat: Infinity,
-					repeatType: 'reverse',
-					ease: 'easeInOut',
-				}}
+				className="absolute top-1/4 right-1/4 w-32 h-32 bg-indigo-600/10 rounded-full blur-2xl"
+				animate={{ scale: [1, 1.2, 1], opacity: [0.3, 0.6, 0.3] }}
+				transition={{ duration: 6, repeat: Infinity, ease: 'easeInOut' }}
 			/>
-
 			<motion.div
-				className="absolute bottom-40 left-20 w-12 h-12 rounded-full bg-gradient-to-r from-indigo-600/20 to-purple-600/20 blur-xl -z-10"
-				animate={{
-					y: [0, -15, 0],
-					rotate: [0, -15, 0],
-				}}
-				transition={{
-					duration: 6,
-					repeat: Infinity,
-					repeatType: 'reverse',
-					ease: 'easeInOut',
-					delay: 1,
-				}}
+				className="absolute bottom-1/4 left-1/4 w-24 h-24 bg-purple-600/10 rounded-full blur-2xl"
+				animate={{ scale: [1, 1.1, 1], opacity: [0.2, 0.5, 0.2] }}
+				transition={{ duration: 8, repeat: Infinity, ease: 'easeInOut', delay: 2 }}
 			/>
 		</footer>
 	);
