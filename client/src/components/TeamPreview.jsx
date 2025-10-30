@@ -110,8 +110,8 @@ const TeamPreview = () => {
 	const getTheme = (index) => CARD_THEMES[index % CARD_THEMES.length];
 
 	return (
-		<div className="min-h-screen bg-transparent relative overflow-hidden flex items-center">
-			<div className="relative z-10 px-4 py-16 sm:py-24 w-full">
+		<section className="section-container py-normal bg-transparent relative overflow-hidden">
+			<div className="relative z-10 px-4 w-full">
 				<div className="max-w-7xl mx-auto">
 					{/* Header Section */}
 					<div className="text-center mb-16">
@@ -146,20 +146,13 @@ const TeamPreview = () => {
 									initial={{ opacity: 0, y: 20 }}
 									animate={{ opacity: 1, y: 0 }}
 									transition={{ duration: 0.6, delay: index * 0.1 }}
-									className="relative group"
 								>
 									<div
-										className={`bg-gradient-to-br ${theme.bg} backdrop-blur-xl border border-white/10 rounded-3xl p-6 shadow-2xl overflow-hidden transition-all duration-300 group-hover:border-white/20 group-hover:shadow-2xl`}
-										style={{
-											boxShadow: `0 0 20px rgba(${theme.glow})`,
-										}}
+										className={`glass-card p-6 shadow-2xl hover-lift border border-white/12`}
+										style={{ boxShadow: `0 0 24px rgba(${theme.glow})` }}
 									>
-										{/* Decorative elements */}
-										<div className="absolute top-0 right-0 w-24 h-24 bg-white/5 rounded-bl-full backdrop-blur-sm transition-all duration-300 group-hover:scale-125" />
-										<div className="absolute bottom-0 left-0 w-16 h-16 bg-white/5 rounded-tr-full backdrop-blur-sm transition-all duration-300 group-hover:scale-125" />
-
 										<div className="relative z-10 text-center">
-											<div className="w-20 h-20 mx-auto mb-4 rounded-full bg-gradient-to-br from-white/20 to-white/10 border border-white/20 flex items-center justify-center shadow-lg">
+											<div className="w-20 h-20 mx-auto mb-4 rounded-full border border-white/20 bg-white/10 flex items-center justify-center">
 												<span className="text-2xl font-bold text-white">
 													{member.name?.charAt(0).toUpperCase() || '?'}
 												</span>
@@ -170,7 +163,7 @@ const TeamPreview = () => {
 											<p className={`text-${theme.accent} font-medium`}>
 												{member.role || 'Role'}
 											</p>
-											<p className="text-gray-300 text-sm mt-2 leading-relaxed">
+											<p className="text-slate-200 text-sm mt-2 leading-relaxed">
 												{member.bio ||
 													'Passionate about technology and innovation.'}
 											</p>
@@ -220,7 +213,7 @@ const TeamPreview = () => {
 					</motion.div>
 				</div>
 			</div>
-		</div>
+		</section>
 	);
 };
 
