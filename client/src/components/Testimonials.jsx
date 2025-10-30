@@ -49,12 +49,11 @@ const Testimonials = () => {
 	};
 
 	return (
-		<section ref={ref} className="py-24 px-4 relative z-10 overflow-hidden">
-			{/* Background elements */}
+		<section ref={ref} className="section-container py-loose relative z-10 overflow-hidden">
+			{/* Background elements - subtle and transparent */}
 			<div className="absolute inset-0 -z-10">
-				<div className="absolute inset-0 bg-gradient-to-br from-indigo-900/20 to-purple-900/30 backdrop-blur-2xl" />
-				<div className="absolute top-1/4 left-1/4 w-64 h-64 bg-indigo-600/10 rounded-full blur-3xl animate-pulse-slow" />
-				<div className="absolute bottom-1/3 right-1/4 w-72 h-72 bg-purple-600/10 rounded-full blur-3xl animate-pulse-slow" />
+				<div className="absolute top-1/4 left-1/4 w-64 h-64 bg-indigo-600/5 rounded-full blur-3xl animate-glow-pulse" />
+				<div className="absolute bottom-1/3 right-1/4 w-72 h-72 bg-purple-600/5 rounded-full blur-3xl animate-glow-pulse" />
 			</div>
 
 			<div className="max-w-4xl mx-auto">
@@ -64,21 +63,21 @@ const Testimonials = () => {
 					transition={{ duration: 0.6 }}
 					className="text-center mb-16"
 				>
-					<h2 className="text-4xl md:text-5xl font-extrabold mb-4 bg-gradient-to-r from-purple-400 to-pink-500 bg-clip-text text-transparent tracking-tight">
+					<h2 className="text-display-md text-heading mb-4 bg-gradient-to-r from-purple-300 to-pink-300 bg-clip-text text-transparent">
 						Member Spotlights
 					</h2>
-					<p className="text-xl text-purple-200 max-w-2xl mx-auto">
+					<p className="text-body text-slate-300 max-w-2xl mx-auto">
 						Stories from members who build, learn, and lead together.
 					</p>
 				</motion.div>
 
 				<motion.div
-					initial={{ opacity: 0, scale: 0.9 }}
+					initial={{ opacity: 0, scale: 0.95 }}
 					animate={inView ? { opacity: 1, scale: 1 } : {}}
 					transition={{ duration: 0.7, delay: 0.2 }}
-					className="relative bg-gradient-to-br from-indigo-900/30 to-purple-900/40 backdrop-blur-xl border border-white/10 rounded-3xl p-6 md:p-10 min-h-[350px] flex flex-col justify-center items-center overflow-hidden"
+					className="glass-card p-8 md:p-12 min-h-[380px] flex flex-col justify-center items-center overflow-hidden"
 				>
-					<Quote className="absolute top-6 left-6 w-16 h-16 text-purple-600/30" />
+					<Quote className="absolute top-8 left-8 w-12 h-12 text-purple-500/25" />
 					<AnimatePresence initial={false} custom={1}>
 						<motion.div
 							key={current}
@@ -93,31 +92,35 @@ const Testimonials = () => {
 							}}
 							className="w-full text-center"
 						>
-							<p className="text-xl md:text-2xl font-light text-white leading-relaxed mb-8 max-w-3xl mx-auto">
+							<p className="text-lg md:text-xl text-body text-slate-100 leading-relaxed mb-10 max-w-3xl mx-auto font-light">
 								"{testimonials[current].quote}"
 							</p>
 							<div className="flex items-center justify-center gap-4">
 								<img
 									src={testimonials[current].avatar}
 									alt={testimonials[current].name}
-									className="w-14 h-14 rounded-full border-2 border-purple-400/50 object-cover"
+									className="w-14 h-14 rounded-full border-2 border-indigo-400/40 object-cover"
 								/>
-								<div>
-									<h4 className="text-lg font-bold text-white">
+								<div className="text-left">
+									<h4 className="text-base font-semibold text-white">
 										{testimonials[current].name}
 									</h4>
-									<p className="text-purple-300">{testimonials[current].role}</p>
+									<p className="text-sm text-slate-400">
+										{testimonials[current].role}
+									</p>
 								</div>
 							</div>
 						</motion.div>
 					</AnimatePresence>
-					<div className="absolute bottom-6 flex gap-2">
+					<div className="absolute bottom-8 flex gap-2">
 						{testimonials.map((_, i) => (
 							<button
 								key={i}
 								onClick={() => setCurrent(i)}
-								className={`w-2.5 h-2.5 rounded-full transition-all duration-300 ${
-									current === i ? 'bg-purple-400 w-6' : 'bg-white/30'
+								className={`rounded-full transition-all duration-300 ${
+									current === i
+										? 'bg-indigo-400 w-6 h-2.5'
+										: 'bg-slate-500/40 w-2.5 h-2.5'
 								}`}
 								aria-label={`Go to testimonial ${i + 1}`}
 							/>
