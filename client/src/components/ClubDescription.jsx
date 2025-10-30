@@ -3,44 +3,22 @@ import { motion } from 'framer-motion';
 import { useInView } from 'react-intersection-observer';
 
 const ClubDescription = () => {
-	const [ref, inView] = useInView({
-		triggerOnce: true,
-		threshold: 0.1,
-	});
+	const [ref, inView] = useInView({ triggerOnce: true, threshold: 0.1 });
 
 	const containerVariants = {
 		hidden: { opacity: 0 },
-		visible: {
-			opacity: 1,
-			transition: {
-				staggerChildren: 0.2,
-			},
-		},
+		visible: { opacity: 1, transition: { staggerChildren: 0.2 } },
 	};
-
 	const itemVariants = {
 		hidden: { opacity: 0, y: 30 },
-		visible: {
-			opacity: 1,
-			y: 0,
-			transition: {
-				duration: 0.6,
-				type: 'spring',
-				damping: 12,
-			},
-		},
+		visible: { opacity: 1, y: 0, transition: { duration: 0.6, type: 'spring', damping: 12 } },
 	};
-
 	const statVariants = {
 		hidden: { opacity: 0, scale: 0.8 },
 		visible: {
 			opacity: 1,
 			scale: 1,
-			transition: {
-				duration: 0.6,
-				type: 'spring',
-				stiffness: 300,
-			},
+			transition: { duration: 0.6, type: 'spring', stiffness: 300 },
 		},
 	};
 
@@ -66,47 +44,24 @@ const ClubDescription = () => {
 					animate={inView ? 'visible' : 'hidden'}
 					className="grid grid-cols-1 lg:grid-cols-2 gap-10"
 				>
-					{/* Who We Are Card */}
+					{/* Who We Are */}
 					<motion.div variants={itemVariants} className="relative group">
 						<div className="bg-gradient-to-br from-blue-900/20 to-indigo-900/20 backdrop-blur-2xl border border-white/10 rounded-3xl p-6 md:p-8 h-full shadow-2xl shadow-blue-900/20 overflow-hidden transition-all duration-300 group-hover:border-white/20 group-hover:shadow-blue-900/40">
-							{/* Decorative corner element */}
 							<div className="absolute top-0 right-0 w-32 h-32 bg-blue-600/10 rounded-bl-full backdrop-blur-sm transition-all duration-300 group-hover:scale-125" />
-
 							<div className="relative z-10">
-								<div className="flex items-center gap-3 mb-6">
-									<div className="w-12 h-12 rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center shadow-lg">
-										<svg
-											className="w-6 h-6 text-white"
-											fill="none"
-											stroke="currentColor"
-											viewBox="0 0 24 24"
-										>
-											<path
-												strokeLinecap="round"
-												strokeLinejoin="round"
-												strokeWidth={2}
-												d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"
-											/>
-										</svg>
-									</div>
-									<h2 className="text-3xl font-bold bg-gradient-to-r from-blue-300 to-cyan-300 bg-clip-text text-transparent">
-										Who We Are
-									</h2>
-								</div>
-
+								<h2 className="text-3xl font-bold bg-gradient-to-r from-blue-300 to-cyan-300 bg-clip-text text-transparent mb-6">
+									Who We Are
+								</h2>
 								<div className="space-y-4">
 									<p className="text-base md:text-lg text-blue-100 leading-relaxed">
-										Syntax is a collective of passionate developers, designers,
-										and tech enthusiasts dedicated to fostering a vibrant
-										culture of innovation and learning.
+										Syntax is a collective of makers—developers, designers,
+										product thinkers—who learn by building and grow by shipping.
 									</p>
 									<p className="text-base md:text-lg text-blue-100 leading-relaxed">
-										We bridge the gap between theory and practice, providing a
-										platform for members to grow their skills, build amazing
-										projects, and connect with the tech industry.
+										We create a runway for ideas to become projects, projects to
+										become experiences, and experiences to become impact.
 									</p>
 								</div>
-
 								<div className="mt-8 grid grid-cols-3 gap-4">
 									{[
 										{ value: '200+', label: 'Members' },
@@ -129,14 +84,9 @@ const ClubDescription = () => {
 								</div>
 							</div>
 						</div>
-
-						{/* Floating abstract shape */}
 						<motion.div
 							className="absolute -bottom-10 -left-10 w-40 h-40 rounded-full bg-gradient-to-r from-blue-600/20 to-cyan-600/20 blur-xl -z-10"
-							animate={{
-								scale: [1, 1.2, 1],
-								rotate: [0, 15, 0],
-							}}
+							animate={{ scale: [1, 1.2, 1], rotate: [0, 15, 0] }}
 							transition={{
 								duration: 8,
 								repeat: Infinity,
@@ -146,34 +96,14 @@ const ClubDescription = () => {
 						/>
 					</motion.div>
 
-					{/* What We Do Card */}
+					{/* What We Do */}
 					<motion.div variants={itemVariants} className="relative group">
 						<div className="bg-gradient-to-br from-indigo-900/20 to-purple-900/20 backdrop-blur-2xl border border-white/10 rounded-3xl p-6 md:p-8 h-full shadow-2xl shadow-indigo-900/20 overflow-hidden transition-all duration-300 group-hover:border-white/20 group-hover:shadow-indigo-900/40">
-							{/* Decorative corner element */}
 							<div className="absolute top-0 right-0 w-32 h-32 bg-indigo-600/10 rounded-bl-full backdrop-blur-sm transition-all duration-300 group-hover:scale-125" />
-
 							<div className="relative z-10">
-								<div className="flex items-center gap-3 mb-6">
-									<div className="w-12 h-12 rounded-full bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center shadow-lg">
-										<svg
-											className="w-6 h-6 text-white"
-											fill="none"
-											stroke="currentColor"
-											viewBox="0 0 24 24"
-										>
-											<path
-												strokeLinecap="round"
-												strokeLinejoin="round"
-												strokeWidth={2}
-												d="M13 10V3L4 14h7v7l9-11h-7z"
-											/>
-										</svg>
-									</div>
-									<h2 className="text-3xl font-bold bg-gradient-to-r from-purple-300 to-pink-300 bg-clip-text text-transparent">
-										What We Do
-									</h2>
-								</div>
-
+								<h2 className="text-3xl font-bold bg-gradient-to-r from-purple-300 to-pink-300 bg-clip-text text-transparent mb-6">
+									What We Do
+								</h2>
 								<motion.div
 									variants={containerVariants}
 									initial="hidden"
@@ -183,25 +113,25 @@ const ClubDescription = () => {
 									{[
 										{
 											title: 'Skill Development',
-											desc: 'Workshops on AI, blockchain, cloud computing and emerging tech.',
+											desc: 'Workshops across dev, design, cloud, AI and more.',
 											icon: '📚',
 											color: 'from-blue-600/20 to-cyan-600/20',
 										},
 										{
 											title: 'Project Building',
-											desc: 'Collaborative solutions to real-world problems.',
+											desc: 'Teams ship real solutions to real problems.',
 											icon: '🚀',
 											color: 'from-indigo-600/20 to-purple-600/20',
 										},
 										{
 											title: 'Industry Connect',
-											desc: 'Tech talks and networking with professionals.',
+											desc: 'Talks, reviews, and networking with professionals.',
 											icon: '🤝',
 											color: 'from-purple-600/20 to-pink-600/20',
 										},
 										{
 											title: 'Innovation Labs',
-											desc: 'Hackathons and creative coding challenges.',
+											desc: 'Hackathons, sprints, showcases, and demos.',
 											icon: '💻',
 											color: 'from-pink-600/20 to-red-600/20',
 										},
