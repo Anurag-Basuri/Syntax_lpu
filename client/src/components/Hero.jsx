@@ -7,7 +7,8 @@ const Hero = () => {
 	const dots = Array.from({ length: 8 });
 
 	return (
-		<section className="relative min-h-[80vh] md:min-h-screen px-4 py-16 flex items-center bg-transparent">
+		<section className="relative min-h-[78vh] md:min-h-screen px-4 py-16 flex items-center bg-transparent">
+			{/* Lightweight particles */}
 			{dots.map((_, i) => (
 				<motion.span
 					key={i}
@@ -27,16 +28,17 @@ const Hero = () => {
 			))}
 
 			<div className="relative z-[1] w-full max-w-6xl mx-auto text-center">
-				{/* Top badge (neutral, no college/org names) */}
+				{/* Small neutral badge (no details) */}
 				<motion.div
 					initial={{ opacity: 0, y: 8 }}
 					animate={{ opacity: 1, y: 0 }}
 					transition={{ duration: 0.5 }}
 					className="inline-flex items-center mx-auto mb-6 rounded-full border border-white/10 bg-white/5 backdrop-blur-md px-3 py-1.5 text-xs md:text-sm text-indigo-200"
 				>
-					Multidisciplinary • Community of builders
+					Create • Collaborate • Ship
 				</motion.div>
 
+				{/* Brand */}
 				<motion.h1
 					initial={{ opacity: 0, y: 10, scale: 0.98 }}
 					animate={{ opacity: 1, y: 0, scale: 1 }}
@@ -48,42 +50,17 @@ const Hero = () => {
 					</span>
 				</motion.h1>
 
+				{/* Short tagline only */}
 				<motion.p
 					initial={{ opacity: 0, y: 8 }}
 					animate={{ opacity: 1, y: 0 }}
 					transition={{ duration: 0.6, delay: 0.05 }}
 					className="text-sm sm:text-base md:text-lg text-indigo-200/90"
 				>
-					A multidisciplinary community for creators and technologists.
+					Build together. Learn faster. Ship better.
 				</motion.p>
 
-				<motion.div
-					initial={{ opacity: 0, y: 12 }}
-					animate={{ opacity: 1, y: 0 }}
-					transition={{ duration: 0.7, delay: 0.1 }}
-					className="mt-6 space-y-4 max-w-3xl mx-auto text-indigo-100"
-				>
-					<p className="text-base sm:text-lg leading-relaxed">
-						We bring together people across disciplines to collaborate, innovate, and
-						grow.
-					</p>
-
-					<div className="rounded-2xl border border-white/10 bg-white/5 backdrop-blur-md p-4 sm:p-5 text-left">
-						<p className="text-sm sm:text-base font-semibold text-indigo-200 mb-2">
-							Our Mission
-						</p>
-						<ul className="list-disc pl-5 space-y-2 text-sm sm:text-base">
-							<li>Learn by building and leading real initiatives.</li>
-							<li>Turn ideas into impactful projects and events.</li>
-							<li>Gain hands-on exposure beyond traditional classes.</li>
-						</ul>
-					</div>
-
-					<p className="italic text-indigo-200/90 text-sm sm:text-base">
-						“Syntax is where creativity meets execution.”
-					</p>
-				</motion.div>
-
+				{/* CTAs */}
 				<motion.div
 					initial={{ opacity: 0, y: 14 }}
 					animate={{ opacity: 1, y: 0 }}
@@ -93,24 +70,25 @@ const Hero = () => {
 					<motion.button
 						whileHover={{ scale: 1.04 }}
 						whileTap={{ scale: 0.97 }}
-						onClick={() => navigate('/auth', { state: { tab: 'register' } })}
+						onClick={() => navigate('/event')}
 						className="w-full sm:w-auto px-6 sm:px-8 py-3 sm:py-3.5 rounded-xl bg-gradient-to-r from-indigo-600 to-purple-600 text-white text-sm sm:text-base font-semibold shadow-lg shadow-indigo-900/30"
-						aria-label="Join Syntax"
+						aria-label="Explore Events"
 					>
-						Join Syntax
+						Explore Events
 					</motion.button>
 
 					<motion.button
 						whileHover={{ scale: 1.04 }}
 						whileTap={{ scale: 0.97 }}
-						onClick={() => navigate('/event')}
+						onClick={() => navigate('/auth', { state: { tab: 'register' } })}
 						className="w-full sm:w-auto px-6 sm:px-8 py-3 sm:py-3.5 rounded-xl border border-white/15 bg-white/5 backdrop-blur-md text-white/90 text-sm sm:text-base"
-						aria-label="Explore Events"
+						aria-label="Join Syntax"
 					>
-						Explore Events
+						Join Syntax
 					</motion.button>
 				</motion.div>
 
+				{/* Scroll indicator */}
 				<motion.div
 					className="mt-10 flex justify-center"
 					initial={{ opacity: 0 }}
