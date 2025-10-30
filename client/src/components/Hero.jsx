@@ -13,10 +13,7 @@ const Hero = () => {
 				<motion.span
 					key={i}
 					className="pointer-events-none absolute w-1 h-1 rounded-full bg-indigo-300/30"
-					style={{
-						top: `${(i * 13 + 7) % 90}%`,
-						left: `${(i * 23 + 11) % 90}%`,
-					}}
+					style={{ top: `${(i * 13 + 7) % 90}%`, left: `${(i * 23 + 11) % 90}%` }}
 					animate={{ y: [0, -10, 0], opacity: [0.3, 0.8, 0.3] }}
 					transition={{
 						duration: 3 + (i % 3),
@@ -28,37 +25,19 @@ const Hero = () => {
 			))}
 
 			<div className="relative z-[1] w-full max-w-6xl mx-auto text-center">
-				{/* Small neutral badge (no details) */}
-				<motion.div
-					initial={{ opacity: 0, y: 8 }}
-					animate={{ opacity: 1, y: 0 }}
-					transition={{ duration: 0.5 }}
-					className="inline-flex items-center mx-auto mb-6 rounded-full border border-white/10 bg-white/5 backdrop-blur-md px-3 py-1.5 text-xs md:text-sm text-indigo-200"
-				>
-					Create • Collaborate • Ship
-				</motion.div>
-
-				{/* Brand */}
+				{/* Brand only */}
 				<motion.h1
 					initial={{ opacity: 0, y: 10, scale: 0.98 }}
 					animate={{ opacity: 1, y: 0, scale: 1 }}
 					transition={{ duration: 0.7 }}
-					className="mb-3"
+					className="mb-2"
 				>
 					<span className="font-brand text-5xl sm:text-6xl md:text-7xl font-extrabold tracking-tight inline-block bg-gradient-to-r from-indigo-300 via-blue-300 to-purple-300 text-transparent bg-clip-text drop-shadow-[0_4px_24px_rgba(99,102,241,0.25)]">
 						SYNTAX
 					</span>
 				</motion.h1>
 
-				{/* Short tagline only */}
-				<motion.p
-					initial={{ opacity: 0, y: 8 }}
-					animate={{ opacity: 1, y: 0 }}
-					transition={{ duration: 0.6, delay: 0.05 }}
-					className="text-sm sm:text-base md:text-lg text-indigo-200/90"
-				>
-					Build together. Learn faster. Ship better.
-				</motion.p>
+				{/* No details here */}
 
 				{/* CTAs */}
 				<motion.div
