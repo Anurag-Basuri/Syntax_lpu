@@ -52,7 +52,7 @@ const Hero = () => {
 						className="inline-block mb-10"
 					>
 						<div className="flex items-center justify-center gap-4">
-							<span className="text-5xl md:text-6xl lg:text-7xl font-extrabold tracking-widest bg-gradient-to-r from-indigo-400 via-blue-400 to-purple-500 bg-clip-text text-transparent drop-shadow-lg animate-gradient-x">
+							<span className="text-5xl md:text-7xl font-extrabold tracking-widest bg-gradient-to-r from-indigo-400 via-blue-400 to-purple-500 bg-clip-text text-transparent drop-shadow-lg animate-gradient-x">
 								SYNTAX
 							</span>
 						</div>
@@ -62,7 +62,7 @@ const Hero = () => {
 					</motion.div>
 
 					<motion.h1
-						className="text-3xl md:text-5xl lg:text-7xl font-bold mt-4 mb-6"
+						className="text-4xl md:text-6xl font-bold mt-4 mb-6"
 						initial={{ opacity: 0, y: 30 }}
 						animate={{ opacity: 1, y: 0 }}
 						transition={{ delay: 0.5, duration: 0.8 }}
@@ -74,7 +74,7 @@ const Hero = () => {
 					</motion.h1>
 
 					<motion.p
-						className="text-base md:text-xl lg:text-2xl max-w-3xl mx-auto text-indigo-200 font-light"
+						className="text-lg md:text-xl max-w-3xl mx-auto text-indigo-200 font-light"
 						initial={{ opacity: 0 }}
 						animate={{ opacity: 1 }}
 						transition={{ delay: 0.7, duration: 0.8 }}
@@ -96,7 +96,7 @@ const Hero = () => {
 							boxShadow: '0 5px 20px rgba(99, 102, 241, 0.4)',
 						}}
 						whileTap={{ scale: 0.95 }}
-						className="px-6 py-3 md:px-8 md:py-4 bg-gradient-to-r from-indigo-600 to-purple-600 rounded-xl font-medium text-base md:text-lg shadow-lg flex items-center gap-2 transition-all"
+						className="px-8 py-4 bg-gradient-to-r from-indigo-600 to-purple-600 rounded-xl font-semibold text-lg shadow-lg flex items-center gap-2 transition-all"
 						onClick={() => navigate('/auth', { state: { tab: 'register' } })}
 					>
 						<svg
@@ -152,15 +152,15 @@ const Hero = () => {
 				<motion.div
 					animate={{ y: [0, 12, 0] }}
 					transition={{ repeat: Infinity, duration: 1.8, ease: 'easeInOut' }}
-					className="w-8 md:w-12 h-12 md:h-16 rounded-full border-2 border-indigo-400/60 bg-gradient-to-b from-indigo-700/30 to-purple-700/20 shadow-xl flex flex-col items-center justify-start p-1 backdrop-blur-md"
+					className="w-8 h-12 rounded-full border-2 border-indigo-400/60 bg-gradient-to-b from-indigo-700/30 to-purple-700/20 shadow-xl flex flex-col items-center justify-start p-1 backdrop-blur-md"
 				>
 					<motion.div
-						className="w-2 md:w-3 h-2 md:h-3 bg-gradient-to-r from-indigo-400 via-blue-400 to-purple-400 rounded-full mt-2 shadow-md"
+						className="w-2 h-2 bg-gradient-to-r from-indigo-400 via-blue-400 to-purple-400 rounded-full mt-2 shadow-md"
 						animate={{ y: [0, 10, 0], opacity: [1, 0.7, 1] }}
 						transition={{ repeat: Infinity, duration: 1.8, ease: 'easeInOut' }}
 					/>
 					<motion.div
-						className="w-1 h-6 mt-2 rounded-full bg-indigo-400/30"
+						className="w-1 h-4 mt-1 rounded-full bg-indigo-400/30"
 						animate={{ scaleY: [1, 1.2, 1] }}
 						transition={{ repeat: Infinity, duration: 1.8, ease: 'easeInOut' }}
 					/>

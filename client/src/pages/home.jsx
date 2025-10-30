@@ -20,10 +20,12 @@ const Home = () => {
 					className="absolute inset-0"
 					style={{
 						backgroundImage: `url(${Logo})`,
-						backgroundSize: '50%',
-						backgroundPosition: 'center 20%',
+						backgroundSize: 'contain',
+						backgroundPosition: 'center 15vh',
 						backgroundRepeat: 'no-repeat',
-						opacity: 0.05,
+						opacity: 0.04,
+						width: '80%',
+						left: '10%',
 					}}
 				/>
 				{/* Blur shapes */}
