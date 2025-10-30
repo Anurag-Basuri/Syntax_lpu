@@ -1,10 +1,11 @@
 import React, { useEffect, useState } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion, AnimatePresence, useReducedMotion } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
 import { Quote } from 'lucide-react';
 
 const Hero = () => {
 	const navigate = useNavigate();
+	const prefersReducedMotion = useReducedMotion();
 	const dots = Array.from({ length: 8 });
 
 	// Rotating micro-quotes
@@ -24,13 +25,17 @@ const Hero = () => {
 
 	return (
 		<section className="relative min-h-[78vh] md:min-h-screen px-4 py-20 md:py-24 flex items-center bg-transparent">
-			{/* Lightweight particles */}
+			{/* Lightweight particles (respect reduced motion) */}
 			{dots.map((_, i) => (
 				<motion.span
 					key={i}
 					className="pointer-events-none absolute w-1 h-1 rounded-full bg-indigo-300/20"
 					style={{ top: `${(i * 13 + 7) % 90}%`, left: `${(i * 23 + 11) % 90}%` }}
-					animate={{ y: [0, -10, 0], opacity: [0.2, 0.6, 0.2] }}
+					animate={
+						prefersReducedMotion
+							? { opacity: 0.35 }
+							: { y: [0, -10, 0], opacity: [0.2, 0.6, 0.2] }
+					}
 					transition={{
 						duration: 3 + (i % 3),
 						repeat: Infinity,
@@ -41,7 +46,7 @@ const Hero = () => {
 			))}
 
 			<div className="relative z-[1] w-full max-w-6xl mx-auto text-center">
-				{/* Subtle glowing ring behind the heading */}
+				{/* Soft halo behind heading */}
 				<div
 					className="pointer-events-none absolute -top-10 left-1/2 -translate-x-1/2 w-[560px] h-[560px] rounded-full opacity-10 blur-3xl hidden md:block"
 					style={{
@@ -62,6 +67,57 @@ const Hero = () => {
 					</h1>
 				</motion.div>
 
+				{/* Subtle orbit arcs around title */}
+				<motion.div
+					className="relative mx-auto mb-6 md:mb-8 h-8 w-[80%] max-w-[560px]"
+					aria-hidden="true"
+					initial={{ opacity: 0 }}
+					animate={{ opacity: 1 }}
+					transition={{ delay: 0.15 }}
+				>
+					<motion.svg
+						viewBox="0 0 600 80"
+						className="absolute inset-0 w-full h-full"
+						animate={prefersReducedMotion ? {} : { rotate: [0, 2, -2, 0] }}
+						transition={{ duration: 8, repeat: Infinity, ease: 'easeInOut' }}
+					>
+						<defs>
+							<linearGradient id="orbit-a" x1="0" x2="1" y1="0" y2="0">
+								<stop offset="0%" stopColor="#a78bfa" />
+								<stop offset="50%" stopColor="#60a5fa" />
+								<stop offset="100%" stopColor="#34d399" />
+							</linearGradient>
+							<linearGradient id="orbit-b" x1="1" x2="0" y1="0" y2="0">
+								<stop offset="0%" stopColor="#34d399" />
+								<stop offset="50%" stopColor="#60a5fa" />
+								<stop offset="100%" stopColor="#a78bfa" />
+							</linearGradient>
+						</defs>
+						<motion.path
+							d="M10,60 C200,10 400,110 590,30"
+							fill="none"
+							stroke="url(#orbit-a)"
+							strokeWidth="2"
+							strokeLinecap="round"
+							strokeDasharray="8 12"
+							animate={prefersReducedMotion ? {} : { strokeDashoffset: [0, 100, 0] }}
+							transition={{ duration: 6, repeat: Infinity, ease: 'easeInOut' }}
+							opacity="0.9"
+						/>
+						<motion.path
+							d="M10,50 C220,0 380,120 590,40"
+							fill="none"
+							stroke="url(#orbit-b)"
+							strokeWidth="1.5"
+							strokeLinecap="round"
+							strokeDasharray="6 10"
+							animate={prefersReducedMotion ? {} : { strokeDashoffset: [60, 0, 60] }}
+							transition={{ duration: 7.5, repeat: Infinity, ease: 'easeInOut' }}
+							opacity="0.6"
+						/>
+					</motion.svg>
+				</motion.div>
+
 				{/* Curved, italic accent line */}
 				<motion.p
 					initial={{ opacity: 0, y: 10 }}
@@ -72,7 +128,7 @@ const Hero = () => {
 					Create • Collaborate • Ship
 				</motion.p>
 
-				{/* Animated swoosh under the accent line */}
+				{/* Swoosh under the accent line */}
 				<motion.svg
 					viewBox="0 0 600 80"
 					className="mx-auto mb-10 md:mb-14 w-[82%] max-w-[620px] h-10"
@@ -95,7 +151,7 @@ const Hero = () => {
 						strokeLinecap="round"
 						strokeDasharray="640"
 						strokeDashoffset="640"
-						animate={{ strokeDashoffset: [640, 0] }}
+						animate={prefersReducedMotion ? {} : { strokeDashoffset: [640, 0] }}
 						transition={{ duration: 1.6, ease: 'easeInOut' }}
 					/>
 				</motion.svg>
@@ -138,6 +194,16 @@ const Hero = () => {
 					</motion.button>
 				</motion.div>
 
+				{/* Trust line */}
+				<motion.div
+					initial={{ opacity: 0, y: 8 }}
+					animate={{ opacity: 1, y: 0 }}
+					transition={{ delay: 0.35, duration: 0.5 }}
+					className="mt-4 text-slate-400 text-sm"
+				>
+					<span>200+ members • 60+ projects • 15+ pods</span>
+				</motion.div>
+
 				{/* Rotating micro‑quotes */}
 				<div className="mt-8 md:mt-10 flex justify-center">
 					<div className="hero-quote inline-flex items-center gap-2 px-4 py-2">
@@ -169,7 +235,11 @@ const Hero = () => {
 					<div className="h-10 w-6 rounded-full border border-slate-400/30 flex items-start justify-center p-1">
 						<motion.div
 							className="h-2 w-2 rounded-full bg-slate-300/60"
-							animate={{ y: [0, 16, 0], opacity: [0.8, 0.3, 0.8] }}
+							animate={
+								prefersReducedMotion
+									? {}
+									: { y: [0, 16, 0], opacity: [0.8, 0.3, 0.8] }
+							}
 							transition={{ duration: 1.6, repeat: Infinity, ease: 'easeInOut' }}
 						/>
 					</div>
