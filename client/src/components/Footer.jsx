@@ -1,6 +1,6 @@
 import React from 'react';
 import { motion } from 'framer-motion';
-import { FaTwitter, FaGithub, FaLinkedin, FaInstagram } from 'react-icons/fa';
+import { FaGithub, FaLinkedin, FaInstagram } from 'react-icons/fa';
 import { useNavigate } from 'react-router-dom';
 
 const Footer = () => {
@@ -8,26 +8,27 @@ const Footer = () => {
 
 	const socialLinks = [
 		{
+			name: 'GitHub',
+			icon: <FaGithub className="w-5 h-5" />,
+			url: 'https://github.com/your-org', // Replace with your GitHub org URL
+		},
+		{
 			name: 'LinkedIn',
 			icon: <FaLinkedin className="w-5 h-5" />,
-			url: 'https://www.linkedin.com/company/vibranta/',
+			url: 'https://www.linkedin.com/company/syntax-club/', // Updated URL
 		},
 		{
 			name: 'Instagram',
 			icon: <FaInstagram className="w-5 h-5" />,
-			url: 'https://www.instagram.com/vibranta.in/',
+			url: 'https://www.instagram.com/syntax.club/', // Updated URL
 		},
 	];
 
 	const footerLinks = [
-		{
-			items: [
-				{ name: 'Terms and Conditions', to: '/policy/terms' },
-				{ name: 'Cancellation and Refund', to: '/policy/refund-policy' },
-				{ name: 'Privacy Policy', to: '/policy/privacy' },
-				{ name: 'Cookie Policy', to: '/policy/cookie' },
-			],
-		},
+		{ name: 'Terms and Conditions', to: '/policy/terms' },
+		{ name: 'Cancellation and Refund', to: '/policy/refund-policy' },
+		{ name: 'Privacy Policy', to: '/policy/privacy' },
+		{ name: 'Cookie Policy', to: '/policy/cookie' },
 	];
 
 	return (
@@ -45,7 +46,7 @@ const Footer = () => {
 					<div className="lg:col-span-2">
 						<div className="flex items-center gap-3 mb-6">
 							<h3 className="text-white font-bold text-2xl bg-gradient-to-r from-blue-300 to-indigo-300 bg-clip-text text-transparent">
-								Vibranta Organization
+								Syntax Club
 							</h3>
 						</div>
 
@@ -89,7 +90,7 @@ const Footer = () => {
 						<ul className="space-y-5 text-blue-200">
 							<li className="flex items-start gap-3">
 								<a
-									href="mailto:vibranta.helpdesk@gmail.com"
+									href="mailto:syntax.helpdesk@gmail.com"
 									className="flex items-start gap-3 hover:text-blue-400 transition-colors"
 								>
 									<div className="w-8 h-8 rounded-full bg-blue-900/20 backdrop-blur-sm border border-white/10 flex items-center justify-center flex-shrink-0">
@@ -108,7 +109,7 @@ const Footer = () => {
 											/>
 										</svg>
 									</div>
-									<span>vibranta.helpdesk@gmail.com</span>
+									<span>syntax.helpdesk@gmail.com</span>
 								</a>
 							</li>
 							<li className="flex items-start gap-3">
@@ -139,34 +140,21 @@ const Footer = () => {
 					</div>
 				</div>
 
-				<div className="pt-8 border-t border-white/10 flex flex-col md:flex-row justify-between items-center gap-4">
-					<p className="text-blue-300 text-center md:text-left">
-						© 2024 Vibranta Club. All rights reserved.
+				<div className="pt-8 border-t border-white/10 flex flex-col md:flex-row justify-between items-center gap-6">
+					<p className="text-blue-300 text-center md:text-left text-sm">
+						© 2024 Syntax Club. All rights reserved.
 					</p>
 
-					<div className="flex flex-wrap gap-6 justify-center md:justify-end">
-						{footerLinks.map((section, index) => (
-							<div key={index} className="text-blue-200">
-								<ul className="space-y-2">
-									{section.items.map((item, idx) => (
-										<li key={idx}>
-											<button
-												type="button"
-												onClick={() => navigate(item.to)}
-												className="hover:text-blue-400 transition-colors bg-transparent p-0 m-0 text-inherit"
-												style={{
-													textAlign: 'left',
-													background: 'none',
-													border: 'none',
-													cursor: 'pointer',
-												}}
-											>
-												{item.name}
-											</button>
-										</li>
-									))}
-								</ul>
-							</div>
+					<div className="flex flex-wrap gap-x-6 gap-y-2 justify-center md:justify-end">
+						{footerLinks.map((item, idx) => (
+							<button
+								key={idx}
+								type="button"
+								onClick={() => navigate(item.to)}
+								className="text-sm text-blue-200 hover:text-blue-400 transition-colors bg-transparent p-0 m-0 border-none cursor-pointer"
+							>
+								{item.name}
+							</button>
 						))}
 					</div>
 				</div>
