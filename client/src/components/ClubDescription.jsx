@@ -44,29 +44,38 @@ const ClubDescription = () => {
 					animate={inView ? 'visible' : 'hidden'}
 					className="grid grid-cols-1 lg:grid-cols-2 gap-10"
 				>
-					{/* Who We Are */}
+					{/* Programs & Tracks */}
 					<motion.div variants={itemVariants} className="relative group">
 						<div className="bg-gradient-to-br from-blue-900/20 to-indigo-900/20 backdrop-blur-2xl border border-white/10 rounded-3xl p-6 md:p-8 h-full shadow-2xl shadow-blue-900/20 overflow-hidden transition-all duration-300 group-hover:border-white/20 group-hover:shadow-blue-900/40">
 							<div className="absolute top-0 right-0 w-32 h-32 bg-blue-600/10 rounded-bl-full backdrop-blur-sm transition-all duration-300 group-hover:scale-125" />
 							<div className="relative z-10">
 								<h2 className="text-3xl font-bold bg-gradient-to-r from-blue-300 to-cyan-300 bg-clip-text text-transparent mb-6">
-									Who We Are
+									Programs & Tracks
 								</h2>
-								<div className="space-y-4">
-									<p className="text-base md:text-lg text-blue-100 leading-relaxed">
-										Syntax is a collective of makers—developers, designers,
-										product thinkers—who learn by building and grow by shipping.
-									</p>
-									<p className="text-base md:text-lg text-blue-100 leading-relaxed">
-										We create a runway for ideas to become projects, projects to
-										become experiences, and experiences to become impact.
-									</p>
+
+								<p className="text-base md:text-lg text-blue-100 leading-relaxed mb-5">
+									Pick a track, join a pod, and start shipping. We keep cohorts
+									small and focused.
+								</p>
+
+								<div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+									{['Web', 'AI/ML', 'Cloud', 'DevOps', 'Design', 'Product'].map(
+										(t, i) => (
+											<span
+												key={t}
+												className="text-center text-sm text-cyan-200/90 bg-blue-900/30 border border-white/10 rounded-lg py-2 backdrop-blur-sm"
+											>
+												{t}
+											</span>
+										)
+									)}
 								</div>
+
 								<div className="mt-8 grid grid-cols-3 gap-4">
 									{[
 										{ value: '200+', label: 'Members' },
-										{ value: '50+', label: 'Projects' },
-										{ value: '12+', label: 'Domains' },
+										{ value: '60+', label: 'Projects' },
+										{ value: '15+', label: 'Pods' },
 									].map((stat, index) => (
 										<motion.div
 											key={index}
@@ -96,14 +105,15 @@ const ClubDescription = () => {
 						/>
 					</motion.div>
 
-					{/* What We Do */}
+					{/* The Build Journey */}
 					<motion.div variants={itemVariants} className="relative group">
 						<div className="bg-gradient-to-br from-indigo-900/20 to-purple-900/20 backdrop-blur-2xl border border-white/10 rounded-3xl p-6 md:p-8 h-full shadow-2xl shadow-indigo-900/20 overflow-hidden transition-all duration-300 group-hover:border-white/20 group-hover:shadow-indigo-900/40">
 							<div className="absolute top-0 right-0 w-32 h-32 bg-indigo-600/10 rounded-bl-full backdrop-blur-sm transition-all duration-300 group-hover:scale-125" />
 							<div className="relative z-10">
 								<h2 className="text-3xl font-bold bg-gradient-to-r from-purple-300 to-pink-300 bg-clip-text text-transparent mb-6">
-									What We Do
+									The Build Journey
 								</h2>
+
 								<motion.div
 									variants={containerVariants}
 									initial="hidden"
@@ -112,27 +122,27 @@ const ClubDescription = () => {
 								>
 									{[
 										{
-											title: 'Skill Development',
-											desc: 'Workshops across dev, design, cloud, AI and more.',
-											icon: '📚',
+											title: 'Starter Labs',
+											desc: 'Foundations and tools to get you shipping fast.',
+											icon: '🧩',
 											color: 'from-blue-600/20 to-cyan-600/20',
 										},
 										{
-											title: 'Project Building',
-											desc: 'Teams ship real solutions to real problems.',
-											icon: '🚀',
+											title: 'Build Sprints',
+											desc: 'Two-week sprints with async reviews and demos.',
+											icon: '⚡',
 											color: 'from-indigo-600/20 to-purple-600/20',
 										},
 										{
-											title: 'Industry Connect',
-											desc: 'Talks, reviews, and networking with professionals.',
-											icon: '🤝',
+											title: 'Open Source Hours',
+											desc: 'Pair on issues and learn the contribution flow.',
+											icon: '🌐',
 											color: 'from-purple-600/20 to-pink-600/20',
 										},
 										{
-											title: 'Innovation Labs',
-											desc: 'Hackathons, sprints, showcases, and demos.',
-											icon: '💻',
+											title: 'Demo Day',
+											desc: 'Showcase your work. Get feedback. Celebrate wins.',
+											icon: '🎤',
 											color: 'from-pink-600/20 to-red-600/20',
 										},
 									].map((item, index) => (
@@ -147,7 +157,7 @@ const ClubDescription = () => {
 													<h3 className="text-xl font-semibold text-white mb-1">
 														{item.title}
 													</h3>
-													<p className="text-blue-100 text-sm">
+													<p className="text-indigo-100 text-sm">
 														{item.desc}
 													</p>
 												</div>
