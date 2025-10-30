@@ -1,142 +1,60 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useInView } from 'react-intersection-observer';
-import { Quote, Star } from 'lucide-react';
+import { Quote } from 'lucide-react';
 
 const testimonials = [
 	{
-		quote: 'Syntax gave me the confidence to lead a project from scratch. The mentorship and collaborative environment are unparalleled.',
+		quote: 'Syntax gave me the confidence to lead a project from scratch. The mentorship and collaboration are unmatched.',
 		name: 'Alex Johnson',
-		role: 'Project Lead, AI Division',
+		role: 'Project Lead',
 		avatar: 'https://i.pravatar.cc/150?img=1',
 	},
 	{
-		quote: "Joining Syntax was the best decision of my college career. I've learned more from the workshops and hackathons than in any class.",
+		quote: "I've learned more shipping with peers than from any course. The feedback loops are fast and kind.",
 		name: 'Samantha Lee',
-		role: 'Frontend Developer',
+		role: 'Frontend Engineer',
 		avatar: 'https://i.pravatar.cc/150?img=2',
 	},
 	{
-		quote: 'The community is incredible. Everyone is so willing to help and share their knowledge. It feels like a second family.',
+		quote: 'Everyone shares knowledge. You always have support when you try something new.',
 		name: 'Michael Chen',
-		role: 'Cloud Engineering Member',
+		role: 'Cloud Enthusiast',
 		avatar: 'https://i.pravatar.cc/150?img=3',
 	},
 	{
-		quote: 'From zero to deploying a full-stack app, Syntax provided the roadmap and the support. I highly recommend it to any aspiring developer.',
+		quote: 'From zero to a full-stack app—this community showed me how to build and iterate.',
 		name: 'Jessica Rodriguez',
-		role: 'Full-Stack Developer',
+		role: 'Full‑Stack Developer',
 		avatar: 'https://i.pravatar.cc/150?img=4',
 	},
 ];
 
-const EventEchoes = () => {
-	const [activeTab, setActiveTab] = useState('ghostboard');
-	const [newMessage, setNewMessage] = useState('');
-	const [messages, setMessages] = useState([]);
-	const [flippedCards, setFlippedCards] = useState([]);
-	const [oneLiners, setOneLiners] = useState(0);
-	const [energyLevels, setEnergyLevels] = useState({
-		crowdHype: 85,
-		djDrops: 92,
-		lightshow: 78,
-		foodWipeout: 65,
-	});
+const Testimonials = () => {
 	const [current, setCurrent] = useState(0);
-	const [ref, inView] = useInView({
-		triggerOnce: true,
-		threshold: 0.2,
-	});
-
-	// Sample data
-	const eventFacts = [
-		{ id: 1, content: 'Over 500 attendees danced through the night', emoji: '💃' },
-		{ id: 2, content: 'DJ set lasted 4 hours non-stop', emoji: '🎧' },
-		{ id: 3, content: 'Lightshow featured 10,000+ LEDs', emoji: '✨' },
-		{ id: 4, content: 'Record crowd jump: 3.5 ft average', emoji: '🚀' },
-		{ id: 5, content: '15 gallons of glow paint used', emoji: '🎨' },
-		{ id: 6, content: 'Midnight flash mob surprised everyone', emoji: '👯' },
-	];
-
-	// Add new message to ghostboard
-	const handleSubmit = (e) => {
-		e.preventDefault();
-		if (newMessage.trim()) {
-			setMessages([
-				...messages,
-				{
-					id: Date.now(),
-					text: newMessage,
-					timestamp: new Date().toLocaleTimeString([], {
-						hour: '2-digit',
-						minute: '2-digit',
-					}),
-					visible: true,
-				},
-			]);
-			setNewMessage('');
-		}
-	};
-
-	// Handle card flip
-	const flipCard = (id) => {
-		if (!flippedCards.includes(id)) {
-			setFlippedCards([...flippedCards, id]);
-		}
-	};
-
-	// Rotate through one-liners
-	useEffect(() => {
-		const interval = setInterval(() => {
-			setOneLiners((prev) => (prev + 1) % testimonials.length);
-		}, 4000);
-		return () => clearInterval(interval);
-	}, []);
-
-	// Animate energy levels
-	useEffect(() => {
-		const interval = setInterval(() => {
-			setEnergyLevels({
-				crowdHype: Math.floor(Math.random() * 20) + 80,
-				djDrops: Math.floor(Math.random() * 15) + 85,
-				lightshow: Math.floor(Math.random() * 25) + 75,
-				foodWipeout: Math.floor(Math.random() * 30) + 60,
-			});
-		}, 3000);
-		return () => clearInterval(interval);
-	}, []);
+	const [ref, inView] = useInView({ triggerOnce: true, threshold: 0.2 });
 
 	useEffect(() => {
-		const timer = setInterval(() => {
-			setCurrent((prev) => (prev === testimonials.length - 1 ? 0 : prev + 1));
-		}, 5000);
-		return () => clearInterval(timer);
+		const t = setInterval(
+			() => setCurrent((p) => (p === testimonials.length - 1 ? 0 : p + 1)),
+			5000
+		);
+		return () => clearInterval(t);
 	}, []);
 
 	const variants = {
-		enter: (direction) => ({
-			x: direction > 0 ? 100 : -100,
-			opacity: 0,
-		}),
-		center: {
-			zIndex: 1,
-			x: 0,
-			opacity: 1,
-		},
-		exit: (direction) => ({
-			zIndex: 0,
-			x: direction < 0 ? 100 : -100,
-			opacity: 0,
-		}),
+		enter: (d) => ({ x: d > 0 ? 100 : -100, opacity: 0 }),
+		center: { zIndex: 1, x: 0, opacity: 1 },
+		exit: (d) => ({ zIndex: 0, x: d < 0 ? 100 : -100, opacity: 0 }),
 	};
 
 	return (
 		<section ref={ref} className="py-24 px-4 relative z-10 overflow-hidden">
 			{/* Background elements */}
 			<div className="absolute inset-0 -z-10">
-				<div className="absolute inset-0 bg-gradient-to-br from-indigo-900/20 to-purple-900/30 backdrop-blur-2xl"></div>
-				<div className="absolute top-1/4 left-1/4 w-64 h-64 bg-indigo-600/10 rounded-full blur-3xl animate-pulse-slow"></div>
-				<div className="absolute bottom-1/3 right-1/4 w-72 h-72 bg-purple-600/10 rounded-full blur-3xl animate-pulse-slow"></div>
+				<div className="absolute inset-0 bg-gradient-to-br from-indigo-900/20 to-purple-900/30 backdrop-blur-2xl" />
+				<div className="absolute top-1/4 left-1/4 w-64 h-64 bg-indigo-600/10 rounded-full blur-3xl animate-pulse-slow" />
+				<div className="absolute bottom-1/3 right-1/4 w-72 h-72 bg-purple-600/10 rounded-full blur-3xl animate-pulse-slow" />
 			</div>
 
 			<div className="max-w-4xl mx-auto">
@@ -150,7 +68,7 @@ const EventEchoes = () => {
 						Member Spotlights
 					</h2>
 					<p className="text-xl text-purple-200 max-w-2xl mx-auto">
-						Hear what our members have to say about their journey with Syntax.
+						Stories from members who build, learn, and lead together.
 					</p>
 				</motion.div>
 
@@ -211,4 +129,4 @@ const EventEchoes = () => {
 	);
 };
 
-export default EventEchoes;
+export default Testimonials;
