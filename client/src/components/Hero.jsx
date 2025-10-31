@@ -56,7 +56,7 @@ const Hero = () => {
 					className="mb-8 inline-flex"
 				>
 					<div className="glass-card px-5 py-2.5 inline-flex items-center gap-2 text-sm">
-						<Sparkles className="w-4 h-4 text-brand-2" />
+						<Sparkles className="w-4 h-4 text-accent" />
 						<span className="text-secondary font-medium">Build. Learn. Grow.</span>
 					</div>
 				</motion.div>
@@ -122,20 +122,20 @@ const Hero = () => {
 					className="flex flex-wrap items-center justify-center gap-6 text-sm text-muted mb-10"
 				>
 					<div className="flex items-center gap-2">
-						<div className="w-2 h-2 rounded-full bg-brand-1 animate-pulse-soft" />
+						<div className="w-2 h-2 rounded-full bg-accent animate-pulse-soft" />
 						<span>200+ members</span>
 					</div>
 					<div className="flex items-center gap-2">
 						<div
-							className="w-2 h-2 rounded-full bg-brand-2 animate-pulse-soft"
-							style={{ animationDelay: '1s' }}
+							className="w-2 h-2 rounded-full bg-accent animate-pulse-soft"
+							style={{ animationDelay: '0.6s', opacity: 0.9 }}
 						/>
 						<span>60+ projects</span>
 					</div>
 					<div className="flex items-center gap-2">
 						<div
-							className="w-2 h-2 rounded-full bg-brand-3 animate-pulse-soft"
-							style={{ animationDelay: '2s' }}
+							className="w-2 h-2 rounded-full bg-accent animate-pulse-soft"
+							style={{ animationDelay: '1.2s', opacity: 0.7 }}
 						/>
 						<span>15+ pods</span>
 					</div>
@@ -175,14 +175,12 @@ const Hero = () => {
 				>
 					<div className="h-12 w-7 rounded-full border border-glass-border flex items-start justify-center p-2">
 						<motion.div
-							className="h-2.5 w-2.5 rounded-full bg-brand-1"
+							className="h-2.5 w-2.5 rounded-full"
+							style={{ background: 'var(--accent-1)' }}
 							animate={
 								prefersReducedMotion
 									? {}
-									: {
-											y: [0, 20, 0],
-											opacity: [0.8, 0.3, 0.8],
-									  }
+									: { y: [0, 20, 0], opacity: [0.8, 0.3, 0.8] }
 							}
 							transition={{ duration: 2, repeat: Infinity, ease: 'easeInOut' }}
 						/>

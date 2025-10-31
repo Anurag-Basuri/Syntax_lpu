@@ -47,10 +47,10 @@ const ClubDescription = () => {
 					<motion.div variants={itemVariants} className="relative group">
 						<div className="glass-card p-6 md:p-8 h-full hover-lift transition-all">
 							<div className="relative z-10">
-								<h2 className="text-display-sm mb-4 bg-gradient-to-r from-blue-300 to-cyan-300 bg-clip-text text-transparent">
+								<h2 className="text-display-sm mb-4 accent-gradient-text">
 									Programs & Tracks
 								</h2>
-								<p className="text-base md:text-lg text-slate-200/90 leading-relaxed mb-6">
+								<p className="text-base md:text-lg text-secondary leading-relaxed mb-6">
 									Pick a track, join a pod, and start shipping. We keep cohorts
 									small and focused.
 								</p>
@@ -59,7 +59,7 @@ const ClubDescription = () => {
 										(t) => (
 											<span
 												key={t}
-												className="text-center text-sm text-cyan-200/90 glass-card border-white/15 rounded-lg py-2"
+												className="text-center text-sm text-secondary glass-card rounded-lg py-2 border border-white/10"
 											>
 												{t}
 											</span>
@@ -94,7 +94,7 @@ const ClubDescription = () => {
 					<motion.div variants={itemVariants} className="relative group">
 						<div className="glass-card p-6 md:p-8 h-full hover-lift transition-all">
 							<div className="relative z-10">
-								<h2 className="text-display-sm mb-6 bg-gradient-to-r from-purple-300 to-pink-300 bg-clip-text text-transparent">
+								<h2 className="text-display-sm mb-6 accent-gradient-text">
 									The Build Journey
 								</h2>
 
@@ -134,7 +134,7 @@ const ClubDescription = () => {
 											<div className="flex gap-4 items-start">
 												<div className="text-3xl mt-1">{item.icon}</div>
 												<div>
-													<h3 className="text-lg font-semibold text-white mb-1">
+													<h3 className="text-lg font-semibold text-primary mb-1">
 														{item.title}
 													</h3>
 													<p className="text-slate-200/90 text-sm">
