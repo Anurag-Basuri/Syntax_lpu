@@ -24,15 +24,17 @@ const ClubDescription = () => {
 
 	return (
 		<section className="section-container py-normal px-4 bg-transparent relative z-10 overflow-hidden">
-			{/* Decorative floating elements */}
+			{/* Decorative floating elements (cyan/blue only) */}
 			<motion.div
-				className="absolute top-1/4 left-1/4 w-64 h-64 rounded-full bg-indigo-600/5 blur-3xl -z-10"
-				animate={{ scale: [1, 1.15, 1], opacity: [0.35, 0.5, 0.35] }}
+				className="absolute top-1/4 left-1/4 w-64 h-64 rounded-full -z-10"
+				style={{ background: 'color-mix(in srgb, var(--accent-2) 10%, transparent)' }}
+				animate={{ scale: [1, 1.15, 1], opacity: [0.3, 0.5, 0.3] }}
 				transition={{ duration: 8, repeat: Infinity, ease: 'easeInOut' }}
 			/>
 			<motion.div
-				className="absolute bottom-1/4 right-1/4 w-72 h-72 rounded-full bg-purple-600/5 blur-3xl -z-10"
-				animate={{ scale: [1, 1.1, 1], opacity: [0.25, 0.4, 0.25] }}
+				className="absolute bottom-1/4 right-1/4 w-72 h-72 rounded-full -z-10"
+				style={{ background: 'color-mix(in srgb, var(--accent-1) 10%, transparent)' }}
+				animate={{ scale: [1, 1.1, 1], opacity: [0.25, 0.45, 0.25] }}
 				transition={{ duration: 9, repeat: Infinity, ease: 'easeInOut', delay: 1.2 }}
 			/>
 			<div className="max-w-7xl mx-auto">
@@ -77,10 +79,13 @@ const ClubDescription = () => {
 											variants={statVariants}
 											className="glass-card text-center py-4"
 										>
-											<div className="text-2xl font-bold text-cyan-300">
+											<div
+												className="text-2xl font-bold"
+												style={{ color: 'var(--accent-1)' }}
+											>
 												{stat.value}
 											</div>
-											<div className="text-sm text-slate-300 mt-1">
+											<div className="text-sm text-secondary mt-1">
 												{stat.label}
 											</div>
 										</motion.div>
@@ -137,7 +142,7 @@ const ClubDescription = () => {
 													<h3 className="text-lg font-semibold text-primary mb-1">
 														{item.title}
 													</h3>
-													<p className="text-slate-200/90 text-sm">
+													<p className="text-secondary text-sm">
 														{item.desc}
 													</p>
 												</div>

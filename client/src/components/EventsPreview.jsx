@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
 import { useInView } from 'react-intersection-observer';
-import { Calendar, MapPin, Users, ArrowRight, Sparkles, Ticket, Clock, Star } from 'lucide-react';
+import { Calendar, MapPin, Users, ArrowRight, Sparkles, Ticket, Clock } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { publicClient } from '../services/api.js';
 
@@ -106,7 +106,11 @@ const UpcomingEventShowcase = () => {
 		return (
 			<section className="py-24 px-4 relative z-10 bg-transparent min-h-[60vh] flex items-center justify-center">
 				<motion.div
-					className="max-w-2xl mx-auto text-center bg-gradient-to-br from-cyan-900/40 to-blue-900/40 backdrop-blur-xl border border-white/15 rounded-3xl shadow-2xl p-8 md:p-12"
+					className="max-w-2xl mx-auto text-center backdrop-blur-xl border border-white/15 rounded-3xl shadow-2xl p-8 md:p-12"
+					style={{
+						background:
+							'linear-gradient(135deg, rgba(0,200,255,0.12), rgba(0,150,255,0.10))',
+					}}
 					initial={{ opacity: 0, y: 30 }}
 					animate={{ opacity: 1, y: 0 }}
 					transition={{ duration: 0.7 }}
@@ -279,7 +283,10 @@ const UpcomingEventShowcase = () => {
 												ease: 'easeInOut',
 											}}
 										>
-											<Ticket className="w-4 h-4 text-cyan-400" />
+											<Ticket
+												className="w-4 h-4"
+												style={{ color: 'var(--accent-1)' }}
+											/>
 											<span className="text-white text-xs font-bold">
 												{slots !== null
 													? `${slots} spots`
@@ -292,20 +299,29 @@ const UpcomingEventShowcase = () => {
 										<div className="bg-white/10 backdrop-blur-xl border border-white/20 rounded-2xl p-2">
 											<div className="flex items-center justify-between mb-1">
 												<div className="flex items-center gap-2">
-													<Calendar className="w-4 h-4 text-cyan-400" />
+													<Calendar
+														className="w-4 h-4"
+														style={{ color: 'var(--accent-1)' }}
+													/>
 													<span className="text-white text-xs font-semibold">
 														{dateStr.split(',')[0]}
 													</span>
 												</div>
 												<div className="flex items-center gap-2">
-													<Clock className="w-4 h-4 text-purple-400" />
+													<Clock
+														className="w-4 h-4"
+														style={{ color: 'var(--accent-2)' }}
+													/>
 													<span className="text-white text-xs font-semibold">
 														{timeStr}
 													</span>
 												</div>
 											</div>
 											<div className="flex items-center gap-2">
-												<MapPin className="w-4 h-4 text-pink-400" />
+												<MapPin
+													className="w-4 h-4"
+													style={{ color: 'var(--accent-2)' }}
+												/>
 												<span className="text-white text-xs font-medium truncate">
 													{event.venue}
 												</span>
@@ -406,10 +422,10 @@ const UpcomingEventShowcase = () => {
 					transition={{ duration: 0.6 }}
 					className="text-center mb-16"
 				>
-					<h2 className="text-4xl md:text-5xl font-extrabold mb-4 bg-gradient-to-r from-purple-400 to-pink-500 bg-clip-text text-transparent tracking-tight">
+					<h2 className="text-4xl md:text-5xl font-extrabold mb-4 accent-gradient-text tracking-tight">
 						Upcoming Events
 					</h2>
-					<p className="text-xl text-purple-200 max-w-2xl mx-auto">
+					<p className="text-xl text-secondary max-w-2xl mx-auto">
 						Join us for exciting workshops, hackathons, and networking events.
 					</p>
 				</motion.div>
@@ -456,36 +472,18 @@ const UpcomingEventShowcase = () => {
 								</p>
 
 								<div className="flex flex-col sm:flex-row gap-4 mb-6">
-									<div className="flex items-center gap-2 text-indigo-200">
-										<svg
+									<div className="flex items-center gap-2 text-secondary">
+										<Calendar
 											className="w-5 h-5"
-											fill="none"
-											stroke="currentColor"
-											viewBox="0 0 24 24"
-										>
-											<path
-												strokeLinecap="round"
-												strokeLinejoin="round"
-												strokeWidth={2}
-												d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"
-											/>
-										</svg>
+											style={{ color: 'var(--accent-1)' }}
+										/>
 										<span className="text-sm md:text-base">{dateStr}</span>
 									</div>
-									<div className="flex items-center gap-2 text-indigo-200">
-										<svg
+									<div className="flex items-center gap-2 text-secondary">
+										<Clock
 											className="w-5 h-5"
-											fill="none"
-											stroke="currentColor"
-											viewBox="0 0 24 24"
-										>
-											<path
-												strokeLinecap="round"
-												strokeLinejoin="round"
-												strokeWidth={2}
-												d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"
-											/>
-										</svg>
+											style={{ color: 'var(--accent-2)' }}
+										/>
 										<span className="text-sm md:text-base">{timeStr}</span>
 									</div>
 								</div>
@@ -531,7 +529,13 @@ const UpcomingEventShowcase = () => {
 									</h3>
 								</div>
 
-								<div className="aspect-video bg-gradient-to-br from-cyan-900/50 to-blue-900/50 rounded-2xl overflow-hidden shadow-lg">
+								<div
+									className="aspect-video rounded-2xl overflow-hidden shadow-lg"
+									style={{
+										background:
+											'linear-gradient(135deg, rgba(0,200,255,0.15), rgba(0,150,255,0.15))',
+									}}
+								>
 									{event?.images?.[0] ? (
 										<img
 											src={event.images[0]}
