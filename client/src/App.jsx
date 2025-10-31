@@ -87,30 +87,21 @@ function App() {
 						boxShadow: '0 8px 32px rgba(0, 0, 0, 0.3)',
 					},
 					success: {
-						iconTheme: {
-							primary: '#10B981',
-							secondary: '#fff',
-						},
+						iconTheme: { primary: '#10B981', secondary: '#fff' },
 						style: {
 							border: '1px solid rgba(16, 185, 129, 0.3)',
 							background: 'rgba(16, 185, 129, 0.1)',
 						},
 					},
 					error: {
-						iconTheme: {
-							primary: '#EF4444',
-							secondary: '#fff',
-						},
+						iconTheme: { primary: '#EF4444', secondary: '#fff' },
 						style: {
 							border: '1px solid rgba(239, 68, 68, 0.3)',
 							background: 'rgba(239, 68, 68, 0.1)',
 						},
 					},
 					loading: {
-						iconTheme: {
-							primary: '#3B82F6',
-							secondary: '#fff',
-						},
+						iconTheme: { primary: '#3B82F6', secondary: '#fff' },
 						style: {
 							border: '1px solid rgba(59, 130, 246, 0.3)',
 							background: 'rgba(59, 130, 246, 0.1)',
@@ -131,18 +122,13 @@ function App() {
 					<Navbar />
 				</div>
 			)}
-			<div className={!hideNavbar ? 'pt-20' : ''}>
-				<AppRoutes />
-			</div>
 
-			{/* Global themed background (all pages) */}
+			{/* Global themed background and theme toggle */}
 			<Background3D />
-
-			{/* Global theme control */}
 			<ThemeToggle />
 
-			{/* App routes */}
-			<main className="relative z-10">
+			{/* Single route mount; add top padding when navbar is visible */}
+			<main className={`relative z-10 ${!hideNavbar ? 'pt-20' : ''}`}>
 				<AppRoutes />
 			</main>
 		</ReactLenis>
