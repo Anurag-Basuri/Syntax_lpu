@@ -67,6 +67,91 @@ html {
 	--grid-dot: rgba(6, 182, 212, 0.5); /* cyan dots */
 }
 
+/* ===== CYAN/BLUE THEME (from Background3D) ===== */
+:root {
+	/* Accents pulled from Background3D */
+	--accent-1: #00c8ff; /* rgba(0,200,255,1) */
+	--accent-2: #0096ff; /* rgba(0,150,255,1) */
+
+	/* Base */
+	--bg-base: #000000;
+	--bg-soft: #0b0b0b;
+	--bg-softer: #111214;
+
+	/* Grid and glow (from Background3D) */
+	--grid-line: rgba(255, 255, 255, 0.07);
+	--grid-stroke-strong: rgba(0, 200, 255, 0.15);
+	--grid-dot: rgba(0, 200, 255, 0.6);
+
+	/* Spotlight (from Background3D radial) */
+	--spotlight: rgba(0, 200, 255, 0.15);
+
+	/* Text */
+	--text-primary: #ffffff;
+	--text-secondary: #b3bac6;
+	--text-muted: #8c93a1;
+
+	/* Buttons */
+	--btn-primary-from: var(--accent-1);
+	--btn-primary-to: var(--accent-2);
+	--btn-primary-text: #ffffff;
+
+	--btn-secondary-bg: rgba(255, 255, 255, 0.06);
+	--btn-secondary-text: #ffffff;
+	--btn-secondary-border: rgba(255, 255, 255, 0.12);
+
+	/* Logo watermark */
+	--logo-opacity: 0.06;
+}
+:root[data-theme='light'] {
+	/* Light mode remains minimal but still cyan/blue accented */
+	--bg-base: #ffffff;
+	--bg-soft: #f8f9fb;
+	--bg-softer: #f1f3f7;
+
+	--grid-line: rgba(0, 0, 0, 0.08);
+	--grid-stroke-strong: rgba(0, 150, 255, 0.16);
+	--grid-dot: rgba(0, 150, 255, 0.55);
+
+	--spotlight: rgba(0, 150, 255, 0.12);
+
+	--text-primary: #0b1220;
+	--text-secondary: #374151;
+	--text-muted: #6b7280;
+
+	--btn-primary-from: var(--accent-2);
+	--btn-primary-to: var(--accent-1);
+	--btn-primary-text: #ffffff;
+
+	--btn-secondary-bg: rgba(0, 0, 0, 0.06);
+	--btn-secondary-text: #0b1220;
+	--btn-secondary-border: rgba(0, 0, 0, 0.1);
+
+	--logo-opacity: 0.08;
+}
+
+/* Accent utilities */
+.text-accent {
+	color: var(--accent-1);
+}
+.bg-accent {
+	background-color: var(--accent-1);
+}
+.accent-gradient-text {
+	background: linear-gradient(120deg, var(--accent-1) 0%, var(--accent-2) 100%);
+	-webkit-background-clip: text;
+	-webkit-text-fill-color: transparent;
+	background-clip: text;
+}
+
+/* Headings using accent gradient previously named brand-text */
+.brand-text {
+	background: linear-gradient(120deg, var(--accent-1) 0%, var(--accent-2) 100%);
+	-webkit-background-clip: text;
+	-webkit-text-fill-color: transparent;
+	background-clip: text;
+}
+
 /* ===== BASE & TYPOGRAPHY ===== */
 body {
 	font-family: 'Inter', system-ui, -apple-system, sans-serif;
@@ -152,12 +237,13 @@ p {
 }
 
 .btn-primary {
-	background-color: var(--btn-primary-bg);
+	background: linear-gradient(135deg, var(--btn-primary-from), var(--btn-primary-to));
 	color: var(--btn-primary-text);
-	box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+	font-weight: 700;
+	border: none;
 }
 .btn-secondary {
-	background-color: var(--btn-secondary-bg);
+	background: var(--btn-secondary-bg);
 	color: var(--btn-secondary-text);
 	border: 1px solid var(--btn-secondary-border);
 }
@@ -226,13 +312,13 @@ a:focus-visible {
 
 /* Next-like base + spotlights + vignette */
 .bg-next-base {
-	background: radial-gradient(900px 420px at 50% -10%, rgba(139, 92, 246, 0.1), transparent 60%),
-		radial-gradient(800px 380px at 85% 0%, rgba(56, 189, 248, 0.08), transparent 60%),
+	background: radial-gradient(900px 420px at 50% -10%, rgba(0, 200, 255, 0.1), transparent 60%),
+		radial-gradient(800px 380px at 85% 0%, rgba(0, 150, 255, 0.08), transparent 60%),
 		linear-gradient(180deg, var(--bg-base) 0%, var(--bg-soft) 50%, var(--bg-softer) 100%);
 }
 .next-spotlights {
-	background: radial-gradient(520px 260px at 20% 20%, rgba(34, 197, 94, 0.08), transparent 65%),
-		radial-gradient(520px 260px at 80% 18%, rgba(139, 92, 246, 0.1), transparent 65%);
+	background: radial-gradient(520px 260px at 20% 20%, rgba(0, 200, 255, 0.08), transparent 65%),
+		radial-gradient(520px 260px at 80% 18%, rgba(0, 150, 255, 0.1), transparent 65%);
 	mix-blend-mode: screen;
 }
 .next-vignette {
@@ -242,16 +328,9 @@ a:focus-visible {
 	background: radial-gradient(1300px 700px at 50% 0%, transparent 45%, rgba(0, 0, 0, 0.06) 100%);
 }
 
-/* Themed logo watermark */
-:root {
-	--logo-opacity: 0.06;
-}
-:root[data-theme='light'] {
-	--logo-opacity: 0.08;
-}
-
+/* Themed logo watermark (cyan/blue gradient) */
 .logo-mask {
-	background: linear-gradient(120deg, var(--brand-1) 0%, var(--brand-2) 50%, var(--brand-3) 100%);
+	background: linear-gradient(120deg, var(--accent-1), var(--accent-2));
 	-webkit-mask-repeat: no-repeat;
 	mask-repeat: no-repeat;
 	-webkit-mask-position: center;
@@ -261,6 +340,10 @@ a:focus-visible {
 	opacity: var(--logo-opacity);
 	filter: drop-shadow(0 2px 12px rgba(0, 0, 0, 0.08));
 }
+.logo-mask.animate {
+	background-size: 200% 200%;
+	animation: logo-sheen 18s ease-in-out infinite;
+}
 @keyframes logo-sheen {
 	0%,
 	100% {
@@ -269,10 +352,6 @@ a:focus-visible {
 	50% {
 		background-position: 100% 50%;
 	}
-}
-.logo-mask.animate {
-	background-size: 200% 200%;
-	animation: logo-sheen 18s ease-in-out infinite;
 }
 
 /* Subtle motto ticker */
@@ -364,7 +443,7 @@ a:focus-visible {
 	pointer-events: none;
 }
 
-/* Floating particles animation (moved out of JSX) */
+/* Floating particles animation */
 @keyframes float-soft {
 	0%,
 	100% {
@@ -383,7 +462,7 @@ a:focus-visible {
 	animation: float-soft linear infinite;
 }
 
-/* Bottom fade that respects theme */
+/* Bottom fade */
 .bg-bottom-fade {
 	background: linear-gradient(to top, var(--bg-base) 0%, transparent 100%);
 }
