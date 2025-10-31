@@ -106,30 +106,27 @@ const UpcomingEventShowcase = () => {
 		return (
 			<section className="py-24 px-4 relative z-10 bg-transparent min-h-[60vh] flex items-center justify-center">
 				<motion.div
-					className="max-w-2xl mx-auto text-center bg-gradient-to-br from-blue-900/40 to-purple-900/40 backdrop-blur-xl border border-white/20 rounded-3xl shadow-2xl p-8 md:p-12"
+					className="max-w-2xl mx-auto text-center bg-gradient-to-br from-cyan-900/40 to-blue-900/40 backdrop-blur-xl border border-white/15 rounded-3xl shadow-2xl p-8 md:p-12"
 					initial={{ opacity: 0, y: 30 }}
 					animate={{ opacity: 1, y: 0 }}
 					transition={{ duration: 0.7 }}
 				>
 					<div className="flex items-center justify-center gap-2 mb-4">
-						<Sparkles className="w-7 h-7 text-yellow-400 animate-pulse" />
-						<span className="text-yellow-400 font-semibold tracking-wide uppercase">
+						<Sparkles className="w-7 h-7 text-accent animate-pulse" />
+						<span className="text-accent font-semibold tracking-wide uppercase">
 							No Upcoming Events
 						</span>
-						<Sparkles className="w-7 h-7 text-yellow-400 animate-pulse" />
+						<Sparkles className="w-7 h-7 text-accent animate-pulse" />
 					</div>
-					<h2 className="text-3xl font-bold text-white mb-2">Stay Tuned!</h2>
-					<p className="text-blue-200 mb-8">
+					<h2 className="text-3xl font-bold text-primary mb-2">Stay Tuned!</h2>
+					<p className="text-secondary mb-8">
 						We're preparing something exciting. Check back soon for new events and
 						opportunities to connect!
 					</p>
 					<motion.button
-						whileHover={{
-							scale: 1.05,
-							backgroundColor: 'rgba(79, 70, 229, 0.3)',
-						}}
+						whileHover={{ scale: 1.05 }}
 						whileTap={{ scale: 0.95 }}
-						className="px-8 py-3 bg-indigo-700/20 backdrop-blur-sm border border-indigo-500/30 rounded-xl font-medium text-indigo-300 hover:text-white transition-all duration-300 flex items-center gap-2 mx-auto"
+						className="px-8 py-3 btn-primary rounded-xl font-medium flex items-center gap-2 mx-auto"
 						onClick={() => navigate('/event')}
 					>
 						<span>View All Events</span>
@@ -534,7 +531,7 @@ const UpcomingEventShowcase = () => {
 									</h3>
 								</div>
 
-								<div className="aspect-video bg-gradient-to-br from-indigo-900/50 to-purple-900/50 rounded-2xl overflow-hidden shadow-lg">
+								<div className="aspect-video bg-gradient-to-br from-cyan-900/50 to-blue-900/50 rounded-2xl overflow-hidden shadow-lg">
 									{event?.images?.[0] ? (
 										<img
 											src={event.images[0]}
