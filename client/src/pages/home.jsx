@@ -10,7 +10,7 @@ import Background3D from '../components/Background3D.jsx';
 
 const Home = () => {
 	return (
-		<div className="relative min-h-screen bg-transparent text-white overflow-x-hidden">
+		<div className="relative min-h-screen bg-transparent overflow-x-hidden text-primary">
 			{/* Themed, Next-like 3D background */}
 			<Background3D />
 
