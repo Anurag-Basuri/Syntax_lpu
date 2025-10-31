@@ -62,12 +62,12 @@ const Hero = () => {
 					transition={{ duration: 0.8, ease: 'easeOut' }}
 					className="mb-4 md:mb-5"
 				>
-					<h1 className="text-display-lg font-brand bg-gradient-to-r from-indigo-200 via-blue-200 to-purple-200 bg-clip-text text-transparent tracking-tight drop-shadow-[0_0_30px_rgba(99,102,241,0.18)]">
+					<h1 className="text-display-lg font-brand brand-text tracking-tight drop-shadow-[0_0_30px_rgba(99,102,241,0.18)]">
 						SYNTAX
 					</h1>
 				</motion.div>
 
-				{/* Subtle orbit arcs around title */}
+				{/* Subtle orbit arcs around title (themed stops) */}
 				<motion.div
 					className="relative mx-auto mb-6 md:mb-8 h-8 w-[80%] max-w-[560px]"
 					aria-hidden="true"
@@ -83,14 +83,14 @@ const Hero = () => {
 					>
 						<defs>
 							<linearGradient id="orbit-a" x1="0" x2="1" y1="0" y2="0">
-								<stop offset="0%" stopColor="#a78bfa" />
-								<stop offset="50%" stopColor="#60a5fa" />
-								<stop offset="100%" stopColor="#34d399" />
+								<stop offset="0%" style={{ stopColor: 'var(--brand-1)' }} />
+								<stop offset="50%" style={{ stopColor: 'var(--brand-2)' }} />
+								<stop offset="100%" style={{ stopColor: 'var(--brand-3)' }} />
 							</linearGradient>
 							<linearGradient id="orbit-b" x1="1" x2="0" y1="0" y2="0">
-								<stop offset="0%" stopColor="#34d399" />
-								<stop offset="50%" stopColor="#60a5fa" />
-								<stop offset="100%" stopColor="#a78bfa" />
+								<stop offset="0%" style={{ stopColor: 'var(--brand-3)' }} />
+								<stop offset="50%" style={{ stopColor: 'var(--brand-2)' }} />
+								<stop offset="100%" style={{ stopColor: 'var(--brand-1)' }} />
 							</linearGradient>
 						</defs>
 						<motion.path
@@ -118,17 +118,17 @@ const Hero = () => {
 					</motion.svg>
 				</motion.div>
 
-				{/* Curved, italic accent line */}
+				{/* Curved, italic accent line (theme text) */}
 				<motion.p
 					initial={{ opacity: 0, y: 10 }}
 					animate={{ opacity: 1, y: 0 }}
 					transition={{ duration: 0.7, ease: 'easeOut', delay: 0.05 }}
-					className="font-accent italic-soft text-xl md:text-2xl text-slate-200/95 -rotate-[1.2deg] mb-6 md:mb-8"
+					className="font-accent italic-soft text-xl md:text-2xl text-primary -rotate-[1.2deg] mb-6 md:mb-8 opacity-90"
 				>
 					Create • Collaborate • Ship
 				</motion.p>
 
-				{/* Swoosh under the accent line */}
+				{/* Swoosh (themed stops) */}
 				<motion.svg
 					viewBox="0 0 600 80"
 					className="mx-auto mb-10 md:mb-14 w-[82%] max-w-[620px] h-10"
@@ -138,9 +138,9 @@ const Hero = () => {
 				>
 					<defs>
 						<linearGradient id="hero-swoosh" x1="0" x2="1" y1="0" y2="0">
-							<stop offset="0%" stopColor="#a78bfa" />
-							<stop offset="50%" stopColor="#60a5fa" />
-							<stop offset="100%" stopColor="#34d399" />
+							<stop offset="0%" style={{ stopColor: 'var(--brand-1)' }} />
+							<stop offset="50%" style={{ stopColor: 'var(--brand-2)' }} />
+							<stop offset="100%" style={{ stopColor: 'var(--brand-3)' }} />
 						</linearGradient>
 					</defs>
 					<motion.path
@@ -156,12 +156,12 @@ const Hero = () => {
 					/>
 				</motion.svg>
 
-				{/* Supporting copy */}
+				{/* Supporting copy (theme text) */}
 				<motion.p
 					initial={{ opacity: 0, y: 15 }}
 					animate={{ opacity: 1, y: 0 }}
 					transition={{ duration: 0.8, delay: 0.15, ease: 'easeOut' }}
-					className="text-lg md:text-xl text-slate-300 font-body max-w-2xl mx-auto mb-10 md:mb-14 leading-relaxed"
+					className="text-lg md:text-xl text-secondary font-body max-w-2xl mx-auto mb-10 md:mb-14 leading-relaxed"
 				>
 					A multidisciplinary community where builders turn ideas into impact.
 				</motion.p>
@@ -225,16 +225,20 @@ const Hero = () => {
 					</div>
 				</div>
 
-				{/* Scroll indicator */}
+				{/* Scroll indicator border uses themed border */}
 				<motion.div
 					className="mt-12 md:mt-16 flex justify-center"
 					initial={{ opacity: 0 }}
 					animate={{ opacity: 1 }}
 					transition={{ delay: 0.6 }}
 				>
-					<div className="h-10 w-6 rounded-full border border-slate-400/30 flex items-start justify-center p-1">
+					<div
+						className="h-10 w-6 rounded-full flex items-start justify-center p-1"
+						style={{ border: `1px solid var(--glass-border)` }}
+					>
 						<motion.div
-							className="h-2 w-2 rounded-full bg-slate-300/60"
+							className="h-2 w-2 rounded-full"
+							style={{ backgroundColor: 'var(--text-secondary)' }}
 							animate={
 								prefersReducedMotion
 									? {}
