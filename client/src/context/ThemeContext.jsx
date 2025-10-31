@@ -1,59 +1,78 @@
-import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
+import React, { createContext, useCallback, useEffect, useMemo, useState } from 'react';
 
-const ThemeContext = createContext({
-	theme: 'dark',
-	toggleTheme: () => {},
-	setTheme: () => {},
+export const ThemeContext = createContext({
+	mode: 'system', // 'light' | 'dark' | 'system'
+	theme: 'dark', // effective: 'light' | 'dark'
+	setMode: () => {},
+	toggleMode: () => {},
 });
 
-const getSystemTheme = () =>
-	window.matchMedia && window.matchMedia('(prefers-color-scheme: light)').matches
-		? 'light'
-		: 'dark';
+const getSystemPrefersLight = () =>
+	typeof window !== 'undefined' &&
+	window.matchMedia &&
+	window.matchMedia('(prefers-color-scheme: light)').matches;
 
-const getInitialTheme = () => {
-	const saved = localStorage.getItem('theme');
-	if (saved === 'light' || saved === 'dark') return saved;
-	return getSystemTheme();
+const getEffectiveTheme = (mode) => {
+	if (mode === 'light') return 'light';
+	if (mode === 'dark') return 'dark';
+	return getSystemPrefersLight() ? 'light' : 'dark';
 };
 
-const applyTheme = (t) => {
-	document.documentElement.setAttribute('data-theme', t);
+const setMetaThemeColor = (theme) => {
 	const meta = document.querySelector('meta[name="theme-color"]');
-	if (meta) meta.setAttribute('content', t === 'light' ? '#f7f9ff' : '#0b1022');
+	if (!meta) return;
+	// Match index.css tokens for top background
+	meta.setAttribute('content', theme === 'light' ? '#f7faff' : '#0b1022');
+};
+
+const applyTheme = (mode) => {
+	const effective = getEffectiveTheme(mode);
+	document.documentElement.setAttribute('data-theme', effective);
+	document.documentElement.setAttribute('data-theme-mode', mode);
+	setMetaThemeColor(effective);
+};
+
+const getInitialMode = () => {
+	try {
+		const saved = localStorage.getItem('themeMode');
+		if (saved === 'light' || saved === 'dark' || saved === 'system') return saved;
+		return 'system';
+	} catch {
+		return 'system';
+	}
 };
 
 export const ThemeProvider = ({ children }) => {
-	const [theme, setThemeState] = useState(getInitialTheme);
+	const [mode, setModeState] = useState(getInitialMode);
+	const theme = getEffectiveTheme(mode);
 
-	const setTheme = useCallback((t) => {
-		setThemeState(t);
-		localStorage.setItem('theme', t);
-		applyTheme(t);
+	const setMode = useCallback((m) => {
+		setModeState(m);
+		try {
+			localStorage.setItem('themeMode', m);
+		} catch {}
+		applyTheme(m);
 	}, []);
 
-	const toggleTheme = useCallback(() => {
-		setTheme((prev) => (prev === 'light' ? 'dark' : 'light'));
-	}, [setTheme]);
+	const toggleMode = useCallback(() => {
+		setMode((prev) => (prev === 'light' ? 'dark' : prev === 'dark' ? 'system' : 'light'));
+	}, [setMode]);
 
+	// Apply on mount and listen for system changes when in 'system' mode
 	useEffect(() => {
-		applyTheme(theme);
-		// If user never set a theme manually, sync with system changes
+		applyTheme(mode);
 		const mql = window.matchMedia('(prefers-color-scheme: light)');
-		const saved = localStorage.getItem('theme');
 		const handler = () => {
-			if (!saved) {
-				const next = mql.matches ? 'light' : 'dark';
-				setThemeState(next);
-				applyTheme(next);
-			}
+			if (mode === 'system') applyTheme('system');
 		};
 		mql.addEventListener('change', handler);
 		return () => mql.removeEventListener('change', handler);
-	}, []); // init once
+	}, [mode]);
 
-	const value = useMemo(() => ({ theme, setTheme, toggleTheme }), [theme, setTheme, toggleTheme]);
+	const value = useMemo(
+		() => ({ mode, theme, setMode, toggleMode }),
+		[mode, theme, setMode, toggleMode]
+	);
 
 	return <ThemeContext.Provider value={value}>{children}</ThemeContext.Provider>;
 };
-

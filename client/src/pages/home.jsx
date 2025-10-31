@@ -4,7 +4,6 @@ import Hero from '../components/Hero';
 import ClubDescription from '../components/ClubDescription.jsx';
 import EventsPreview from '../components/EventsPreview.jsx';
 import TeamPreview from '../components/TeamPreview.jsx';
-import Testimonials from '../components/Testimonials.jsx';
 import Footer from '../components/Footer.jsx';
 import Logo from '../assets/logo.png';
 import AboutSyntax from '../components/AboutSyntax.jsx';
@@ -48,7 +47,6 @@ const Home = () => {
 				<ClubDescription />
 				<EventsPreview />
 				<TeamPreview />
-				<Testimonials />
 				<Footer />
 			</div>
 		</div>
