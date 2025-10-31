@@ -3,49 +3,32 @@ import { useReducedMotion } from 'framer-motion';
 
 const Background3D = () => {
 	const gridRef = useRef(null);
-	const stageRef = useRef(null);
 	const prefersReducedMotion = useReducedMotion();
 
 	useEffect(() => {
-		if (prefersReducedMotion) return;
+		if (prefersReducedMotion || !gridRef.current) return;
 
 		const onMove = (e) => {
-			const w = window.innerWidth;
-			const h = window.innerHeight;
-			const nx = e.clientX / w - 0.5; // [-0.5, 0.5]
-			const ny = e.clientY / h - 0.5;
+			const { clientX, clientY } = e;
+			const { innerWidth: w, innerHeight: h } = window;
+			const nx = (clientX / w) * 2 - 1; // -1 to 1
+			const ny = (clientY / h) * 2 - 1; // -1 to 1
 
-			// Subtle tilt with mouse
-			const tiltZ = nx * 4; // deg
-			const tiltY = nx * 4; // deg
-			const lift = ny * 10; // px
-
-			if (gridRef.current) {
-				gridRef.current.style.setProperty('--tiltZ', `${tiltZ}deg`);
-				gridRef.current.style.setProperty('--lift', `${lift}px`);
-				gridRef.current.style.setProperty('--tiltY', `${tiltY}deg`);
-				// Drift grid lines slightly
-				gridRef.current.style.setProperty('--grid-x', `${nx * 30}px`);
-				gridRef.current.style.setProperty('--grid-y', `${ny * 30}px`);
-			}
+			gridRef.current.style.setProperty('--tiltY', `${nx * -3}deg`);
+			gridRef.current.style.setProperty('--lift', `${ny * -5}px`);
+			gridRef.current.style.setProperty('--grid-x', `${nx * -25}px`);
+			gridRef.current.style.setProperty('--grid-y', `${ny * -25}px`);
 		};
 
-		window.addEventListener('pointermove', onMove);
+		window.addEventListener('pointermove', onMove, { passive: true });
 		return () => window.removeEventListener('pointermove', onMove);
 	}, [prefersReducedMotion]);
 
 	return (
-		<div className="bg3d fixed inset-0 -z-50 pointer-events-none" aria-hidden="true">
-			{/* Next-like base gradient */}
-			<div className="absolute inset-0 bg-next-base" />
-			{/* Subtle spotlights */}
-			<div className="absolute inset-0 next-spotlights" />
-			{/* Vignette */}
-			<div className="absolute inset-0 next-vignette" />
-			{/* 3D stage with perspective */}
-			<div ref={stageRef} className="bg-3d-stage">
-				<div ref={gridRef} className="bg-3d-grid" />
-				<div className="bg-3d-horizon" />
+		<div className="bg-3d-container" aria-hidden="true">
+			<div className="bg-3d-glow" />
+			<div className="bg-3d-grid">
+				<div ref={gridRef} className="bg-3d-grid-inner" />
 			</div>
 		</div>
 	);
