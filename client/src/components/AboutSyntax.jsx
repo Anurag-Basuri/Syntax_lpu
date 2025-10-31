@@ -1,84 +1,87 @@
 import React from 'react';
 import { motion } from 'framer-motion';
-import { Users2, Flame, Compass, HeartHandshake, Quote } from 'lucide-react';
+import { Users2, Flame, Compass, HeartHandshake, Zap } from 'lucide-react';
 
 const container = {
 	hidden: { opacity: 0 },
-	visible: { opacity: 1, transition: { staggerChildren: 0.12, delayChildren: 0.1 } },
+	visible: { opacity: 1, transition: { staggerChildren: 0.1, delayChildren: 0.2 } },
 };
 const item = {
-	hidden: { opacity: 0, y: 24 },
-	visible: { opacity: 1, y: 0, transition: { duration: 0.5 } },
+	hidden: { opacity: 0, y: 20 },
+	visible: { opacity: 1, y: 0, transition: { duration: 0.6, ease: [0.4, 0, 0.2, 1] } },
 };
 
 const AboutSyntax = () => {
 	return (
-		<section className="py-20 md:py-24 px-4 bg-transparent relative overflow-hidden">
-			{/* soft background accents */}
-			<div className="absolute inset-0 pointer-events-none -z-10">
-				<div className="absolute -top-10 -left-16 w-64 h-64 bg-indigo-600/10 blur-3xl rounded-full" />
-				<div className="absolute bottom-0 right-[-40px] w-72 h-72 bg-purple-600/10 blur-3xl rounded-full" />
-			</div>
-
-			<div className="max-w-7xl mx-auto">
+		<section className="section-container py-loose px-4 bg-transparent relative overflow-hidden">
+			<div className="max-w-6xl mx-auto">
 				{/* Header */}
 				<motion.div
-					initial={{ opacity: 0, y: 12 }}
+					initial={{ opacity: 0, y: 15 }}
 					whileInView={{ opacity: 1, y: 0 }}
 					viewport={{ once: true, amount: 0.3 }}
 					transition={{ duration: 0.6 }}
-					className="text-center mb-12"
+					className="text-center mb-16"
 				>
-					<span className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-white/5 border border-white/10 text-indigo-200 text-xs sm:text-sm backdrop-blur-md">
-						<Users2 className="w-4 h-4" />
-						People • Projects • Progress
-					</span>
-					<h2 className="mt-5 text-3xl sm:text-4xl md:text-5xl font-extrabold tracking-tight bg-gradient-to-r from-indigo-200 via-blue-200 to-purple-200 bg-clip-text text-transparent">
-						About Syntax
+					<div className="glass-card inline-flex items-center gap-2 px-4 py-2 mb-6">
+						<Users2 className="w-4 h-4 text-brand-2" />
+						<span className="text-sm text-secondary font-medium">About Us</span>
+					</div>
+					<h2 className="text-4xl sm:text-5xl md:text-6xl font-display font-bold tracking-tight text-primary mb-4">
+						What is <span className="brand-text">Syntax</span>?
 					</h2>
-					<p className="mt-4 text-indigo-200/90 max-w-3xl mx-auto text-sm sm:text-base">
+					<p className="text-lg sm:text-xl text-secondary max-w-3xl mx-auto leading-relaxed">
 						A creative space where builders meet, learn in public, and turn ideas into
 						momentum.
 					</p>
 				</motion.div>
 
-				{/* The Spark + How We Work */}
+				{/* Core Cards */}
 				<motion.div
 					variants={container}
 					initial="hidden"
 					whileInView="visible"
-					viewport={{ once: true, amount: 0.25 }}
-					className="grid grid-cols-1 lg:grid-cols-2 gap-6"
+					viewport={{ once: true, amount: 0.2 }}
+					className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-12"
 				>
-					<motion.div
-						variants={item}
-						className="relative bg-gradient-to-br from-blue-900/20 to-indigo-900/20 border border-white/10 rounded-2xl p-6 md:p-8 backdrop-blur-xl overflow-hidden"
-					>
-						<div className="absolute -top-10 -right-10 w-40 h-40 rounded-full bg-blue-500/10 blur-2xl" />
+					<motion.div variants={item} className="glass-card p-8 hover-lift">
 						<div className="flex items-center gap-3 mb-4">
-							<Flame className="w-5 h-5 text-cyan-300" />
-							<h3 className="text-2xl font-bold text-white">The Spark</h3>
+							<div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-brand-1/20 to-brand-2/20 flex items-center justify-center">
+								<Flame className="w-6 h-6 text-brand-2" />
+							</div>
+							<h3 className="text-2xl font-display font-bold text-primary">
+								The Spark
+							</h3>
 						</div>
-						<p className="text-indigo-100/90 text-sm sm:text-base">
+						<p className="text-secondary leading-relaxed">
 							Started with a simple belief: learning accelerates when you build with
 							others. Syntax is a home for doers—shaped by experiments, feedback, and
 							consistent shipping.
 						</p>
 					</motion.div>
 
-					<motion.div
-						variants={item}
-						className="relative bg-gradient-to-br from-indigo-900/20 to-purple-900/20 border border-white/10 rounded-2xl p-6 md:p-8 backdrop-blur-xl overflow-hidden"
-					>
-						<div className="absolute -bottom-10 -left-10 w-40 h-40 rounded-full bg-purple-500/10 blur-2xl" />
+					<motion.div variants={item} className="glass-card p-8 hover-lift">
 						<div className="flex items-center gap-3 mb-4">
-							<Compass className="w-5 h-5 text-purple-300" />
-							<h3 className="text-2xl font-bold text-white">How We Work</h3>
+							<div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-brand-2/20 to-brand-3/20 flex items-center justify-center">
+								<Compass className="w-6 h-6 text-brand-3" />
+							</div>
+							<h3 className="text-2xl font-display font-bold text-primary">
+								How We Work
+							</h3>
 						</div>
-						<ul className="list-disc pl-5 space-y-2 text-indigo-100 text-sm sm:text-base">
-							<li>Small pods build focused features and products.</li>
-							<li>Guilds share craft across tracks like web, AI, cloud, design.</li>
-							<li>Weekly demos keep the loop tight and transparent.</li>
+						<ul className="space-y-3 text-secondary">
+							<li className="flex items-start gap-2">
+								<Zap className="w-5 h-5 text-brand-1 flex-shrink-0 mt-0.5" />
+								<span>Small pods build focused features and products</span>
+							</li>
+							<li className="flex items-start gap-2">
+								<Zap className="w-5 h-5 text-brand-2 flex-shrink-0 mt-0.5" />
+								<span>Guilds share craft across web, AI, cloud, design</span>
+							</li>
+							<li className="flex items-start gap-2">
+								<Zap className="w-5 h-5 text-brand-3 flex-shrink-0 mt-0.5" />
+								<span>Weekly demos keep the loop tight and transparent</span>
+							</li>
 						</ul>
 					</motion.div>
 				</motion.div>
@@ -88,61 +91,50 @@ const AboutSyntax = () => {
 					variants={container}
 					initial="hidden"
 					whileInView="visible"
-					viewport={{ once: true, amount: 0.25 }}
-					className="mt-8 grid grid-cols-1 md:grid-cols-3 gap-5 md:gap-6"
+					viewport={{ once: true, amount: 0.2 }}
+					className="grid grid-cols-1 md:grid-cols-3 gap-5"
 				>
-					<motion.div
-						variants={item}
-						className="bg-gradient-to-br from-blue-900/25 to-indigo-900/20 border border-white/10 rounded-2xl p-6 md:p-7 backdrop-blur-xl hover:border-white/20 transition-colors"
-					>
-						<div className="flex items-center gap-3 mb-3">
-							<HeartHandshake className="w-5 h-5 text-cyan-300" />
-							<h3 className="text-xl font-semibold text-white">Kind + Candid</h3>
-						</div>
-						<p className="text-indigo-100 text-sm sm:text-base">
-							We give honest feedback and help each other level up.
-						</p>
-					</motion.div>
-					<motion.div
-						variants={item}
-						className="bg-gradient-to-br from-indigo-900/25 to-purple-900/20 border border-white/10 rounded-2xl p-6 md:p-7 backdrop-blur-xl hover:border-white/20 transition-colors"
-					>
-						<div className="flex items-center gap-3 mb-3">
-							<Compass className="w-5 h-5 text-amber-300" />
-							<h3 className="text-xl font-semibold text-white">Build > Talk</h3>
-						</div>
-						<p className="text-indigo-100 text-sm sm:text-base">
-							Prototype early, iterate often, learn in public.
-						</p>
-					</motion.div>
-					<motion.div
-						variants={item}
-						className="bg-gradient-to-br from-purple-900/25 to-pink-900/20 border border-white/10 rounded-2xl p-6 md:p-7 backdrop-blur-xl hover:border-white/20 transition-colors"
-					>
-						<div className="flex items-center gap-3 mb-3">
-							<Users2 className="w-5 h-5 text-pink-300" />
-							<h3 className="text-xl font-semibold text-white">Everyone Ships</h3>
-						</div>
-						<p className="text-indigo-100 text-sm sm:text-base">
-							Roles are fluid; contribution is what counts.
-						</p>
-					</motion.div>
-				</motion.div>
-
-				{/* Quote */}
-				<motion.div
-					initial={{ opacity: 0, y: 16 }}
-					whileInView={{ opacity: 1, y: 0 }}
-					viewport={{ once: true, amount: 0.3 }}
-					transition={{ duration: 0.6 }}
-					className="mt-10 md:mt-12"
-				>
-					<div className="mx-auto max-w-3xl rounded-2xl border border-white/10 bg-white/5 backdrop-blur-md p-5 sm:p-6 text-center">
-						<Quote className="w-6 h-6 text-purple-300/70 mx-auto mb-2" />
-						<p className="text-sm sm:text-base text-indigo-100 italic">
-							“Start small. Ship often. Grow together.”
-						</p>
-					</div>
+					{[
+						{
+							icon: HeartHandshake,
+							title: 'Kind + Candid',
+							desc: 'We give honest feedback and help each other level up.',
+							color: 'brand-1',
+						},
+						{
+							icon: Zap,
+							title: 'Build > Talk',
+							desc: 'Prototype early, iterate often, learn in public.',
+							color: 'brand-2',
+						},
+						{
+							icon: Users2,
+							title: 'Everyone Ships',
+							desc: 'Roles are fluid; contribution is what counts.',
+							color: 'brand-3',
+						},
+					].map((principle, idx) => (
+						<motion.div
+							key={idx}
+							variants={item}
+							className="glass-card p-6 text-center hover-lift"
+						>
+							<div
+								className={`w-14 h-14 rounded-2xl bg-gradient-to-br from-${principle.color}/20 to-${principle.color}/10 flex items-center justify-center mx-auto mb-4`}
+							>
+								<principle.icon
+									className={`w-7 h-7 text-${principle.color}`}
+									style={{ color: `var(--${principle.color})` }}
+								/>
+							</div>
+							<h3 className="text-xl font-display font-semibold text-primary mb-2">
+								{principle.title}
+							</h3>
+							<p className="text-secondary text-sm leading-relaxed">
+								{principle.desc}
+							</p>
+						</motion.div>
+					))}
 				</motion.div>
 			</div>
 		</section>
