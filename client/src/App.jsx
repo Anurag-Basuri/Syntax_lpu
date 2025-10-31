@@ -5,6 +5,9 @@ import { ReactLenis } from 'lenis/react';
 import { Toaster } from 'react-hot-toast';
 import AppRoutes from './routes/AppRoutes.jsx';
 import Navbar from './components/Navbar.jsx';
+import React from 'react';
+import Background3D from './components/Background3D.jsx';
+import ThemeToggle from './components/ThemeToggle.jsx';
 
 function App() {
 	const location = useLocation();
@@ -131,6 +134,17 @@ function App() {
 			<div className={!hideNavbar ? 'pt-20' : ''}>
 				<AppRoutes />
 			</div>
+
+			{/* Global themed background (all pages) */}
+			<Background3D />
+
+			{/* Global theme control */}
+			<ThemeToggle />
+
+			{/* App routes */}
+			<main className="relative z-10">
+				<AppRoutes />
+			</main>
 		</ReactLenis>
 	);
 }
