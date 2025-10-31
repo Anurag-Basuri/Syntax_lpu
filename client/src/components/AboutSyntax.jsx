@@ -24,7 +24,7 @@ const AboutSyntax = () => {
 					className="text-center mb-16"
 				>
 					<div className="glass-card inline-flex items-center gap-2 px-4 py-2 mb-6">
-						<Users2 className="w-4 h-4 text-brand-2" />
+						<Users2 className="w-4 h-4" style={{ color: 'var(--accent-2)' }} />
 						<span className="text-sm text-secondary font-medium">About Us</span>
 					</div>
 					<h2 className="text-4xl sm:text-5xl md:text-6xl font-display font-bold tracking-tight text-primary mb-4">
@@ -46,8 +46,14 @@ const AboutSyntax = () => {
 				>
 					<motion.div variants={item} className="glass-card p-8 hover-lift">
 						<div className="flex items-center gap-3 mb-4">
-							<div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-brand-1/20 to-brand-2/20 flex items-center justify-center">
-								<Flame className="w-6 h-6 text-brand-2" />
+							<div
+								className="w-12 h-12 rounded-2xl flex items-center justify-center"
+								style={{
+									background:
+										'linear-gradient(135deg, color-mix(in srgb, var(--accent-1) 20%, transparent), color-mix(in srgb, var(--accent-2) 20%, transparent))',
+								}}
+							>
+								<Flame className="w-6 h-6" style={{ color: 'var(--accent-2)' }} />
 							</div>
 							<h3 className="text-2xl font-display font-bold text-primary">
 								The Spark
@@ -62,8 +68,14 @@ const AboutSyntax = () => {
 
 					<motion.div variants={item} className="glass-card p-8 hover-lift">
 						<div className="flex items-center gap-3 mb-4">
-							<div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-brand-2/20 to-brand-3/20 flex items-center justify-center">
-								<Compass className="w-6 h-6 text-brand-3" />
+							<div
+								className="w-12 h-12 rounded-2xl flex items-center justify-center"
+								style={{
+									background:
+										'linear-gradient(135deg, color-mix(in srgb, var(--accent-2) 20%, transparent), color-mix(in srgb, var(--accent-1) 20%, transparent))',
+								}}
+							>
+								<Compass className="w-6 h-6" style={{ color: 'var(--accent-1)' }} />
 							</div>
 							<h3 className="text-2xl font-display font-bold text-primary">
 								How We Work
@@ -71,15 +83,24 @@ const AboutSyntax = () => {
 						</div>
 						<ul className="space-y-3 text-secondary">
 							<li className="flex items-start gap-2">
-								<Zap className="w-5 h-5 text-brand-1 flex-shrink-0 mt-0.5" />
+								<Zap
+									className="w-5 h-5 flex-shrink-0 mt-0.5"
+									style={{ color: 'var(--accent-1)' }}
+								/>
 								<span>Small pods build focused features and products</span>
 							</li>
 							<li className="flex items-start gap-2">
-								<Zap className="w-5 h-5 text-brand-2 flex-shrink-0 mt-0.5" />
+								<Zap
+									className="w-5 h-5 flex-shrink-0 mt-0.5"
+									style={{ color: 'var(--accent-2)' }}
+								/>
 								<span>Guilds share craft across web, AI, cloud, design</span>
 							</li>
 							<li className="flex items-start gap-2">
-								<Zap className="w-5 h-5 text-brand-3 flex-shrink-0 mt-0.5" />
+								<Zap
+									className="w-5 h-5 flex-shrink-0 mt-0.5"
+									style={{ color: 'var(--accent-1)' }}
+								/>
 								<span>Weekly demos keep the loop tight and transparent</span>
 							</li>
 						</ul>
@@ -99,40 +120,36 @@ const AboutSyntax = () => {
 							icon: HeartHandshake,
 							title: 'Kind + Candid',
 							desc: 'We give honest feedback and help each other level up.',
-							color: 'brand-1',
 						},
 						{
 							icon: Zap,
 							title: 'Build > Talk',
 							desc: 'Prototype early, iterate often, learn in public.',
-							color: 'brand-2',
 						},
 						{
 							icon: Users2,
 							title: 'Everyone Ships',
 							desc: 'Roles are fluid; contribution is what counts.',
-							color: 'brand-3',
 						},
-					].map((principle, idx) => (
+					].map((P, idx) => (
 						<motion.div
 							key={idx}
 							variants={item}
 							className="glass-card p-6 text-center hover-lift"
 						>
 							<div
-								className={`w-14 h-14 rounded-2xl bg-gradient-to-br from-${principle.color}/20 to-${principle.color}/10 flex items-center justify-center mx-auto mb-4`}
+								className="w-14 h-14 rounded-2xl flex items-center justify-center mx-auto mb-4"
+								style={{
+									background:
+										'linear-gradient(135deg, color-mix(in srgb, var(--accent-1) 18%, transparent), color-mix(in srgb, var(--accent-2) 18%, transparent))',
+								}}
 							>
-								<principle.icon
-									className={`w-7 h-7 text-${principle.color}`}
-									style={{ color: `var(--${principle.color})` }}
-								/>
+								<P.icon className="w-7 h-7" style={{ color: 'var(--accent-1)' }} />
 							</div>
 							<h3 className="text-xl font-display font-semibold text-primary mb-2">
-								{principle.title}
+								{P.title}
 							</h3>
-							<p className="text-secondary text-sm leading-relaxed">
-								{principle.desc}
-							</p>
+							<p className="text-secondary text-sm leading-relaxed">{P.desc}</p>
 						</motion.div>
 					))}
 				</motion.div>

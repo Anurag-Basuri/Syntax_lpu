@@ -28,8 +28,9 @@ const Hero = () => {
 				Array.from({ length: 6 }).map((_, i) => (
 					<motion.div
 						key={i}
-						className="pointer-events-none absolute w-1.5 h-1.5 rounded-full bg-brand-1/30"
+						className="pointer-events-none absolute w-1.5 h-1.5 rounded-full"
 						style={{
+							background: 'color-mix(in srgb, var(--accent-1) 40%, transparent)',
 							top: `${(i * 17 + 10) % 80}%`,
 							left: `${(i * 29 + 15) % 85}%`,
 						}}
@@ -173,7 +174,10 @@ const Hero = () => {
 					animate={{ opacity: 1 }}
 					transition={{ delay: 0.7 }}
 				>
-					<div className="h-12 w-7 rounded-full border border-glass-border flex items-start justify-center p-2">
+					<div
+						className="h-12 w-7 rounded-full border flex items-start justify-center p-2"
+						style={{ borderColor: 'var(--glass-border)' }}
+					>
 						<motion.div
 							className="h-2.5 w-2.5 rounded-full"
 							style={{ background: 'var(--accent-1)' }}
