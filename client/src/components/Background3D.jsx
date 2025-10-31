@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
+import logo from '../assets/logo.png';
 
 const Background3D = ({ logoUrl = '/logo.png' }) => {
 	const canvasRef = useRef(null);
