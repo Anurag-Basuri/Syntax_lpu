@@ -1,14 +1,12 @@
 import React, { useEffect, useState } from 'react';
 import { motion, AnimatePresence, useReducedMotion } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
-import { Quote } from 'lucide-react';
+import { Sparkles, ArrowRight } from 'lucide-react';
 
 const Hero = () => {
 	const navigate = useNavigate();
 	const prefersReducedMotion = useReducedMotion();
-	const dots = Array.from({ length: 8 });
 
-	// Rotating micro-quotes
 	const quotes = [
 		'Start small. Ship often. Grow together.',
 		'Design bravely. Build kindly.',
@@ -19,232 +17,174 @@ const Hero = () => {
 	const [qIndex, setQIndex] = useState(0);
 
 	useEffect(() => {
-		const t = setInterval(() => setQIndex((p) => (p + 1) % quotes.length), 4200);
+		const t = setInterval(() => setQIndex((p) => (p + 1) % quotes.length), 4500);
 		return () => clearInterval(t);
 	}, []);
 
 	return (
-		<section className="relative min-h-[78vh] md:min-h-screen px-4 py-20 md:py-24 flex items-center bg-transparent">
-			{/* Lightweight particles (respect reduced motion) */}
-			{dots.map((_, i) => (
-				<motion.span
-					key={i}
-					className="pointer-events-none absolute w-1 h-1 rounded-full bg-indigo-300/20"
-					style={{ top: `${(i * 13 + 7) % 90}%`, left: `${(i * 23 + 11) % 90}%` }}
-					animate={
-						prefersReducedMotion
-							? { opacity: 0.35 }
-							: { y: [0, -10, 0], opacity: [0.2, 0.6, 0.2] }
-					}
-					transition={{
-						duration: 3 + (i % 3),
-						repeat: Infinity,
-						delay: i * 0.2,
-						ease: 'easeInOut',
-					}}
-				/>
-			))}
+		<section className="relative min-h-[85vh] md:min-h-screen px-4 py-24 md:py-32 flex items-center bg-transparent">
+			{/* Floating particles */}
+			{!prefersReducedMotion &&
+				Array.from({ length: 6 }).map((_, i) => (
+					<motion.div
+						key={i}
+						className="pointer-events-none absolute w-1.5 h-1.5 rounded-full bg-brand-1/30"
+						style={{
+							top: `${(i * 17 + 10) % 80}%`,
+							left: `${(i * 29 + 15) % 85}%`,
+						}}
+						animate={{
+							y: [0, -12, 0],
+							opacity: [0.3, 0.7, 0.3],
+							scale: [1, 1.2, 1],
+						}}
+						transition={{
+							duration: 4 + (i % 2),
+							repeat: Infinity,
+							delay: i * 0.3,
+							ease: 'easeInOut',
+						}}
+					/>
+				))}
 
-			<div className="relative z-[1] w-full max-w-6xl mx-auto text-center">
-				{/* Soft halo behind heading */}
-				<div
-					className="pointer-events-none absolute -top-10 left-1/2 -translate-x-1/2 w-[560px] h-[560px] rounded-full opacity-10 blur-3xl hidden md:block"
-					style={{
-						background:
-							'radial-gradient(40% 40% at 50% 50%, rgba(99,102,241,0.45) 0%, rgba(99,102,241,0.0) 60%)',
-					}}
-				/>
+			<div className="relative z-10 w-full max-w-6xl mx-auto text-center">
+				{/* Badge */}
+				<motion.div
+					initial={{ opacity: 0, y: -10 }}
+					animate={{ opacity: 1, y: 0 }}
+					transition={{ duration: 0.6 }}
+					className="mb-8 inline-flex"
+				>
+					<div className="glass-card px-5 py-2.5 inline-flex items-center gap-2 text-sm">
+						<Sparkles className="w-4 h-4 text-brand-2" />
+						<span className="text-secondary font-medium">Build. Learn. Grow.</span>
+					</div>
+				</motion.div>
 
 				{/* Main heading */}
 				<motion.div
-					initial={{ opacity: 0, y: 20, scale: 0.96 }}
-					animate={{ opacity: 1, y: 0, scale: 1 }}
-					transition={{ duration: 0.8, ease: 'easeOut' }}
-					className="mb-4 md:mb-5"
+					initial={{ opacity: 0, y: 20 }}
+					animate={{ opacity: 1, y: 0 }}
+					transition={{ duration: 0.7, delay: 0.1 }}
+					className="mb-6"
 				>
-					<h1 className="text-display-lg font-brand brand-text tracking-tight drop-shadow-[0_0_30px_rgba(99,102,241,0.18)]">
+					<h1 className="text-5xl sm:text-6xl md:text-7xl lg:text-8xl font-display font-extrabold tracking-tight brand-text leading-tight">
 						SYNTAX
 					</h1>
+					<p className="mt-4 text-xl sm:text-2xl md:text-3xl text-muted font-display font-medium tracking-wide">
+						Create • Collaborate • Ship
+					</p>
 				</motion.div>
 
-				{/* Subtle orbit arcs around title (themed stops) */}
-				<motion.div
-					className="relative mx-auto mb-6 md:mb-8 h-8 w-[80%] max-w-[560px]"
-					aria-hidden="true"
-					initial={{ opacity: 0 }}
-					animate={{ opacity: 1 }}
-					transition={{ delay: 0.15 }}
-				>
-					<motion.svg
-						viewBox="0 0 600 80"
-						className="absolute inset-0 w-full h-full"
-						animate={prefersReducedMotion ? {} : { rotate: [0, 2, -2, 0] }}
-						transition={{ duration: 8, repeat: Infinity, ease: 'easeInOut' }}
-					>
-						<defs>
-							<linearGradient id="orbit-a" x1="0" x2="1" y1="0" y2="0">
-								<stop offset="0%" style={{ stopColor: 'var(--brand-1)' }} />
-								<stop offset="50%" style={{ stopColor: 'var(--brand-2)' }} />
-								<stop offset="100%" style={{ stopColor: 'var(--brand-3)' }} />
-							</linearGradient>
-							<linearGradient id="orbit-b" x1="1" x2="0" y1="0" y2="0">
-								<stop offset="0%" style={{ stopColor: 'var(--brand-3)' }} />
-								<stop offset="50%" style={{ stopColor: 'var(--brand-2)' }} />
-								<stop offset="100%" style={{ stopColor: 'var(--brand-1)' }} />
-							</linearGradient>
-						</defs>
-						<motion.path
-							d="M10,60 C200,10 400,110 590,30"
-							fill="none"
-							stroke="url(#orbit-a)"
-							strokeWidth="2"
-							strokeLinecap="round"
-							strokeDasharray="8 12"
-							animate={prefersReducedMotion ? {} : { strokeDashoffset: [0, 100, 0] }}
-							transition={{ duration: 6, repeat: Infinity, ease: 'easeInOut' }}
-							opacity="0.9"
-						/>
-						<motion.path
-							d="M10,50 C220,0 380,120 590,40"
-							fill="none"
-							stroke="url(#orbit-b)"
-							strokeWidth="1.5"
-							strokeLinecap="round"
-							strokeDasharray="6 10"
-							animate={prefersReducedMotion ? {} : { strokeDashoffset: [60, 0, 60] }}
-							transition={{ duration: 7.5, repeat: Infinity, ease: 'easeInOut' }}
-							opacity="0.6"
-						/>
-					</motion.svg>
-				</motion.div>
-
-				{/* Curved, italic accent line (theme text) */}
-				<motion.p
-					initial={{ opacity: 0, y: 10 }}
-					animate={{ opacity: 1, y: 0 }}
-					transition={{ duration: 0.7, ease: 'easeOut', delay: 0.05 }}
-					className="font-accent italic-soft text-xl md:text-2xl text-primary -rotate-[1.2deg] mb-6 md:mb-8 opacity-90"
-				>
-					Create • Collaborate • Ship
-				</motion.p>
-
-				{/* Swoosh (themed stops) */}
-				<motion.svg
-					viewBox="0 0 600 80"
-					className="mx-auto mb-10 md:mb-14 w-[82%] max-w-[620px] h-10"
-					initial={{ opacity: 0 }}
-					animate={{ opacity: 1 }}
-					transition={{ delay: 0.2 }}
-				>
-					<defs>
-						<linearGradient id="hero-swoosh" x1="0" x2="1" y1="0" y2="0">
-							<stop offset="0%" style={{ stopColor: 'var(--brand-1)' }} />
-							<stop offset="50%" style={{ stopColor: 'var(--brand-2)' }} />
-							<stop offset="100%" style={{ stopColor: 'var(--brand-3)' }} />
-						</linearGradient>
-					</defs>
-					<motion.path
-						d="M10,60 C150,10 450,110 590,30"
-						fill="none"
-						stroke="url(#hero-swoosh)"
-						strokeWidth="3"
-						strokeLinecap="round"
-						strokeDasharray="640"
-						strokeDashoffset="640"
-						animate={prefersReducedMotion ? {} : { strokeDashoffset: [640, 0] }}
-						transition={{ duration: 1.6, ease: 'easeInOut' }}
-					/>
-				</motion.svg>
-
-				{/* Supporting copy (theme text) */}
+				{/* Subheading */}
 				<motion.p
 					initial={{ opacity: 0, y: 15 }}
 					animate={{ opacity: 1, y: 0 }}
-					transition={{ duration: 0.8, delay: 0.15, ease: 'easeOut' }}
-					className="text-lg md:text-xl text-secondary font-body max-w-2xl mx-auto mb-10 md:mb-14 leading-relaxed"
+					transition={{ duration: 0.7, delay: 0.2 }}
+					className="text-lg sm:text-xl md:text-2xl text-secondary font-body max-w-3xl mx-auto mb-12 leading-relaxed"
 				>
-					A multidisciplinary community where builders turn ideas into impact.
+					A multidisciplinary community where builders turn ideas into impact through
+					hands-on projects and mentorship.
 				</motion.p>
 
 				{/* CTAs */}
 				<motion.div
 					initial={{ opacity: 0, y: 20 }}
 					animate={{ opacity: 1, y: 0 }}
-					transition={{ duration: 0.8, delay: 0.22, ease: 'easeOut' }}
-					className="flex flex-col sm:flex-row items-center justify-center gap-4 md:gap-6"
+					transition={{ duration: 0.7, delay: 0.3 }}
+					className="flex flex-col sm:flex-row items-center justify-center gap-4 mb-10"
 				>
 					<motion.button
-						whileHover={{ scale: 1.05, y: -2 }}
-						whileTap={{ scale: 0.98 }}
+						whileHover={{ scale: 1.03 }}
+						whileTap={{ scale: 0.97 }}
 						onClick={() => navigate('/event')}
-						className="w-full sm:w-auto btn-primary"
-						aria-label="Explore Events"
+						className="btn-primary group inline-flex items-center gap-2"
 					>
-						Explore Events
+						<span>Explore Events</span>
+						<ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
 					</motion.button>
 
 					<motion.button
-						whileHover={{ scale: 1.05, y: -2 }}
-						whileTap={{ scale: 0.98 }}
+						whileHover={{ scale: 1.03 }}
+						whileTap={{ scale: 0.97 }}
 						onClick={() => navigate('/auth', { state: { tab: 'register' } })}
-						className="w-full sm:w-auto btn-secondary"
-						aria-label="Join Syntax"
+						className="btn-secondary"
 					>
 						Join Syntax
 					</motion.button>
 				</motion.div>
 
-				{/* Trust line */}
+				{/* Stats */}
 				<motion.div
-					initial={{ opacity: 0, y: 8 }}
-					animate={{ opacity: 1, y: 0 }}
-					transition={{ delay: 0.35, duration: 0.5 }}
-					className="mt-4 text-slate-400 text-sm"
+					initial={{ opacity: 0 }}
+					animate={{ opacity: 1 }}
+					transition={{ delay: 0.4 }}
+					className="flex flex-wrap items-center justify-center gap-6 text-sm text-muted mb-10"
 				>
-					<span>200+ members • 60+ projects • 15+ pods</span>
+					<div className="flex items-center gap-2">
+						<div className="w-2 h-2 rounded-full bg-brand-1 animate-pulse-soft" />
+						<span>200+ members</span>
+					</div>
+					<div className="flex items-center gap-2">
+						<div
+							className="w-2 h-2 rounded-full bg-brand-2 animate-pulse-soft"
+							style={{ animationDelay: '1s' }}
+						/>
+						<span>60+ projects</span>
+					</div>
+					<div className="flex items-center gap-2">
+						<div
+							className="w-2 h-2 rounded-full bg-brand-3 animate-pulse-soft"
+							style={{ animationDelay: '2s' }}
+						/>
+						<span>15+ pods</span>
+					</div>
 				</motion.div>
 
-				{/* Rotating micro‑quotes */}
-				<div className="mt-8 md:mt-10 flex justify-center">
-					<div className="hero-quote inline-flex items-center gap-2 px-4 py-2">
-						<Quote className="w-4 h-4 text-purple-300/80" />
-						<div className="relative h-5 overflow-hidden">
+				{/* Rotating quote */}
+				<motion.div
+					initial={{ opacity: 0 }}
+					animate={{ opacity: 1 }}
+					transition={{ delay: 0.5 }}
+					className="flex justify-center"
+				>
+					<div className="glass-card px-6 py-3 max-w-md">
+						<div className="relative h-6 overflow-hidden">
 							<AnimatePresence mode="wait">
-								<motion.span
+								<motion.p
 									key={qIndex}
 									initial={{ y: 20, opacity: 0 }}
 									animate={{ y: 0, opacity: 1 }}
 									exit={{ y: -20, opacity: 0 }}
-									transition={{ duration: 0.35, ease: 'easeOut' }}
-									className="text-slate-200 text-sm font-accent italic-soft whitespace-nowrap"
+									transition={{ duration: 0.4 }}
+									className="text-sm text-secondary font-medium italic text-center"
 								>
-									{quotes[qIndex]}
-								</motion.span>
+									"{quotes[qIndex]}"
+								</motion.p>
 							</AnimatePresence>
 						</div>
 					</div>
-				</div>
+				</motion.div>
 
-				{/* Scroll indicator border uses themed border */}
+				{/* Scroll indicator */}
 				<motion.div
-					className="mt-12 md:mt-16 flex justify-center"
+					className="mt-16 md:mt-20 flex justify-center"
 					initial={{ opacity: 0 }}
 					animate={{ opacity: 1 }}
-					transition={{ delay: 0.6 }}
+					transition={{ delay: 0.7 }}
 				>
-					<div
-						className="h-10 w-6 rounded-full flex items-start justify-center p-1"
-						style={{ border: `1px solid var(--glass-border)` }}
-					>
+					<div className="h-12 w-7 rounded-full border border-glass-border flex items-start justify-center p-2">
 						<motion.div
-							className="h-2 w-2 rounded-full"
-							style={{ backgroundColor: 'var(--text-secondary)' }}
+							className="h-2.5 w-2.5 rounded-full bg-brand-1"
 							animate={
 								prefersReducedMotion
 									? {}
-									: { y: [0, 16, 0], opacity: [0.8, 0.3, 0.8] }
+									: {
+											y: [0, 20, 0],
+											opacity: [0.8, 0.3, 0.8],
+									  }
 							}
-							transition={{ duration: 1.6, repeat: Infinity, ease: 'easeInOut' }}
+							transition={{ duration: 2, repeat: Infinity, ease: 'easeInOut' }}
 						/>
 					</div>
 				</motion.div>
