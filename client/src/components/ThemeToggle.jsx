@@ -44,11 +44,12 @@ const ThemeToggle = ({ size = 'sm' }) => {
 	return (
 		<div
 			ref={containerRef}
-			className="relative flex items-center gap-1 rounded-xl"
+			className="relative flex items-center gap-1 rounded-xl p-1"
 			style={{
 				background: 'var(--glass-bg)',
 				border: '1px solid var(--glass-border)',
-				padding: '4px',
+				backdropFilter: 'blur(12px)',
+				boxShadow: 'var(--shadow-sm)',
 			}}
 			role="group"
 			aria-label="Theme toggle"
@@ -58,7 +59,8 @@ const ThemeToggle = ({ size = 'sm' }) => {
 				className="absolute top-1 left-1 h-[calc(100%-8px)] rounded-lg transition-all duration-300 ease-out"
 				style={{
 					...pillStyle,
-					background: 'color-mix(in srgb, var(--glass-bg), var(--glass-hover) 60%)',
+					background: `linear-gradient(135deg, var(--accent-1), var(--accent-2))`,
+					opacity: 0.15,
 				}}
 			/>
 			<button
