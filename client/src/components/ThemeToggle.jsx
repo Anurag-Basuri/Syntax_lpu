@@ -29,6 +29,7 @@ const ThemeToggle = ({ variant = 'floating' }) => {
 					padding: '4px',
 				}}
 				aria-label="Theme"
+				role="group"
 			>
 				<SegButton
 					active={mode === 'light'}
@@ -58,9 +59,13 @@ const ThemeToggle = ({ variant = 'floating' }) => {
 		);
 	}
 
-	// Floating (legacy)
+	// Floating variant (for use outside the navbar if needed)
 	return (
-		<div className="fixed right-4 top-4 z-50 glass-card rounded-xl" aria-label="Theme">
+		<div
+			className="fixed right-4 top-24 z-50 glass-card rounded-xl"
+			aria-label="Theme"
+			role="group"
+		>
 			<div className="flex items-center gap-1 p-1">
 				<SegButton active={mode === 'light'} onClick={() => setMode('light')} label="Light">
 					<Sun className="w-4 h-4" />
