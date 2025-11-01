@@ -16,8 +16,7 @@ import {
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth.js';
 import ThemeToggle from './ThemeToggle.jsx';
-import logo from '../assets/logo.png';
-import NavLogo from './NavLogo';
+import NavLogo from './NavLogo.jsx';
 
 const navSections = [
 	{
@@ -44,12 +43,10 @@ const Navbar = () => {
 	const { user, isAuthenticated, loading, logoutMember, logoutAdmin } = useAuth();
 	const [isUserOpen, setIsUserOpen] = useState(false);
 	const [elevated, setElevated] = useState(false);
-	const [showNavbar, setShowNavbar] = useState(true);
 	const [progress, setProgress] = useState(0);
 	const userRef = useRef(null);
 	const menuButtonRef = useRef(null);
 	const drawerRef = useRef(null);
-	const lastScrollY = useRef(typeof window !== 'undefined' ? window.scrollY : 0);
 	const navigate = useNavigate();
 	const location = useLocation();
 
@@ -65,16 +62,7 @@ const Navbar = () => {
 			const doc = document.documentElement;
 			const max = (doc.scrollHeight || 0) - (window.innerHeight || 1);
 			setProgress(Math.min(100, Math.max(0, (currentScrollY / Math.max(1, max)) * 100)));
-			setElevated(currentScrollY > 8);
-
-			if (currentScrollY <= 0) {
-				setShowNavbar(true);
-			} else if (currentScrollY > lastScrollY.current && currentScrollY > 100) {
-				setShowNavbar(false);
-			} else if (currentScrollY < lastScrollY.current - 2) {
-				setShowNavbar(true);
-			}
-			lastScrollY.current = currentScrollY;
+			setElevated(currentScrollY > 10);
 		};
 		window.addEventListener('scroll', handleScroll, { passive: true });
 		handleScroll();
@@ -145,11 +133,6 @@ const Navbar = () => {
 		setActiveLink(name);
 		setIsOpen(false);
 		setIsUserOpen(false);
-
-		if (name === 'QR Scanner') {
-			navigate('/vib/qrscanner');
-			return;
-		}
 		const found = navSections.flatMap((s) => s.items).find((item) => item.name === name);
 		if (found) navigate(found.path);
 	};
@@ -202,38 +185,6 @@ const Navbar = () => {
 
 	return (
 		<>
-			<style>{`
-                @keyframes slideIn {
-                    from { transform: translateX(-100%); }
-                    to { transform: translateX(0); }
-                }
-                .navbar {
-                    transition: transform .4s cubic-bezier(.4,0,.2,1), background .35s, box-shadow .35s, border-color .35s, height .25s;
-                }
-                .nav-link {
-                    position: relative;
-                    transition: color .25s ease, background .25s ease, transform .2s ease;
-                }
-                .nav-pill {
-                    position: absolute;
-                    inset: 0;
-                    border-radius: 14px;
-                    background: linear-gradient(90deg, color-mix(in srgb, var(--accent-1) 12%, transparent), color-mix(in srgb, var(--accent-2) 12%, transparent));
-                    opacity: 0;
-                    transform: scale(.96);
-                    transition: opacity .25s, transform .25s;
-                }
-                .nav-link:hover .nav-pill { opacity: .6; transform: scale(1); }
-                .nav-link.active .nav-pill { opacity: .9; transform: scale(1); }
-                .custom-scrollbar::-webkit-scrollbar { width: 6px; height: 6px; }
-                .custom-scrollbar::-webkit-scrollbar-thumb {
-                    background: linear-gradient(to bottom, var(--accent-1), var(--accent-2));
-                    border-radius: 6px; border: 1px solid rgba(255,255,255,.1);
-                }
-                .custom-scrollbar::-webkit-scrollbar-track { background: rgba(0,0,0,.2); border-radius: 6px; }
-                .custom-scrollbar { scrollbar-width: thin; scrollbar-color: var(--accent-1) rgba(0,0,0,.2); }
-            `}</style>
-
 			<a
 				href="#main"
 				className="sr-only focus:not-sr-only fixed top-2 left-2 z-[1000] px-3 py-2 rounded-lg"
@@ -242,239 +193,184 @@ const Navbar = () => {
 				Skip to content
 			</a>
 
-			<nav
-				role="navigation"
-				aria-label="Primary"
-				className="fixed top-0 left-0 w-full z-50 navbar"
-				style={{
-					height: elevated ? '4.5rem' : '5rem',
-					borderBottom: `1px solid ${
-						elevated ? 'var(--nav-border-elevated)' : 'var(--nav-border)'
-					}`,
-					boxShadow: elevated ? 'var(--nav-shadow-elevated)' : 'var(--nav-shadow)',
-					background: elevated ? 'var(--nav-bg-elevated)' : 'var(--nav-bg)',
-					backdropFilter: 'blur(16px)',
-					transform: showNavbar ? 'translateY(0)' : 'translateY(-100%)',
-				}}
-			>
-				{/* Progress bar */}
-				<div
-					aria-hidden="true"
-					className="absolute top-0 left-0 h-[2px] transition-all duration-300"
-					style={{
-						width: `${progress}%`,
-						background: 'linear-gradient(90deg, var(--accent-1), var(--accent-2))',
-						boxShadow: '0 0 12px var(--accent-1)',
-					}}
-				/>
+			<nav role="navigation" aria-label="Primary" className="navbar" data-elevated={elevated}>
+				<div className="navbar-progress-bar" style={{ width: `${progress}%` }} />
 
-				{/* Main navbar content */}
-				<div className="max-w-7xl mx-auto px-2 sm:px-4 lg:px-8 h-full">
-					<div className="flex items-center justify-between h-full w-full gap-4">
-						{/* Left section - Logo */}
-						<div className="flex-shrink-0">
-							<NavLogo onClick={handleLogoClick} elevated={elevated} />
-						</div>
+				<div className="navbar-grid">
+					<div className="navbar-section-left">
+						<NavLogo onClick={handleLogoClick} elevated={elevated} />
+					</div>
 
-						{/* Center section - Navigation */}
-						<div className="hidden lg:flex items-center justify-center flex-1 gap-1 xl:gap-2 px-4">
-							{navSections.flatMap((section) =>
-								section.items.map((item) => {
-									const isActive = activeLink === item.name;
-									return (
-										<button
-											key={item.name}
-											onClick={() => handleLinkClick(item.name)}
-											className={`
-                        nav-link relative flex items-center gap-2 
-                        px-3 py-2 rounded-xl font-medium text-sm xl:text-base
-                        transition-all duration-300
-                        ${isActive ? 'text-primary' : 'text-secondary hover:text-primary'}
-                      `}
-											aria-current={isActive ? 'page' : undefined}
-											style={{
-												background: isActive
-													? 'var(--glass-bg)'
-													: 'transparent',
-												borderColor: isActive
-													? 'var(--glass-border)'
-													: 'transparent',
-												boxShadow: isActive ? 'var(--shadow-sm)' : 'none',
-											}}
-										>
-											<item.icon
-												size={18}
-												style={{
-													color: isActive
-														? 'var(--accent-1)'
-														: 'currentColor',
-												}}
-											/>
-											<span>{item.name}</span>
-											{isActive && (
-												<span
-													className="absolute inset-0 rounded-xl opacity-20"
-													style={{
-														background:
-															'linear-gradient(135deg, var(--accent-1), var(--accent-2))',
-														filter: 'blur(1px)',
-													}}
-												/>
-											)}
-										</button>
-									);
-								})
-							)}
-						</div>
-
-						{/* Right section - Auth & Theme */}
-						<div className="flex items-center justify-end gap-3 sm:gap-4 flex-shrink-0">
-							{/* Theme Toggle */}
-							<div className="hidden sm:flex">
-								<ThemeToggle size="sm" />
-							</div>
-
-							{/* Auth Buttons or User Menu */}
-							{isAuthenticated ? (
-								<div className="relative" ref={userRef}>
+					<div className="navbar-section-center">
+						{navSections.flatMap((section) =>
+							section.items.map((item) => {
+								const isActive = activeLink === item.name;
+								return (
 									<button
-										onClick={() => setIsUserOpen((v) => !v)}
-										className="flex items-center gap-2 sm:gap-3 px-2 sm:px-3 md:px-3.5 py-2 rounded-full transition-all"
-										style={{
-											background: 'var(--glass-bg)',
-											border: '1px solid var(--glass-border)',
-											backdropFilter: 'blur(10px)',
-										}}
-										aria-haspopup="menu"
-										aria-expanded={isUserOpen}
-										aria-controls="user-menu"
+										key={item.name}
+										onClick={() => handleLinkClick(item.name)}
+										className={`nav-link ${isActive ? 'active' : ''}`}
+										aria-current={isActive ? 'page' : undefined}
 									>
-										<div
-											className="w-8 h-8 sm:w-9 sm:h-9 rounded-full flex items-center justify-center shadow-lg"
+										<item.icon
+											size={18}
 											style={{
-												background:
-													'linear-gradient(135deg, var(--accent-1), var(--accent-2))',
-											}}
-										>
-											<User className="h-4 w-4 sm:h-5 sm:w-5 text-white" />
-										</div>
-										<span className="hidden sm:block text-white font-medium text-xs sm:text-sm">
-											{isMember ? 'Member' : 'Admin'}
-										</span>
-										<ChevronDown
-											className="h-4 w-4 text-white transition-transform duration-300"
-											style={{
-												transform: isUserOpen
-													? 'rotate(180deg)'
-													: 'rotate(0deg)',
+												color: isActive
+													? 'var(--accent-1)'
+													: 'currentColor',
 											}}
 										/>
+										<span className="whitespace-nowrap">{item.name}</span>
+										{isActive && <span className="nav-pill" />}
 									</button>
+								);
+							})
+						)}
+					</div>
 
-									{isUserOpen && (
-										<div
-											id="user-menu"
-											className="absolute right-0 mt-3 w-56 sm:w-64 rounded-2xl backdrop-blur-lg border shadow-2xl overflow-hidden z-50"
-											style={{
-												background: 'rgba(2,6,12,0.9)',
-												borderColor: 'rgba(255,255,255,0.12)',
-											}}
-											role="menu"
-										>
-											<div className="py-2">
-												<button
-													onClick={handleDashboardClick}
-													className="w-full flex items-center gap-3 px-4 py-3 text-left hover:bg-white/5 transition-all text-white"
-													role="menuitem"
-												>
-													<LayoutDashboard
-														className="h-5 w-5"
-														style={{ color: 'var(--accent-1)' }}
-													/>
-													<span>
-														{isMember
-															? 'Member Dashboard'
-															: 'Admin Dashboard'}
-													</span>
-												</button>
-												<button
-													onClick={() => navigate('/show')}
-													className="w-full flex items-center gap-3 px-4 py-3 text-left hover:bg-white/5 transition-all text-white"
-													role="menuitem"
-												>
-													<QrCode
-														className="h-5 w-5"
-														style={{ color: 'var(--accent-2)' }}
-													/>
-													<span>Show</span>
-												</button>
-												<button
-													onClick={handleQRScannerClick}
-													className="w-full flex items-center gap-3 px-4 py-3 text-left hover:bg-white/5 transition-all text-white"
-													role="menuitem"
-												>
-													<QrCode
-														className="h-5 w-5"
-														style={{ color: 'var(--accent-1)' }}
-													/>
-													<span>QR Scanner</span>
-												</button>
-											</div>
-											<div
-												className="p-3 border-t"
-												style={{ borderColor: 'rgba(255,255,255,0.1)' }}
-											>
-												<button
-													className="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl font-medium text-white transition-all"
-													onClick={handleLogout}
-													style={{
-														background:
-															'linear-gradient(135deg, rgba(239,68,68,0.9), rgba(239,68,68,0.75))',
-													}}
-												>
-													<LogOut className="h-4 w-4" />
-													<span>Log Out</span>
-												</button>
-											</div>
-										</div>
-									)}
-								</div>
-							) : (
-								<div className="hidden sm:flex items-center gap-3">
-									<button
-										onClick={handleAlreadyMember}
-										className="btn btn-secondary rounded-xl text-sm px-4 py-2"
-									>
-										<LogIn className="h-4 w-4" />
-										<span>Login</span>
-									</button>
-									<button
-										onClick={handleJoinClub}
-										className="btn btn-primary rounded-xl text-sm px-4 py-2"
-									>
-										<UserPlus className="h-4 w-4" />
-										<span>Join</span>
-									</button>
-								</div>
-							)}
-
-							{/* Mobile Menu Button */}
-							<button
-								ref={menuButtonRef}
-								className="lg:hidden p-2 sm:p-2.5 rounded-xl text-white shadow-lg hover:shadow-xl transition-all hover:scale-105"
-								onClick={() => setIsOpen(true)}
-								aria-label="Open menu"
-								aria-controls="mobile-drawer"
-								aria-expanded={isOpen}
-								style={{
-									background:
-										'linear-gradient(135deg, var(--accent-1), var(--accent-2))',
-									zIndex: 60,
-								}}
-							>
-								<Menu className="w-6 h-6" />
-							</button>
+					<div className="navbar-section-right">
+						<div className="hidden sm:flex">
+							<ThemeToggle size="sm" />
 						</div>
+
+						{isAuthenticated ? (
+							<div className="relative" ref={userRef}>
+								<button
+									onClick={() => setIsUserOpen((v) => !v)}
+									className="flex items-center gap-2 sm:gap-3 px-2 sm:px-3 md:px-3.5 py-2 rounded-full transition-all"
+									style={{
+										background: 'var(--glass-bg)',
+										border: '1px solid var(--glass-border)',
+										backdropFilter: 'blur(10px)',
+									}}
+									aria-haspopup="menu"
+									aria-expanded={isUserOpen}
+									aria-controls="user-menu"
+								>
+									<div
+										className="w-8 h-8 sm:w-9 sm:h-9 rounded-full flex items-center justify-center shadow-lg"
+										style={{
+											background:
+												'linear-gradient(135deg, var(--accent-1), var(--accent-2))',
+										}}
+									>
+										<User className="h-4 w-4 sm:h-5 sm:w-5 text-white" />
+									</div>
+									<span className="hidden sm:block text-white font-medium text-xs sm:text-sm">
+										{isMember ? 'Member' : 'Admin'}
+									</span>
+									<ChevronDown
+										className="h-4 w-4 text-white transition-transform duration-300"
+										style={{
+											transform: isUserOpen
+												? 'rotate(180deg)'
+												: 'rotate(0deg)',
+										}}
+									/>
+								</button>
+
+								{isUserOpen && (
+									<div
+										id="user-menu"
+										className="absolute right-0 mt-3 w-56 sm:w-64 rounded-2xl backdrop-blur-lg border shadow-2xl overflow-hidden z-50"
+										style={{
+											background: 'rgba(2,6,12,0.9)',
+											borderColor: 'rgba(255,255,255,0.12)',
+										}}
+										role="menu"
+									>
+										<div className="py-2">
+											<button
+												onClick={handleDashboardClick}
+												className="w-full flex items-center gap-3 px-4 py-3 text-left hover:bg-white/5 transition-all text-white"
+												role="menuitem"
+											>
+												<LayoutDashboard
+													className="h-5 w-5"
+													style={{ color: 'var(--accent-1)' }}
+												/>
+												<span>
+													{isMember
+														? 'Member Dashboard'
+														: 'Admin Dashboard'}
+												</span>
+											</button>
+											<button
+												onClick={() => navigate('/show')}
+												className="w-full flex items-center gap-3 px-4 py-3 text-left hover:bg-white/5 transition-all text-white"
+												role="menuitem"
+											>
+												<QrCode
+													className="h-5 w-5"
+													style={{ color: 'var(--accent-2)' }}
+												/>
+												<span>Show</span>
+											</button>
+											<button
+												onClick={handleQRScannerClick}
+												className="w-full flex items-center gap-3 px-4 py-3 text-left hover:bg-white/5 transition-all text-white"
+												role="menuitem"
+											>
+												<QrCode
+													className="h-5 w-5"
+													style={{ color: 'var(--accent-1)' }}
+												/>
+												<span>QR Scanner</span>
+											</button>
+										</div>
+										<div
+											className="p-3 border-t"
+											style={{ borderColor: 'rgba(255,255,255,0.1)' }}
+										>
+											<button
+												className="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl font-medium text-white transition-all"
+												onClick={handleLogout}
+												style={{
+													background:
+														'linear-gradient(135deg, rgba(239,68,68,0.9), rgba(239,68,68,0.75))',
+												}}
+											>
+												<LogOut className="h-4 w-4" />
+												<span>Log Out</span>
+											</button>
+										</div>
+									</div>
+								)}
+							</div>
+						) : (
+							<div className="hidden sm:flex items-center gap-2 sm:gap-3">
+								<button
+									onClick={handleAlreadyMember}
+									className="btn btn-secondary rounded-xl text-sm px-4 py-2"
+								>
+									<LogIn className="h-4 w-4" />
+									<span>Login</span>
+								</button>
+								<button
+									onClick={handleJoinClub}
+									className="btn btn-primary rounded-xl text-sm px-4 py-2"
+								>
+									<UserPlus className="h-4 w-4" />
+									<span>Join</span>
+								</button>
+							</div>
+						)}
+
+						<button
+							ref={menuButtonRef}
+							className="lg:hidden p-2 sm:p-2.5 rounded-xl text-white shadow-lg hover:shadow-xl transition-all hover:scale-105"
+							onClick={() => setIsOpen(true)}
+							aria-label="Open menu"
+							aria-controls="mobile-drawer"
+							aria-expanded={isOpen}
+							style={{
+								background:
+									'linear-gradient(135deg, var(--accent-1), var(--accent-2))',
+								zIndex: 60,
+							}}
+						>
+							<Menu className="w-6 h-6" />
+						</button>
 					</div>
 				</div>
 			</nav>
