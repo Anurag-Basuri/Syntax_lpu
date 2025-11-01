@@ -7,7 +7,6 @@ import AppRoutes from './routes/AppRoutes.jsx';
 import Navbar from './components/Navbar.jsx';
 import React from 'react';
 import Background3D from './components/Background3D.jsx';
-import ThemeToggle from './components/ThemeToggle.jsx';
 
 function App() {
 	const location = useLocation();
@@ -31,18 +30,13 @@ function App() {
 			if (!ticking.current) {
 				requestAnimationFrame(() => {
 					const currentScrollY = window.scrollY;
-
-					// Show navbar at top or when scrolling up
 					if (currentScrollY <= 10) {
 						setShowNavbar(true);
 					} else if (currentScrollY > lastScrollY.current && currentScrollY > 100) {
-						// Hide when scrolling down past 100px
 						setShowNavbar(false);
 					} else if (currentScrollY < lastScrollY.current - 5) {
-						// Show when scrolling up (with threshold to avoid flicker)
 						setShowNavbar(true);
 					}
-
 					lastScrollY.current = currentScrollY;
 					ticking.current = false;
 				});
@@ -73,7 +67,6 @@ function App() {
 				infinite: false,
 			}}
 		>
-			{/* Toast Notifications */}
 			<Toaster
 				position="top-right"
 				toastOptions={{
@@ -123,11 +116,9 @@ function App() {
 				</div>
 			)}
 
-			{/* Global themed background and theme toggle */}
+			{/* Global themed background (toggle moved into Navbar) */}
 			<Background3D />
-			<ThemeToggle />
 
-			{/* Single route mount; add top padding when navbar is visible */}
 			<main className={`relative z-10 ${!hideNavbar ? 'pt-20' : ''}`}>
 				<AppRoutes />
 			</main>
