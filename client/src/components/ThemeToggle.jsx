@@ -33,59 +33,43 @@ const ThemeToggle = ({ size = 'sm' }) => {
 
 	useEffect(() => {
 		updatePill();
-		window.addEventListener('resize', updatePill);
+		window.addEventListener('resize', updatePill, { passive: true });
 		return () => window.removeEventListener('resize', updatePill);
 		// eslint-disable-next-line react-hooks/exhaustive-deps
 	}, [mode]);
 
 	const btnClass =
-		size === 'sm' ? 'h-8 min-w-[2.25rem] px-2 text-xs' : 'h-9 min-w-[2.5rem] px-2.5 text-sm';
+		size === 'sm'
+			? 'h-8 min-w-[2.25rem] px-2 text-[11px]'
+			: 'h-9 min-w-[2.6rem] px-2.5 text-[13px]';
 
 	return (
-		<div
-			ref={containerRef}
-			className="relative flex items-center gap-1 rounded-xl p-1"
-			style={{
-				background: 'var(--glass-bg)',
-				border: '1px solid var(--glass-border)',
-				backdropFilter: 'blur(12px)',
-				boxShadow: 'var(--shadow-sm)',
-			}}
-			role="group"
-			aria-label="Theme toggle"
-		>
-			<div
-				aria-hidden="true"
-				className="absolute top-1 left-1 h-[calc(100%-8px)] rounded-lg transition-all duration-300 ease-out"
-				style={{
-					...pillStyle,
-					background: `linear-gradient(135deg, var(--accent-1), var(--accent-2))`,
-					opacity: 0.15,
-				}}
-			/>
+		<div ref={containerRef} className="theme-toggle" role="group" aria-label="Theme toggle">
+			{/* Sliding pill */}
+			<div aria-hidden="true" className="theme-toggle__pill" style={pillStyle} />
+
+			{/* Light */}
 			<button
 				ref={(el) => (btnRefs.current[0] = el)}
 				type="button"
-				className={`relative z-10 inline-flex items-center justify-center rounded-lg ${btnClass} transition-colors ${
-					mode === 'light' ? 'text-primary' : 'text-secondary hover:text-primary'
-				}`}
+				className={`theme-toggle__btn ${btnClass} ${mode === 'light' ? 'active' : ''}`}
 				aria-pressed={mode === 'light'}
-				aria-label="Bright mode"
+				aria-label="Light mode"
 				onClick={() => setMode('light')}
 			>
-				<Sun className="w-4 h-4" />
+				<Sun className="theme-toggle__icon w-[18px] h-[18px]" />
 			</button>
+
+			{/* Dark */}
 			<button
 				ref={(el) => (btnRefs.current[1] = el)}
 				type="button"
-				className={`relative z-10 inline-flex items-center justify-center rounded-lg ${btnClass} transition-colors ${
-					mode === 'dark' ? 'text-primary' : 'text-secondary hover:text-primary'
-				}`}
+				className={`theme-toggle__btn ${btnClass} ${mode === 'dark' ? 'active' : ''}`}
 				aria-pressed={mode === 'dark'}
 				aria-label="Dark mode"
 				onClick={() => setMode('dark')}
 			>
-				<Moon className="w-4 h-4" />
+				<Moon className="theme-toggle__icon w-[18px] h-[18px]" />
 			</button>
 		</div>
 	);

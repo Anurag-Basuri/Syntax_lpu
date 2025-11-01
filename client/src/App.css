@@ -604,6 +604,90 @@
 	transform: translateY(-1px);
 }
 
+/* THEME TOGGLE (improved UI) */
+.theme-toggle {
+	position: relative;
+	display: inline-flex;
+	align-items: center;
+	gap: 6px;
+	padding: 6px;
+	border-radius: 12px;
+	background: var(--glass-bg);
+	border: 1px solid var(--glass-border);
+	backdrop-filter: blur(12px);
+	-webkit-backdrop-filter: blur(12px);
+	box-shadow: var(--shadow-sm);
+	transition: box-shadow 240ms ease, border-color 240ms ease, transform 240ms ease;
+}
+.theme-toggle:hover {
+	box-shadow: var(--shadow-md);
+	border-color: color-mix(in srgb, var(--glass-border) 78%, var(--accent-1) 22%);
+}
+.theme-toggle:focus-within {
+	outline: 2px solid color-mix(in srgb, var(--accent-1) 70%, transparent);
+	outline-offset: 2px;
+}
+
+.theme-toggle__pill {
+	position: absolute;
+	top: 6px;
+	left: 6px;
+	height: calc(100% - 12px);
+	border-radius: 10px;
+	background: linear-gradient(135deg, var(--accent-1), var(--accent-2));
+	box-shadow: 0 2px 8px rgba(14, 165, 233, 0.25), 0 6px 18px rgba(14, 165, 233, 0.18);
+	opacity: 0.18;
+	will-change: transform, width;
+	transition: transform 420ms cubic-bezier(0.34, 1.56, 0.64, 1),
+		width 420ms cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+@media (prefers-reduced-motion: reduce) {
+	.theme-toggle__pill {
+		transition: transform 120ms linear, width 120ms linear;
+	}
+}
+
+.theme-toggle__btn {
+	position: relative;
+	z-index: 1;
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	border-radius: 8px;
+	color: var(--text-secondary);
+	background: transparent;
+	border: 0;
+	cursor: pointer;
+	user-select: none;
+	transition: color 200ms ease, transform 200ms ease;
+}
+.theme-toggle__btn:hover {
+	color: var(--text-primary);
+	transform: scale(1.05);
+}
+.theme-toggle__btn.active {
+	color: white;
+}
+
+.theme-toggle__btn:focus-visible {
+	outline: 2px solid var(--accent-1);
+	outline-offset: 2px;
+	border-radius: 10px;
+}
+
+.theme-toggle__icon {
+	transition: transform 260ms ease, filter 260ms ease;
+	filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.12));
+}
+.theme-toggle__btn:hover .theme-toggle__icon {
+	transform: rotate(-12deg) scale(1.1);
+	filter: drop-shadow(0 3px 6px rgba(0, 0, 0, 0.18));
+}
+.theme-toggle__btn.active .theme-toggle__icon {
+	transform: rotate(0) scale(1);
+	filter: drop-shadow(0 2px 8px rgba(255, 255, 255, 0.28));
+}
+
 /* Responsive breakpoints */
 @media (min-width: 640px) {
 	.navbar-grid {
