@@ -272,79 +272,63 @@ const Navbar = () => {
 						{/* Logo (natural aspect) with improved size & glow */}
 						<button
 							onClick={handleLogoClick}
-							className="group px-2 py-1.5 rounded-xl transition-all duration-300 select-none transform-gpu"
+							className="group relative px-3 py-2 transition-all duration-300 select-none"
 							aria-label="Go to home"
 						>
 							<div className="relative inline-flex items-center">
-								{/* Soft radial halo behind the logo */}
+								{/* Ambient glow behind logo */}
 								<div
 									aria-hidden="true"
-									className="absolute rounded-full pointer-events-none transition-opacity duration-500 -z-10"
+									className="absolute inset-0 pointer-events-none transition-opacity duration-500"
 									style={{
-										width: 88,
-										height: 88,
-										left: -8,
-										top: -8,
-										background:
-											'radial-gradient(40% 40% at 30% 35%, rgba(14,165,233,0.45), rgba(99,102,241,0.18) 30%, transparent 60%)',
-										filter: 'blur(18px)',
-										opacity: elevated ? 0.85 : 0.7,
+										background: `radial-gradient(80% 120% at 50% 50%, ${
+											elevated
+												? 'rgba(0,200,255,0.12)'
+												: 'rgba(0,200,255,0.18)'
+										} 0%, ${
+											elevated
+												? 'rgba(0,150,255,0.08)'
+												: 'rgba(0,150,255,0.12)'
+										} 45%, transparent 100%)`,
+										filter: 'blur(20px)',
+										opacity: elevated ? 0.8 : 1,
 										transform: 'translateZ(0)',
 									}}
 								/>
 
-								{/* Subtle long side glow (masked to the logo shape) */}
-								<div
-									aria-hidden="true"
-									className="absolute inset-0 pointer-events-none -z-5"
-									style={{
-										WebkitMaskImage: `url(${logo})`,
-										maskImage: `url(${logo})`,
-										WebkitMaskRepeat: 'no-repeat',
-										maskRepeat: 'no-repeat',
-										WebkitMaskSize: 'contain',
-										maskSize: 'contain',
-										WebkitMaskPosition: 'left center',
-										maskPosition: 'left center',
-										background:
-											'linear-gradient(90deg, rgba(14,165,233,0.00) 0%, rgba(14,165,233,0.28) 25%, rgba(99,102,241,0.28) 65%, rgba(99,102,241,0.00) 100%)',
-										opacity: elevated ? 0.6 : 0.8,
-										filter: 'blur(10px)',
-										transition: 'opacity .35s ease, transform .35s ease',
-										transform: 'scale(1.02)',
-									}}
-								/>
+								{/* Main logo with enhanced size */}
+								<div className="relative transform-gpu transition-transform duration-300 group-hover:scale-[1.02]">
+									<img
+										src={logo}
+										alt="Logo"
+										className="h-10 md:h-12 w-auto relative z-10"
+										style={{
+											filter: `drop-shadow(0 4px 12px rgba(0,200,255,0.3)) drop-shadow(0 8px 24px rgba(0,150,255,0.2))`,
+											transition: 'filter 0.3s ease, transform 0.3s ease',
+										}}
+									/>
 
-								{/* Main logo — increased size and interactive subtle scale + stronger drop shadow on hover */}
-								<img
-									src={logo}
-									alt="Logo"
-									className="h-12 sm:h-14 md:h-16 w-auto relative z-10 transition-transform duration-300 group-hover:scale-105"
-									style={{
-										filter: `drop-shadow(0 10px 22px rgba(2,6,23,0.55))`,
-										WebkitFilter: `drop-shadow(0 10px 22px rgba(2,6,23,0.55))`,
-										transition: 'filter .3s ease, transform .3s ease',
-									}}
-								/>
-
-								{/* Thin glossy sheen mask over the logo for a polished look */}
-								<div
-									className="absolute inset-0 pointer-events-none z-20 transition-opacity duration-400"
-									style={{
-										WebkitMaskImage: `url(${logo})`,
-										maskImage: `url(${logo})`,
-										WebkitMaskRepeat: 'no-repeat',
-										maskRepeat: 'no-repeat',
-										WebkitMaskSize: 'contain',
-										maskSize: 'contain',
-										WebkitMaskPosition: 'left center',
-										maskPosition: 'left center',
-										background:
-											'linear-gradient(180deg, rgba(255,255,255,0.18) 0%, rgba(255,255,255,0.02) 30%, rgba(255,255,255,0.00) 70%)',
-										opacity: elevated ? 0.65 : 0.5,
-										filter: 'blur(2px)',
-									}}
-								/>
+									{/* Edge glow effect */}
+									<div
+										className="absolute inset-0 pointer-events-none"
+										style={{
+											WebkitMaskImage: `url(${logo})`,
+											maskImage: `url(${logo})`,
+											WebkitMaskSize: 'contain',
+											maskSize: 'contain',
+											WebkitMaskRepeat: 'no-repeat',
+											maskRepeat: 'no-repeat',
+											WebkitMaskPosition: 'center',
+											maskPosition: 'center',
+											background:
+												'linear-gradient(90deg, rgba(0,200,255,0.00) 0%, rgba(0,200,255,0.35) 30%, rgba(0,150,255,0.35) 70%, rgba(0,150,255,0.00) 100%)',
+											filter: 'blur(8px)',
+											opacity: elevated ? 0.6 : 0.8,
+											transform: 'scale(1.1)',
+											transition: 'opacity 0.35s ease, transform 0.35s ease',
+										}}
+									/>
+								</div>
 							</div>
 						</button>
 						<div className="hidden lg:flex items-center gap-1 xl:gap-2">
