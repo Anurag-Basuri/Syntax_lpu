@@ -17,6 +17,7 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth.js';
 import ThemeToggle from './ThemeToggle.jsx';
 import NavLogo from './NavLogo.jsx';
+import logo from '../assets/logo.png';
 
 const navSections = [
 	{
@@ -197,10 +198,12 @@ const Navbar = () => {
 				<div className="navbar-progress-bar" style={{ width: `${progress}%` }} />
 
 				<div className="navbar-grid">
+					{/* Left Section - Logo */}
 					<div className="navbar-section-left">
 						<NavLogo onClick={handleLogoClick} elevated={elevated} />
 					</div>
 
+					{/* Center Section - Navigation Links */}
 					<div className="navbar-section-center">
 						{navSections.flatMap((section) =>
 							section.items.map((item) => {
@@ -212,15 +215,8 @@ const Navbar = () => {
 										className={`nav-link ${isActive ? 'active' : ''}`}
 										aria-current={isActive ? 'page' : undefined}
 									>
-										<item.icon
-											size={18}
-											style={{
-												color: isActive
-													? 'var(--accent-1)'
-													: 'currentColor',
-											}}
-										/>
-										<span className="whitespace-nowrap">{item.name}</span>
+										<item.icon size={18} className="nav-link-icon" />
+										<span className="nav-link-text">{item.name}</span>
 										{isActive && <span className="nav-pill" />}
 									</button>
 								);
@@ -228,39 +224,29 @@ const Navbar = () => {
 						)}
 					</div>
 
+					{/* Right Section - Theme + Auth */}
 					<div className="navbar-section-right">
-						<div className="hidden sm:flex">
+						<div className="navbar-theme-toggle">
 							<ThemeToggle size="sm" />
 						</div>
 
 						{isAuthenticated ? (
-							<div className="relative" ref={userRef}>
+							<div className="navbar-user-menu" ref={userRef}>
 								<button
 									onClick={() => setIsUserOpen((v) => !v)}
-									className="flex items-center gap-2 sm:gap-3 px-2 sm:px-3 md:px-3.5 py-2 rounded-full transition-all"
-									style={{
-										background: 'var(--glass-bg)',
-										border: '1px solid var(--glass-border)',
-										backdropFilter: 'blur(10px)',
-									}}
+									className="user-menu-button"
 									aria-haspopup="menu"
 									aria-expanded={isUserOpen}
 									aria-controls="user-menu"
 								>
-									<div
-										className="w-8 h-8 sm:w-9 sm:h-9 rounded-full flex items-center justify-center shadow-lg"
-										style={{
-											background:
-												'linear-gradient(135deg, var(--accent-1), var(--accent-2))',
-										}}
-									>
-										<User className="h-4 w-4 sm:h-5 sm:w-5 text-white" />
+									<div className="user-avatar">
+										<User className="user-avatar-icon" />
 									</div>
-									<span className="hidden sm:block text-white font-medium text-xs sm:text-sm">
+									<span className="user-role-text">
 										{isMember ? 'Member' : 'Admin'}
 									</span>
 									<ChevronDown
-										className="h-4 w-4 text-white transition-transform duration-300"
+										className="user-menu-chevron"
 										style={{
 											transform: isUserOpen
 												? 'rotate(180deg)'
@@ -270,25 +256,14 @@ const Navbar = () => {
 								</button>
 
 								{isUserOpen && (
-									<div
-										id="user-menu"
-										className="absolute right-0 mt-3 w-56 sm:w-64 rounded-2xl backdrop-blur-lg border shadow-2xl overflow-hidden z-50"
-										style={{
-											background: 'rgba(2,6,12,0.9)',
-											borderColor: 'rgba(255,255,255,0.12)',
-										}}
-										role="menu"
-									>
-										<div className="py-2">
+									<div id="user-menu" className="user-dropdown" role="menu">
+										<div className="user-dropdown-items">
 											<button
 												onClick={handleDashboardClick}
-												className="w-full flex items-center gap-3 px-4 py-3 text-left hover:bg-white/5 transition-all text-white"
+												className="user-dropdown-item"
 												role="menuitem"
 											>
-												<LayoutDashboard
-													className="h-5 w-5"
-													style={{ color: 'var(--accent-1)' }}
-												/>
+												<LayoutDashboard className="dropdown-icon" />
 												<span>
 													{isMember
 														? 'Member Dashboard'
@@ -297,38 +272,25 @@ const Navbar = () => {
 											</button>
 											<button
 												onClick={() => navigate('/show')}
-												className="w-full flex items-center gap-3 px-4 py-3 text-left hover:bg-white/5 transition-all text-white"
+												className="user-dropdown-item"
 												role="menuitem"
 											>
-												<QrCode
-													className="h-5 w-5"
-													style={{ color: 'var(--accent-2)' }}
-												/>
+												<QrCode className="dropdown-icon" />
 												<span>Show</span>
 											</button>
 											<button
 												onClick={handleQRScannerClick}
-												className="w-full flex items-center gap-3 px-4 py-3 text-left hover:bg-white/5 transition-all text-white"
+												className="user-dropdown-item"
 												role="menuitem"
 											>
-												<QrCode
-													className="h-5 w-5"
-													style={{ color: 'var(--accent-1)' }}
-												/>
+												<QrCode className="dropdown-icon" />
 												<span>QR Scanner</span>
 											</button>
 										</div>
-										<div
-											className="p-3 border-t"
-											style={{ borderColor: 'rgba(255,255,255,0.1)' }}
-										>
+										<div className="user-dropdown-footer">
 											<button
-												className="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl font-medium text-white transition-all"
+												className="logout-button"
 												onClick={handleLogout}
-												style={{
-													background:
-														'linear-gradient(135deg, rgba(239,68,68,0.9), rgba(239,68,68,0.75))',
-												}}
 											>
 												<LogOut className="h-4 w-4" />
 												<span>Log Out</span>
@@ -338,17 +300,17 @@ const Navbar = () => {
 								)}
 							</div>
 						) : (
-							<div className="hidden sm:flex items-center gap-2 sm:gap-3">
+							<div className="navbar-auth-buttons">
 								<button
 									onClick={handleAlreadyMember}
-									className="btn btn-secondary rounded-xl text-sm px-4 py-2"
+									className="auth-button auth-button-secondary"
 								>
 									<LogIn className="h-4 w-4" />
 									<span>Login</span>
 								</button>
 								<button
 									onClick={handleJoinClub}
-									className="btn btn-primary rounded-xl text-sm px-4 py-2"
+									className="auth-button auth-button-primary"
 								>
 									<UserPlus className="h-4 w-4" />
 									<span>Join</span>
@@ -358,16 +320,11 @@ const Navbar = () => {
 
 						<button
 							ref={menuButtonRef}
-							className="lg:hidden p-2 sm:p-2.5 rounded-xl text-white shadow-lg hover:shadow-xl transition-all hover:scale-105"
+							className="mobile-menu-button"
 							onClick={() => setIsOpen(true)}
 							aria-label="Open menu"
 							aria-controls="mobile-drawer"
 							aria-expanded={isOpen}
-							style={{
-								background:
-									'linear-gradient(135deg, var(--accent-1), var(--accent-2))',
-								zIndex: 60,
-							}}
 						>
 							<Menu className="w-6 h-6" />
 						</button>
@@ -378,165 +335,83 @@ const Navbar = () => {
 			{/* Mobile Drawer */}
 			{isOpen && (
 				<div
-					className="fixed inset-0 z-[100] lg:hidden"
+					className="mobile-drawer-overlay"
 					role="dialog"
 					aria-modal="true"
 					id="mobile-drawer"
 				>
 					<div
-						className="fixed inset-0 bg-black/60 backdrop-blur-sm"
+						className="mobile-drawer-backdrop"
 						onClick={() => setIsOpen(false)}
-						style={{ zIndex: 90 }}
 						aria-hidden="true"
 					/>
-					<div
-						ref={drawerRef}
-						className="fixed top-0 left-0 h-[100dvh] w-72 max-w-[90vw] backdrop-blur-lg border-r shadow-2xl overflow-hidden z-[100]"
-						style={{
-							background: 'rgba(2,6,12,0.92)',
-							borderColor: 'rgba(255,255,255,0.12)',
-							animation: 'slideIn .3s ease-out',
-						}}
-					>
-						<div className="h-full flex flex-col">
-							{/* Drawer header with logo (natural) + glow */}
-							<div
-								className="flex justify-between items-center p-4 sm:p-6 border-b"
-								style={{
-									borderColor: 'var(--nav-border)',
-									background:
-										'linear-gradient(90deg, color-mix(in srgb, var(--accent-1) 12%, transparent), color-mix(in srgb, var(--accent-2) 12%, transparent))',
-								}}
-							>
-								<div className="relative inline-flex items-center h-8">
-									<img
-										src={logo}
-										alt="Logo"
-										className="h-8 w-auto block pointer-events-none select-none"
-										draggable="false"
-									/>
-									<div
-										className="absolute inset-0 pointer-events-none"
-										aria-hidden="true"
-									>
-										<div
-											className="w-full h-full"
-											style={{
-												WebkitMaskImage: `url(${logo})`,
-												maskImage: `url(${logo})`,
-												WebkitMaskRepeat: 'no-repeat',
-												maskRepeat: 'no-repeat',
-												WebkitMaskSize: 'contain',
-												maskSize: 'contain',
-												WebkitMaskPosition: 'left center',
-												maskPosition: 'left center',
-												background:
-													'linear-gradient(90deg, rgba(0,200,255,0.0) 0%, rgba(0,200,255,0.45) 30%, rgba(0,150,255,0.45) 70%, rgba(0,150,255,0.0) 100%)',
-												filter: 'blur(8px)',
-												opacity: 'var(--logo-glow-opacity)',
-											}}
-										/>
+					<div ref={drawerRef} className="mobile-drawer">
+						<div className="mobile-drawer-content">
+							{/* Drawer Header */}
+							<div className="mobile-drawer-header">
+								<div className="mobile-drawer-logo">
+									<img src={logo} alt="Logo" draggable="false" />
+									<div className="mobile-drawer-logo-glow" aria-hidden="true">
+										<div className="mobile-drawer-logo-glow-inner" />
 									</div>
 								</div>
-								<div className="flex items-center gap-2">
+								<div className="mobile-drawer-actions">
 									<ThemeToggle size="sm" />
 									<button
-										className="p-2 rounded-xl text-white transition-all"
+										className="mobile-drawer-close"
 										onClick={() => setIsOpen(false)}
 										aria-label="Close menu"
-										style={{
-											background: 'var(--glass-bg)',
-											border: '1px solid var(--glass-border)',
-											backdropFilter: 'blur(10px)',
-										}}
 									>
 										<X size={20} />
 									</button>
 								</div>
 							</div>
 
-							{/* Navigation */}
-							<div className="flex-1 overflow-y-auto p-3 sm:p-6 custom-scrollbar">
-								<div className="space-y-6">
-									{navSections.map((section, idx) => (
-										<div key={idx}>
-											<ul className="space-y-2">
-												{section.items.map((item) => {
-													const isActive = activeLink === item.name;
-													return (
+							{/* Drawer Navigation */}
+							<div className="mobile-drawer-nav">
+								{navSections.map((section, idx) => (
+									<div key={idx}>
+										<ul className="mobile-nav-list">
+											{section.items.map((item) => {
+												const isActive = activeLink === item.name;
+												return (
+													<li key={item.name}>
 														<button
-															key={item.name}
 															onClick={() =>
 																handleLinkClick(item.name)
 															}
-															className={`w-full flex items-center gap-3 sm:gap-4 p-3 sm:p-4 rounded-xl text-left transition-all ${
-																isActive
-																	? 'text-white'
-																	: 'text-slate-300 hover:text-white'
+															className={`mobile-nav-item ${
+																isActive ? 'active' : ''
 															}`}
 														>
-															<div
-																className="w-9 h-9 sm:w-10 sm:h-10 rounded-lg flex items-center justify-center transition-all border"
-																style={{
-																	background: isActive
-																		? 'linear-gradient(90deg, color-mix(in srgb, var(--accent-1) 20%, transparent), color-mix(in srgb, var(--accent-2) 20%, transparent))'
-																		: 'rgba(255,255,255,0.05)',
-																	borderColor: isActive
-																		? 'color-mix(in srgb, var(--accent-1) 30%, rgba(255,255,255,0.15))'
-																		: 'rgba(255,255,255,0.1)',
-																}}
-															>
-																<item.icon
-																	size={20}
-																	style={{
-																		color: isActive
-																			? 'var(--accent-1)'
-																			: 'inherit',
-																	}}
-																/>
+															<div className="mobile-nav-icon">
+																<item.icon size={20} />
 															</div>
-															<span className="font-medium">
+															<span className="mobile-nav-text">
 																{item.name}
 															</span>
 														</button>
-													);
-												})}
-											</ul>
-										</div>
-									))}
-								</div>
+													</li>
+												);
+											})}
+										</ul>
+									</div>
+								))}
 							</div>
 
-							{/* Auth (mobile) */}
+							{/* Drawer Auth */}
 							{!isAuthenticated && (
-								<div
-									className="p-4 sm:p-6 border-t space-y-3"
-									style={{
-										borderColor: 'rgba(255,255,255,0.1)',
-										background:
-											'linear-gradient(90deg, color-mix(in srgb, var(--accent-1) 10%, transparent), color-mix(in srgb, var(--accent-2) 10%, transparent))',
-									}}
-								>
+								<div className="mobile-drawer-auth">
 									<button
 										onClick={handleAlreadyMember}
-										className="w-full flex items-center justify-center gap-2 px-4 py-3 rounded-xl font-semibold text-sm"
-										style={{
-											background: 'var(--glass-bg)',
-											border: '1px solid var(--glass-border)',
-											color: 'var(--text-primary)',
-											backdropFilter: 'blur(10px)',
-										}}
+										className="mobile-auth-button secondary"
 									>
 										<LogIn className="h-4 w-4" />
 										<span>Already a member</span>
 									</button>
 									<button
 										onClick={handleJoinClub}
-										className="w-full flex items-center justify-center gap-2 px-4 py-3 rounded-xl font-semibold text-white text-sm"
-										style={{
-											background:
-												'linear-gradient(135deg, var(--accent-1), var(--accent-2))',
-										}}
+										className="mobile-auth-button primary"
 									>
 										<UserPlus className="h-4 w-4" />
 										<span>Join Club</span>
