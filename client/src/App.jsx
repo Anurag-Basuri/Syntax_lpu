@@ -5,48 +5,57 @@ import { ReactLenis } from 'lenis/react';
 import { Toaster } from 'react-hot-toast';
 import AppRoutes from './routes/AppRoutes.jsx';
 import Navbar from './components/Navbar.jsx';
-import React from 'react';
 import Background3D from './components/Background3D.jsx';
 
 function App() {
 	const location = useLocation();
-
-	// Hide navbar for specific routes
-	const hideNavbar =
-		location.pathname.startsWith('/auth') ||
-		location.pathname.startsWith('/admin/auth') ||
-		location.pathname.startsWith('/terms') ||
-		location.pathname.startsWith('/refund') ||
-		location.pathname.startsWith('/policy') ||
-		location.pathname.startsWith('/privacy') ||
-		location.pathname.startsWith('/cookie');
-
+	const [scrollProgress, setScrollProgress] = useState(0);
 	const [showNavbar, setShowNavbar] = useState(true);
 	const lastScrollY = useRef(0);
-	const ticking = useRef(false);
+	const scrollTimeout = useRef(null);
+
+	// Hide navbar for specific routes
+	const hideNavbar = [
+		'/auth',
+		'/admin/auth',
+		'/terms',
+		'/refund',
+		'/policy',
+		'/privacy',
+		'/cookie',
+	].some((path) => location.pathname.startsWith(path));
 
 	useEffect(() => {
 		const handleScroll = () => {
-			if (!ticking.current) {
-				requestAnimationFrame(() => {
-					const currentScrollY = window.scrollY;
-					if (currentScrollY <= 10) {
-						setShowNavbar(true);
-					} else if (currentScrollY > lastScrollY.current && currentScrollY > 100) {
-						setShowNavbar(false);
-					} else if (currentScrollY < lastScrollY.current - 5) {
-						setShowNavbar(true);
-					}
-					lastScrollY.current = currentScrollY;
-					ticking.current = false;
-				});
-				ticking.current = true;
+			const currentScrollY = window.scrollY;
+			const docHeight = document.documentElement.scrollHeight - window.innerHeight;
+			const progress = (currentScrollY / Math.max(docHeight, 1)) * 100;
+
+			// Update scroll progress
+			setScrollProgress(Math.min(100, Math.max(0, progress)));
+
+			// Smart navbar show/hide logic
+			if (currentScrollY < 100) {
+				setShowNavbar(true);
+			} else if (currentScrollY > lastScrollY.current + 20) {
+				setShowNavbar(false);
+			} else if (currentScrollY < lastScrollY.current - 20) {
+				setShowNavbar(true);
 			}
+
+			lastScrollY.current = currentScrollY;
+
+			// Reset scroll timeout
+			if (scrollTimeout.current) clearTimeout(scrollTimeout.current);
+			scrollTimeout.current = setTimeout(() => setShowNavbar(true), 1000);
 		};
 
 		if (!hideNavbar) {
 			window.addEventListener('scroll', handleScroll, { passive: true });
-			return () => window.removeEventListener('scroll', handleScroll);
+			return () => {
+				window.removeEventListener('scroll', handleScroll);
+				if (scrollTimeout.current) clearTimeout(scrollTimeout.current);
+			};
 		}
 	}, [hideNavbar]);
 
@@ -56,14 +65,9 @@ function App() {
 			options={{
 				lerp: 0.1,
 				duration: 1.2,
-				easing: (t) => Math.min(1, 1.001 - Math.pow(2, -10 * t)),
-				orientation: 'vertical',
-				gestureOrientation: 'vertical',
 				smoothWheel: true,
-				wheelMultiplier: 1,
+				smoothTouch: true,
 				touchMultiplier: 2,
-				syncTouch: true,
-				touchInertiaMultiplier: 35,
 				infinite: false,
 			}}
 		>
@@ -71,57 +75,53 @@ function App() {
 				position="top-right"
 				toastOptions={{
 					duration: 4000,
-					style: {
-						background: 'rgba(0, 0, 0, 0.8)',
-						color: '#fff',
-						border: '1px solid rgba(255, 255, 255, 0.1)',
-						borderRadius: '12px',
-						backdropFilter: 'blur(10px)',
-						boxShadow: '0 8px 32px rgba(0, 0, 0, 0.3)',
-					},
-					success: {
-						iconTheme: { primary: '#10B981', secondary: '#fff' },
-						style: {
-							border: '1px solid rgba(16, 185, 129, 0.3)',
-							background: 'rgba(16, 185, 129, 0.1)',
-						},
-					},
-					error: {
-						iconTheme: { primary: '#EF4444', secondary: '#fff' },
-						style: {
-							border: '1px solid rgba(239, 68, 68, 0.3)',
-							background: 'rgba(239, 68, 68, 0.1)',
-						},
-					},
-					loading: {
-						iconTheme: { primary: '#3B82F6', secondary: '#fff' },
-						style: {
-							border: '1px solid rgba(59, 130, 246, 0.3)',
-							background: 'rgba(59, 130, 246, 0.1)',
-						},
-					},
+					className: '!bg-transparent !border-0 !shadow-none',
+					style: { background: 'transparent' },
 				}}
 			/>
 
 			{!hideNavbar && (
-				<div
-					className="fixed top-0 left-0 w-full z-50 transition-all duration-300 ease-out"
+				<header
+					className="fixed top-0 left-0 w-full z-50 transition-all duration-500 ease-out-expo"
 					style={{
-						transform: showNavbar ? 'translateY(0)' : 'translateY(-100%)',
+						transform: `translateY(${showNavbar ? '0' : '-100%'})`,
 						opacity: showNavbar ? 1 : 0,
-						pointerEvents: showNavbar ? 'auto' : 'none',
 					}}
 				>
+					{/* Progress bar */}
+					<div
+						className="absolute top-0 left-0 h-[2px] transition-all duration-300"
+						style={{
+							width: `${scrollProgress}%`,
+							background: 'linear-gradient(90deg, var(--accent-1), var(--accent-2))',
+							boxShadow: '0 0 20px var(--accent-1)',
+						}}
+					/>
 					<Navbar />
-				</div>
+				</header>
 			)}
 
-			{/* Global themed background (toggle moved into Navbar) */}
 			<Background3D />
 
-			<main id="main" className={`relative z-10 ${!hideNavbar ? 'pt-20' : ''}`}>
-				<AppRoutes />
+			<main
+				id="main"
+				className={`relative z-10 transition-all duration-300 ${
+					!hideNavbar ? 'pt-20' : ''
+				}`}
+			>
+				{/* Page transition wrapper */}
+				<div className="page-transition-wrapper">
+					<AppRoutes />
+				</div>
 			</main>
+
+			{/* Scroll progress indicator (optional) */}
+			<div
+				className="fixed right-4 bottom-4 w-12 h-12 rounded-full bg-black/20 backdrop-blur-md border border-white/10 flex items-center justify-center font-mono text-sm"
+				style={{ opacity: scrollProgress > 2 ? 0.8 : 0 }}
+			>
+				{Math.round(scrollProgress)}%
+			</div>
 		</ReactLenis>
 	);
 }

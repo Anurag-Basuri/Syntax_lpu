@@ -718,3 +718,54 @@ a:focus-visible {
 	box-shadow: var(--shadow-md);
 	transform: translateY(-1px);
 }
+
+/* Add these new utility classes */
+
+.ease-out-expo {
+	transition-timing-function: cubic-bezier(0.19, 1, 0.22, 1);
+}
+
+.page-transition-wrapper {
+	animation: page-enter 1s cubic-bezier(0.19, 1, 0.22, 1);
+}
+
+@keyframes page-enter {
+	from {
+		opacity: 0;
+		transform: translateY(20px);
+	}
+	to {
+		opacity: 1;
+		transform: translateY(0);
+	}
+}
+
+/* Improved scrollbar styling */
+::-webkit-scrollbar {
+	width: 10px;
+	background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+	background: linear-gradient(to bottom, var(--accent-1), var(--accent-2));
+	border-radius: 5px;
+	border: 2px solid rgba(0, 0, 0, 0.2);
+}
+
+::-webkit-scrollbar-track {
+	background: rgba(0, 0, 0, 0.1);
+}
+
+/* Smooth scroll behavior */
+html {
+	scroll-behavior: smooth;
+	@media (prefers-reduced-motion: no-preference) {
+		scroll-behavior: smooth;
+	}
+}
+
+/* Enhanced focus styles */
+:focus-visible {
+	outline: 2px solid var(--accent-1);
+	outline-offset: 2px;
+}
