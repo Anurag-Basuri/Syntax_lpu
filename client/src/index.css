@@ -816,6 +816,12 @@ a:focus-visible {
 	top: 45%;
 	left: 30%;
 }
+.hero-card:nth-child(4) {
+	width: 230px;
+	bottom: 5%;
+	right: 5%;
+	z-index: 10;
+}
 
 @media (max-width: 1023px) {
 	.hero-visuals-container {
@@ -887,6 +893,8 @@ html {
 	outline-offset: 2px;
 }
 
+/* ===== Hero responsiveness polish (transparent + tighter layout) ===== */
+
 /* Make glass lighter for hero badges/cards */
 .hero-badge {
 	background: color-mix(in srgb, var(--glass-bg) 85%, transparent);
@@ -902,6 +910,7 @@ html {
 
 /* Softer card background for true transparency */
 .hero-card {
+	position: absolute;
 	background: color-mix(in srgb, var(--glass-bg) 92%, transparent);
 	border: 1px solid var(--glass-border);
 	border-radius: 16px;
@@ -911,39 +920,47 @@ html {
 	transition: transform 0.35s ease, border-color 0.25s ease, box-shadow 0.25s ease;
 }
 
-/* Card positions (desktop default) */
+.hero-card:hover {
+	transform: translateY(-8px) scale(1.05) !important;
+	border-color: color-mix(in srgb, var(--glass-border) 50%, var(--accent-1) 50%);
+}
+
+/* Card positions (desktop default) - NOW WITH 4 CARDS */
 .hero-card:nth-child(1) {
 	width: 240px;
-	top: 8%;
-	left: 6%;
-}
+	top: 5%;
+	left: 0%;
+} /* Team */
 .hero-card:nth-child(2) {
-	width: 260px;
-	bottom: 12%;
-	right: 2%;
-	z-index: 10;
-}
-.hero-card:nth-child(3) {
 	width: 220px;
-	top: 46%;
-	left: 30%;
-}
+	bottom: 25%;
+	left: 5%;
+	z-index: 10;
+} /* Code */
+.hero-card:nth-child(3) {
+	width: 210px;
+	top: 15%;
+	right: 0%;
+} /* Design */
+.hero-card:nth-child(4) {
+	width: 230px;
+	bottom: 5%;
+	right: 5%;
+	z-index: 10;
+} /* Ship */
 
 /* Large tablets */
 @media (max-width: 1200px) {
 	.hero-card:nth-child(1) {
-		top: 6%;
-		left: 4%;
 		width: 220px;
 	}
 	.hero-card:nth-child(2) {
-		bottom: 10%;
-		right: 2%;
-		width: 240px;
+		width: 200px;
 	}
 	.hero-card:nth-child(3) {
-		top: 44%;
-		left: 28%;
+		width: 190px;
+	}
+	.hero-card:nth-child(4) {
 		width: 210px;
 	}
 }
@@ -956,13 +973,18 @@ html {
 		width: 210px;
 	}
 	.hero-card:nth-child(2) {
-		bottom: 8%;
-		right: 1%;
-		width: 220px;
+		bottom: 22%;
+		left: 5%;
+		width: 190px;
 	}
 	.hero-card:nth-child(3) {
-		top: 42%;
-		left: 24%;
+		top: 12%;
+		right: 2%;
+		width: 180px;
+	}
+	.hero-card:nth-child(4) {
+		bottom: 8%;
+		right: 5%;
 		width: 200px;
 	}
 }
@@ -970,21 +992,27 @@ html {
 /* Mobile: keep inside viewport and scale down a bit */
 @media (max-width: 640px) {
 	.hero-visuals-container {
-		transform: scale(0.92);
+		transform: scale(0.9);
+		margin-top: -2rem;
 	}
 	.hero-card:nth-child(1) {
 		top: 4%;
-		left: 4%;
+		left: 0%;
 		width: 200px;
 	}
 	.hero-card:nth-child(2) {
-		bottom: 6%;
-		right: 4%;
-		width: 210px;
+		bottom: 20%;
+		left: 2%;
+		width: 180px;
 	}
 	.hero-card:nth-child(3) {
-		top: 46%;
-		left: 16%;
+		top: 15%;
+		right: 0%;
+		width: 170px;
+	}
+	.hero-card:nth-child(4) {
+		bottom: 5%;
+		right: 2%;
 		width: 190px;
 	}
 }
