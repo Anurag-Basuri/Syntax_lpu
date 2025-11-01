@@ -12,7 +12,6 @@ import {
 	LogOut,
 	ChevronDown,
 	QrCode,
-	Search,
 } from 'lucide-react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth.js';
@@ -261,6 +260,7 @@ const Navbar = () => {
 					transform: showNavbar ? 'translateY(0)' : 'translateY(-100%)',
 				}}
 			>
+				{/* Scroll progress bar */}
 				<div
 					aria-hidden="true"
 					className="absolute top-0 left-0 h-[2px]"
@@ -270,34 +270,52 @@ const Navbar = () => {
 						boxShadow: '0 0 12px rgba(0,200,255,0.55)',
 					}}
 				/>
+
 				<div className="max-w-7xl mx-auto px-2 sm:px-4 lg:px-8 h-full">
 					<div className="flex items-center justify-between h-full w-full">
-						{/* New Logo-only Design */}
-						<div className="flex items-center justify-start">
-							<button
-								onClick={handleLogoClick}
-								className="flex items-center justify-center w-12 h-12 rounded-full transition-all duration-300 group"
-								aria-label="Go to home"
-							>
+						{/* Logo (natural aspect) with masked side glow */}
+						<button
+							onClick={handleLogoClick}
+							className="group px-2 py-1.5 rounded-xl transition-transform select-none"
+							aria-label="Go to home"
+							style={{ background: 'transparent' }}
+						>
+							<div className="relative inline-flex items-center">
+								<img
+									src={logo}
+									alt="Logo"
+									className="h-8 sm:h-9 md:h-10 w-auto block pointer-events-none select-none"
+									draggable="false"
+									decoding="async"
+								/>
+								{/* Glow derived from the logo silhouette (not container) */}
 								<div
-									className="relative w-10 h-10 rounded-full flex items-center justify-center transition-all duration-300 transform group-hover:scale-110"
-									style={{
-										background: 'var(--glass-bg)',
-										border: '1px solid var(--glass-border)',
-										boxShadow: elevated
-											? '0 0 12px rgba(0,200,255,0.2)'
-											: '0 0 24px rgba(0,200,255,0.3)',
-									}}
+									className="absolute inset-0 pointer-events-none"
+									aria-hidden="true"
 								>
-									<img
-										src={logo}
-										alt="Syntax Club Logo"
-										className="w-6 h-6 transition-transform duration-300"
+									<div
+										className="w-full h-full transition-opacity duration-300"
+										style={{
+											WebkitMaskImage: `url(${logo})`,
+											maskImage: `url(${logo})`,
+											WebkitMaskRepeat: 'no-repeat',
+											maskRepeat: 'no-repeat',
+											WebkitMaskSize: 'contain',
+											maskSize: 'contain',
+											WebkitMaskPosition: 'left center',
+											maskPosition: 'left center',
+											background:
+												'linear-gradient(90deg, rgba(0,200,255,0.0) 0%, rgba(0,200,255,0.45) 30%, rgba(0,150,255,0.45) 70%, rgba(0,150,255,0.0) 100%)',
+											filter: 'blur(8px)',
+											opacity: elevated ? 0.55 : 0.8,
+											transform: 'translateZ(0)',
+										}}
 									/>
 								</div>
-							</button>
-						</div>
+							</div>
+						</button>
 
+						{/* Center Nav */}
 						<div className="hidden lg:flex items-center gap-1 xl:gap-2">
 							{navSections.flatMap((section) =>
 								section.items.map((item) => {
@@ -326,26 +344,11 @@ const Navbar = () => {
 							)}
 						</div>
 
+						{/* Right cluster */}
 						<div className="flex items-center justify-end gap-2 sm:gap-3">
 							<div className="hidden sm:flex">
 								<ThemeToggle />
 							</div>
-
-							<button
-								type="button"
-								className="hidden md:flex items-center gap-2 px-3 py-2 rounded-xl text-sm"
-								title="Search (coming soon)"
-								disabled
-								style={{
-									background: 'var(--glass-bg)',
-									border: '1px solid var(--glass-border)',
-									opacity: 0.7,
-									cursor: 'not-allowed',
-								}}
-							>
-								<Search className="w-4 h-4" />
-								<span className="text-secondary">Search</span>
-							</button>
 
 							{isAuthenticated ? (
 								<div className="relative" ref={userRef}>
@@ -472,6 +475,7 @@ const Navbar = () => {
 								</div>
 							)}
 
+							{/* Mobile menu button */}
 							<button
 								ref={menuButtonRef}
 								className="lg:hidden p-2 sm:p-3 rounded-xl text-white shadow-lg hover:shadow-xl transition-all hover:scale-105"
@@ -492,6 +496,7 @@ const Navbar = () => {
 				</div>
 			</nav>
 
+			{/* Mobile Drawer */}
 			{isOpen && (
 				<div
 					className="fixed inset-0 z-[100] lg:hidden"
@@ -515,6 +520,7 @@ const Navbar = () => {
 						}}
 					>
 						<div className="h-full flex flex-col">
+							{/* Drawer header with logo (natural) + glow */}
 							<div
 								className="flex justify-between items-center p-4 sm:p-6 border-b"
 								style={{
@@ -523,16 +529,34 @@ const Navbar = () => {
 										'linear-gradient(90deg, color-mix(in srgb, var(--accent-1) 12%, transparent), color-mix(in srgb, var(--accent-2) 12%, transparent))',
 								}}
 							>
-								<div className="flex items-center gap-3">
+								<div className="relative inline-flex items-center h-8">
+									<img
+										src={logo}
+										alt="Logo"
+										className="h-8 w-auto block pointer-events-none select-none"
+										draggable="false"
+									/>
 									<div
-										className="w-10 h-10 rounded-xl flex items-center justify-center text-white shadow-lg"
-										style={{
-											background:
-												'linear-gradient(135deg, var(--accent-1), var(--accent-2))',
-										}}
+										className="absolute inset-0 pointer-events-none"
+										aria-hidden="true"
 									>
-										{/* Replaced text with logo in mobile drawer header */}
-										<img src={logo} alt="Syntax Logo" className="w-6 h-6" />
+										<div
+											className="w-full h-full"
+											style={{
+												WebkitMaskImage: `url(${logo})`,
+												maskImage: `url(${logo})`,
+												WebkitMaskRepeat: 'no-repeat',
+												maskRepeat: 'no-repeat',
+												WebkitMaskSize: 'contain',
+												maskSize: 'contain',
+												WebkitMaskPosition: 'left center',
+												maskPosition: 'left center',
+												background:
+													'linear-gradient(90deg, rgba(0,200,255,0.0) 0%, rgba(0,200,255,0.45) 30%, rgba(0,150,255,0.45) 70%, rgba(0,150,255,0.0) 100%)',
+												filter: 'blur(8px)',
+												opacity: 0.8,
+											}}
+										/>
 									</div>
 								</div>
 								<div className="flex items-center gap-2">
@@ -552,6 +576,7 @@ const Navbar = () => {
 								</div>
 							</div>
 
+							{/* Navigation */}
 							<div className="flex-1 overflow-y-auto p-3 sm:p-6 custom-scrollbar">
 								<div className="space-y-6">
 									{navSections.map((section, idx) => (
@@ -603,6 +628,7 @@ const Navbar = () => {
 								</div>
 							</div>
 
+							{/* Auth (mobile) */}
 							{!isAuthenticated && (
 								<div
 									className="p-4 sm:p-6 border-t space-y-3"
