@@ -1,86 +1,109 @@
 import React from 'react';
 import { motion } from 'framer-motion';
-import { Users2, Flame, Compass, HeartHandshake, Zap, BrainCircuit } from 'lucide-react';
-
-const container = {
-	hidden: { opacity: 0 },
-	visible: { opacity: 1, transition: { staggerChildren: 0.1, delayChildren: 0.2 } },
-};
-const item = {
-	hidden: { opacity: 0, y: 20 },
-	visible: { opacity: 1, y: 0, transition: { duration: 0.6, ease: [0.4, 0, 0.2, 1] } },
-};
+import { BrainCircuit, Lightbulb, Users, Zap } from 'lucide-react';
 
 const AboutSyntax = () => {
+	const culture = [
+		{
+			icon: Lightbulb,
+			title: 'Creativity',
+			desc: 'We encourage new ideas and innovative thinking to solve real problems.',
+		},
+		{
+			icon: BrainCircuit,
+			title: 'Curiosity',
+			desc: 'A desire to learn, explore, and question is at the heart of everything we do.',
+		},
+		{
+			icon: Zap,
+			title: 'Leadership',
+			desc: 'We empower students to take initiative, lead projects, and inspire others.',
+		},
+		{
+			icon: Users,
+			title: 'Collaboration',
+			desc: 'We believe the best work comes from diverse teams working together.',
+		},
+	];
+
 	return (
 		<section className="section-padding page-container">
-			{/* Header */}
-			<motion.div
-				initial={{ opacity: 0, y: 15 }}
-				whileInView={{ opacity: 1, y: 0 }}
-				viewport={{ once: true, amount: 0.3 }}
-				transition={{ duration: 0.6 }}
-				className="text-center mb-16"
-			>
-				<div className="hero-badge inline-flex items-center gap-2 mb-6">
-					<Users2 className="w-4 h-4 text-accent-2" />
-					<span className="font-medium">The Syntax Philosophy</span>
-				</div>
-				<h2 className="text-4xl sm:text-5xl font-display font-bold tracking-tight text-primary mb-4">
-					A place to build, learn, and <span className="brand-text">grow</span>.
-				</h2>
-				<p className="text-lg sm:text-xl text-secondary max-w-3xl mx-auto leading-relaxed">
-					Syntax is a creative space where builders meet, learn in public, and turn ideas
-					into momentum. We are a community of doers, driven by curiosity and a passion
-					for shipping great work.
-				</p>
-			</motion.div>
+			{/* Main "What is Syntax?" Section */}
+			<div className="grid grid-cols-1 lg:grid-cols-5 gap-12 items-center mb-24">
+				<motion.div
+					initial={{ opacity: 0, x: -20 }}
+					whileInView={{ opacity: 1, x: 0 }}
+					viewport={{ once: true, amount: 0.3 }}
+					transition={{ duration: 0.7 }}
+					className="lg:col-span-2"
+				>
+					<h2 className="text-4xl sm:text-5xl font-display font-bold tracking-tight text-primary mb-4">
+						What is <span className="brand-text">Syntax?</span>
+					</h2>
+				</motion.div>
+				<motion.div
+					initial={{ opacity: 0, y: 20 }}
+					whileInView={{ opacity: 1, y: 0 }}
+					viewport={{ once: true, amount: 0.3 }}
+					transition={{ duration: 0.7, delay: 0.1 }}
+					className="lg:col-span-3"
+				>
+					<p className="text-lg sm:text-xl text-secondary leading-relaxed">
+						Syntax is a dynamic student organization at Lovely Professional University
+						focused on innovation, leadership, and collaborative learning. We bridge
+						academics with real-world execution by providing a platform to work on
+						impactful projects, develop essential skills, and network with like-minded
+						peers.
+					</p>
+				</motion.div>
+			</div>
 
-			{/* Core Principles */}
+			{/* Culture Section */}
 			<motion.div
-				variants={container}
 				initial="hidden"
 				whileInView="visible"
 				viewport={{ once: true, amount: 0.2 }}
-				className="grid grid-cols-1 md:grid-cols-3 gap-6"
+				variants={{ visible: { transition: { staggerChildren: 0.1 } } }}
+				className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-24"
 			>
-				{[
-					{
-						icon: HeartHandshake,
-						title: 'Community First',
-						desc: 'We give honest feedback, share knowledge, and help each other level up. Success is a team sport.',
-					},
-					{
-						icon: Zap,
-						title: 'Bias for Action',
-						desc: 'We believe in prototyping early, iterating often, and learning in public. Build more, talk less.',
-					},
-					{
-						icon: BrainCircuit,
-						title: 'Own Your Craft',
-						desc: 'Roles are fluid; contribution is what counts. We encourage taking ownership and shipping with pride.',
-					},
-				].map((P, idx) => (
+				{culture.map((item) => (
 					<motion.div
-						key={idx}
-						variants={item}
-						className="glass-card p-8 text-center hover-lift"
+						key={item.title}
+						variants={{ hidden: { opacity: 0, y: 20 }, visible: { opacity: 1, y: 0 } }}
+						className="glass-card p-6 text-center hover-lift"
 					>
-						<div
-							className="w-14 h-14 rounded-2xl flex items-center justify-center mx-auto mb-5"
-							style={{
-								background:
-									'linear-gradient(135deg, color-mix(in srgb, var(--accent-1) 18%, transparent), color-mix(in srgb, var(--accent-2) 18%, transparent))',
-							}}
-						>
-							<P.icon className="w-7 h-7 text-accent-1" />
+						<div className="culture-icon-wrapper">
+							<item.icon className="w-6 h-6 text-accent-1" />
 						</div>
 						<h3 className="text-xl font-display font-semibold text-primary mb-2">
-							{P.title}
+							{item.title}
 						</h3>
-						<p className="text-secondary text-sm leading-relaxed">{P.desc}</p>
+						<p className="text-secondary text-sm leading-relaxed">{item.desc}</p>
 					</motion.div>
 				))}
+			</motion.div>
+
+			{/* Vision & Mission Section */}
+			<motion.div
+				initial={{ opacity: 0, scale: 0.95 }}
+				whileInView={{ opacity: 1, scale: 1 }}
+				viewport={{ once: true, amount: 0.5 }}
+				transition={{ duration: 0.7 }}
+				className="vision-mission-card"
+			>
+				<div className="text-center">
+					<h3 className="text-2xl font-bold text-primary mb-2">Our Vision</h3>
+					<p className="text-lg text-secondary max-w-3xl mx-auto">
+						To build one of the most impactful student communities in India — where
+						students learn by doing, grow through collaboration, and lead with
+						confidence.
+					</p>
+					<div className="vision-mission-divider" />
+					<h3 className="text-2xl font-bold text-primary mb-2">Our Mission</h3>
+					<p className="text-lg brand-text font-semibold">
+						Empower students to turn ideas into action.
+					</p>
+				</div>
 			</motion.div>
 		</section>
 	);
