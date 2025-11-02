@@ -1,9 +1,10 @@
-import { Routes, Route } from 'react-router-dom';
+import { Routes, Route, Navigate } from 'react-router-dom';
 import { ProtectedRoute, PublicRoute } from './protectedRoutes.jsx';
 
 // Import your page components
 import Home from '../pages/home.jsx';
-import AuthPage from '../pages/auth/auth.jsx';
+import LoginPage from '../pages/auth/Login.jsx';
+import JoinPage from '../pages/auth/Join.jsx';
 import AdminAuth from '../pages/auth/adminAuth.jsx';
 import AdminDash from '../pages/adminDash.jsx';
 import MemberDashboard from '../pages/member.jsx';
@@ -33,11 +34,20 @@ const AppRoutes = () => {
 			<Route path="/policy/refund" element={<Refund />} />
 
 			{/* Auth routes */}
+			<Route path="/auth" element={<Navigate to="/login" replace />} />
 			<Route
-				path="/auth/*"
+				path="/login"
 				element={
 					<PublicRoute>
-						<AuthPage />
+						<LoginPage />
+					</PublicRoute>
+				}
+			/>
+			<Route
+				path="/join"
+				element={
+					<PublicRoute>
+						<JoinPage />
 					</PublicRoute>
 				}
 			/>
