@@ -12,24 +12,24 @@ const AboutSyntax = () => {
 		{
 			icon: BrainCircuit,
 			title: 'Curiosity',
-			desc: 'A desire to learn, explore, and question is at the heart of everything we do.',
+			desc: 'Learning in public, exploring, and asking better questions.',
 		},
 		{
 			icon: Zap,
 			title: 'Leadership',
-			desc: 'We empower students to take initiative, lead projects, and inspire others.',
+			desc: 'Take ownership, lead pods, and ship work that matters.',
 		},
 		{
 			icon: Users,
 			title: 'Collaboration',
-			desc: 'We believe the best work comes from diverse teams working together.',
+			desc: 'The best work comes from diverse teams building together.',
 		},
 	];
 
 	return (
-		<section className="section-padding page-container">
+		<section className="section-padding page-container" id="about-syntax">
 			<div className="grid grid-cols-1 lg:grid-cols-12 gap-x-12">
-				{/* Guiding Line Column */}
+				{/* Guiding line */}
 				<div className="hidden lg:block lg:col-span-1">
 					<motion.div
 						className="guiding-line"
@@ -40,9 +40,8 @@ const AboutSyntax = () => {
 					/>
 				</div>
 
-				{/* Content Column */}
+				{/* Content */}
 				<div className="lg:col-span-11">
-					{/* Main "What is Syntax?" Section */}
 					<motion.div
 						initial={{ opacity: 0, y: 30 }}
 						whileInView={{ opacity: 1, y: 0 }}
@@ -56,13 +55,11 @@ const AboutSyntax = () => {
 						<p className="text-lg sm:text-xl text-secondary max-w-4xl leading-relaxed">
 							Syntax is a dynamic student organization at Lovely Professional
 							University focused on innovation, leadership, and collaborative
-							learning. We bridge academics with real-world execution by providing a
-							platform to work on impactful projects, develop essential skills, and
-							network with like-minded peers.
+							learning. We bridge academics with real-world execution through hands-on
+							projects, real roles, and community-driven growth.
 						</p>
 					</motion.div>
 
-					{/* Culture Section */}
 					<motion.div
 						initial="hidden"
 						whileInView="visible"
@@ -94,7 +91,6 @@ const AboutSyntax = () => {
 						))}
 					</motion.div>
 
-					{/* Vision & Mission Section */}
 					<motion.div
 						initial={{ opacity: 0, scale: 0.95 }}
 						whileInView={{ opacity: 1, scale: 1 }}
