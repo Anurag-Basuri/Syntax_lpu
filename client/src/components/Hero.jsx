@@ -5,7 +5,6 @@ import {
 	Sparkles,
 	ArrowRight,
 	Users,
-	Code2,
 	Rocket,
 	Palette,
 	PlayCircle,
@@ -13,6 +12,7 @@ import {
 	Lightbulb,
 	Handshake,
 	BarChart,
+	ChevronsDown,
 } from 'lucide-react';
 
 const Hero = () => {
@@ -35,7 +35,7 @@ const Hero = () => {
 		<section className="relative overflow-hidden bg-transparent min-h-screen flex items-center">
 			<div className="page-container">
 				<div className="grid grid-cols-1 lg:grid-cols-12 gap-y-12 lg:gap-x-12 items-center">
-					{/* Left Column: Content (First on mobile) */}
+					{/* Left: Narrative */}
 					<div className="order-2 lg:order-1 lg:col-span-7 text-center lg:text-left">
 						<motion.div {...fadeUp(0)} className="mb-5 inline-flex">
 							<div className="hero-badge">
@@ -79,6 +79,7 @@ const Hero = () => {
 							))}
 						</motion.div>
 
+						{/* CTAs */}
 						<motion.div
 							{...fadeUp(0.28)}
 							className="mt-8 flex flex-col sm:flex-row items-center justify-center lg:justify-start gap-3.5 sm:gap-4 w-full"
@@ -104,15 +105,24 @@ const Hero = () => {
 								className="btn btn-secondary w-full sm:w-auto"
 							>
 								<PlayCircle className="w-5 h-5" />
-								What is Syntax?
+								Explore Our Mission
 							</motion.button>
+						</motion.div>
+
+						{/* Scroll cue */}
+						<motion.div
+							{...fadeUp(0.36)}
+							className="mt-10 flex items-center justify-center lg:justify-start gap-2 text-muted"
+						>
+							<ChevronsDown className="w-4 h-4" />
+							<span className="text-sm">Scroll to continue the story</span>
 						</motion.div>
 					</div>
 
-					{/* Right Column: Visuals (Second on mobile) */}
+					{/* Right: Visual cues */}
 					<motion.div {...fadeUp(0.1)} className="order-1 lg:order-2 lg:col-span-5">
 						<div className="hero-visuals-container min-h-[clamp(340px,45vw,520px)]">
-							{/* Card 1: Team Pod */}
+							{/* Card 1 */}
 							<motion.div
 								className="hero-card"
 								initial={{ rotate: -8 }}
@@ -142,7 +152,7 @@ const Hero = () => {
 								</div>
 							</motion.div>
 
-							{/* Card 2: Code */}
+							{/* Card 2 */}
 							<motion.div
 								className="hero-card"
 								initial={{ rotate: 6 }}
@@ -173,7 +183,7 @@ const Hero = () => {
 								</div>
 							</motion.div>
 
-							{/* Card 3: Design */}
+							{/* Card 3 */}
 							<motion.div
 								className="hero-card"
 								initial={{ rotate: 10 }}
@@ -202,7 +212,7 @@ const Hero = () => {
 								</div>
 							</motion.div>
 
-							{/* Card 4: Shipping */}
+							{/* Card 4 */}
 							<motion.div
 								className="hero-card"
 								initial={{ rotate: -2 }}
