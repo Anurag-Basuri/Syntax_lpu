@@ -7,39 +7,39 @@ const ClubDescription = () => {
 		{
 			icon: Code,
 			title: 'Skill Development',
-			desc: 'Engage in tech, management, creative & research-based learning.',
+			desc: 'Tech, management, creative & research-based learning.',
 		},
 		{
 			icon: BrainCircuit,
 			title: 'Hands-On Projects',
-			desc: 'Build real products, websites, and impactful tech solutions.',
+			desc: 'Build real products, websites, and tech solutions.',
 		},
 		{
 			icon: Zap,
 			title: 'Event Execution',
-			desc: 'Plan and run university events, workshops, and competitions.',
+			desc: 'Plan and run events, workshops, and competitions.',
 		},
 		{
 			icon: Users,
 			title: 'Leadership Roles',
-			desc: 'Lead teams, departments, and initiatives with real responsibility.',
+			desc: 'Lead teams, departments, and initiatives.',
 		},
 		{
 			icon: Briefcase,
 			title: 'Networking',
-			desc: 'Connect with mentors, alumni, and distinguished industry guests.',
+			desc: 'Connect with mentors, alumni, and industry guests.',
 		},
 		{
 			icon: Award,
 			title: 'Recognition',
-			desc: 'Earn certificates and build a portfolio of achievements.',
+			desc: 'Certificates, achievements, and portfolio-worthy work.',
 		},
 	];
 
 	return (
 		<section className="section-padding page-container">
 			<div className="grid grid-cols-1 lg:grid-cols-12 gap-x-12">
-				{/* Guiding Line Column */}
+				{/* Guiding line */}
 				<div className="hidden lg:block lg:col-span-1">
 					<motion.div
 						className="guiding-line"
@@ -50,7 +50,7 @@ const ClubDescription = () => {
 					/>
 				</div>
 
-				{/* Content Column */}
+				{/* Content */}
 				<div className="lg:col-span-11">
 					<motion.div
 						initial={{ opacity: 0, y: 30 }}
@@ -63,8 +63,8 @@ const ClubDescription = () => {
 							Where Students Become <span className="brand-text">Creators</span>
 						</h2>
 						<p className="text-lg sm:text-xl text-secondary max-w-4xl leading-relaxed">
-							At Syntax, you don’t just join a club — you become part of an ecosystem
-							that supports learning by doing.
+							At Syntax, you don’t just join a club — you join an ecosystem that helps
+							you learn by doing.
 						</p>
 					</motion.div>
 
