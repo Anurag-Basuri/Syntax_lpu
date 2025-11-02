@@ -2,6 +2,7 @@ import { useLocation } from 'react-router-dom';
 import { useState, useEffect, useRef } from 'react';
 import { ReactLenis } from 'lenis/react';
 import { Toaster } from 'react-hot-toast';
+import { motion, AnimatePresence } from 'framer-motion'; // Import motion and AnimatePresence
 import AppRoutes from './routes/AppRoutes.jsx';
 import Navbar from './components/Navbar.jsx';
 import Background3D from './components/Background3D.jsx';
@@ -14,16 +15,17 @@ function App() {
 	const lastScrollY = useRef(0);
 	const scrollTimeout = useRef(null);
 
-	// Hide navbar for specific routes
-	const hideNavbar = [
-		'/auth',
+	// Updated list of routes where the navbar should be hidden
+	const hideNavbarRoutes = [
+		'/login',
+		'/join',
 		'/admin/auth',
-		'/terms',
-		'/refund',
-		'/policy',
-		'/privacy',
-		'/cookie',
-	].some((p) => location.pathname.startsWith(p));
+		'/policy/terms',
+		'/policy/refund',
+		'/policy/privacy',
+		'/policy/cookie',
+	];
+	const hideNavbar = hideNavbarRoutes.includes(location.pathname);
 
 	useEffect(() => {
 		const handleScroll = () => {
@@ -33,7 +35,6 @@ function App() {
 
 			setScrollProgress(Math.min(100, Math.max(0, progress)));
 
-			// Slide-away / slide-in with threshold
 			if (currentScrollY < 100) setShowNavbar(true);
 			else if (currentScrollY > lastScrollY.current + 22) setShowNavbar(false);
 			else if (currentScrollY < lastScrollY.current - 18) setShowNavbar(true);
@@ -50,18 +51,31 @@ function App() {
 				window.removeEventListener('scroll', handleScroll);
 				if (scrollTimeout.current) clearTimeout(scrollTimeout.current);
 			};
+		} else {
+			// Reset scroll progress on routes without a navbar
+			setScrollProgress(0);
 		}
 	}, [hideNavbar]);
+
+	const pageVariants = {
+		initial: { opacity: 0, y: 15 },
+		in: { opacity: 1, y: 0 },
+		out: { opacity: 0, y: -15 },
+	};
+
+	const pageTransition = {
+		type: 'tween',
+		ease: 'anticipate',
+		duration: 0.5,
+	};
 
 	return (
 		<ReactLenis
 			root
 			options={{
-				lerp: 0.12,
-				duration: 1.1,
+				lerp: 0.1,
+				duration: 1.2,
 				smoothWheel: true,
-				smoothTouch: true,
-				touchMultiplier: 1.8,
 			}}
 		>
 			<Toaster
@@ -96,18 +110,37 @@ function App() {
 					!hideNavbar ? 'pt-20' : ''
 				}`}
 			>
-				<div className="page-transition-wrapper">
-					<AppRoutes />
-				</div>
+				<AnimatePresence mode="wait">
+					<motion.div
+						key={location.pathname}
+						initial="initial"
+						animate="in"
+						exit="out"
+						variants={pageVariants}
+						transition={pageTransition}
+					>
+						<AppRoutes />
+					</motion.div>
+				</AnimatePresence>
 			</main>
 
-			{/* Optional scroll % */}
-			<div
-				className="fixed right-3 sm:right-4 bottom-3 sm:bottom-4 w-10 sm:w-12 h-10 sm:h-12 rounded-full bg-black/20 backdrop-blur-md border border-white/10 flex items-center justify-center font-mono text-[11px] sm:text-sm"
-				style={{ opacity: scrollProgress > 2 ? 0.85 : 0, transition: 'opacity .25s ease' }}
-			>
-				{Math.round(scrollProgress)}%
-			</div>
+			{/* Restyled Scroll Progress Indicator */}
+			{!hideNavbar && (
+				<div
+					className="fixed right-4 bottom-4 w-10 h-10 rounded-full flex items-center justify-center font-mono text-xs font-semibold"
+					style={{
+						background: `conic-gradient(var(--accent-1) ${
+							scrollProgress * 3.6
+						}deg, var(--glass-bg) 0deg)`,
+						opacity: scrollProgress > 2 ? 1 : 0,
+						transition: 'opacity .25s ease',
+						border: '1px solid var(--glass-border)',
+						backdropFilter: 'blur(8px)',
+					}}
+				>
+					{Math.round(scrollProgress)}
+				</div>
+			)}
 		</ReactLenis>
 	);
 }
