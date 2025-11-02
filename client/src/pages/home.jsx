@@ -11,7 +11,10 @@ const Home = () => {
 		<div className="relative min-h-screen bg-transparent overflow-x-hidden text-primary">
 			<div className="relative z-10">
 				<Hero />
-				<AboutSyntax />
+				{/* The 'id' is now on the parent for a smoother scroll transition */}
+				<div id="about-syntax">
+					<AboutSyntax />
+				</div>
 				<ClubDescription />
 				<EventsPreview />
 				<TeamPreview />

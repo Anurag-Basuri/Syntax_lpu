@@ -32,8 +32,8 @@ const Hero = () => {
 	];
 
 	return (
-		<section className="relative overflow-hidden bg-transparent">
-			<div className="page-container section-padding">
+		<section className="relative overflow-hidden bg-transparent min-h-screen flex items-center">
+			<div className="page-container">
 				<div className="grid grid-cols-1 lg:grid-cols-12 gap-y-12 lg:gap-x-12 items-center">
 					{/* Left Column: Content (First on mobile) */}
 					<div className="order-2 lg:order-1 lg:col-span-7 text-center lg:text-left">
