@@ -8,7 +8,6 @@ const Background3D = () => {
 	const [prefersReducedMotion, setPrefersReducedMotion] = useState(false);
 	const location = useLocation();
 
-	// Determine if the background should be in a "calm" state for auth pages
 	const isAuthPage =
 		location.pathname.startsWith('/login') || location.pathname.startsWith('/join');
 
@@ -38,85 +37,90 @@ const Background3D = () => {
 
 		const ctx = canvas.getContext('2d');
 		let animationId;
-		let particles = [];
-		const particleCount = window.innerWidth < 768 ? 150 : 300;
+		let nodes = [];
+		const nodeCount = window.innerWidth < 768 ? 60 : 100;
+		const maxDist = 200; // Max distance to draw a line between nodes
 
-		// Particle class
-		class Particle {
+		class Node {
 			constructor() {
-				this.x = (Math.random() - 0.5) * canvas.width * 2;
-				this.y = (Math.random() - 0.5) * canvas.height * 2;
-				this.z = Math.random() * 2000;
-				this.pz = this.z; // Previous Z
+				this.x = Math.random() * canvas.width;
+				this.y = Math.random() * canvas.height;
+				this.vx = (Math.random() - 0.5) * 0.5; // Velocity X
+				this.vy = (Math.random() - 0.5) * 0.5; // Velocity Y
+				this.radius = Math.random() * 1.5 + 1;
 			}
 
 			update() {
-				this.z -= isAuthPage ? 3 : 8; // Slower speed on auth pages
-				if (this.z < 1) {
-					this.z = Math.random() * 2000;
-					this.x = (Math.random() - 0.5) * canvas.width * 2;
-					this.y = (Math.random() - 0.5) * canvas.height * 2;
-					this.pz = this.z;
-				}
+				this.x += this.vx;
+				this.y += this.vy;
+
+				// Bounce off edges
+				if (this.x < 0 || this.x > canvas.width) this.vx *= -1;
+				if (this.y < 0 || this.y > canvas.height) this.vy *= -1;
 			}
 
 			draw() {
-				const fov = 300;
-				const scale = fov / (fov + this.z);
-				const x2d = this.x * scale + canvas.width / 2;
-				const y2d = this.y * scale + canvas.height / 2;
-
-				const pScale = fov / (fov + this.pz);
-				const pX2d = this.x * pScale + canvas.width / 2;
-				const pY2d = this.y * pScale + canvas.height / 2;
-
-				const alpha = Math.min(1, (2000 - this.z) / 1000);
-				const size = scale * 2;
-
 				ctx.beginPath();
-				ctx.moveTo(pX2d, pY2d);
-				ctx.lineTo(x2d, y2d);
-				ctx.strokeStyle = `rgba(14, 165, 233, ${alpha})`; // Use accent-1 color
-				ctx.lineWidth = size;
-				ctx.stroke();
-
-				this.pz = this.z;
+				ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
+				ctx.fillStyle = 'rgba(14, 165, 233, 0.8)'; // accent-1
+				ctx.fill();
 			}
 		}
 
 		const resize = () => {
 			canvas.width = window.innerWidth;
 			canvas.height = window.innerHeight;
-			particles = [];
-			for (let i = 0; i < particleCount; i++) {
-				particles.push(new Particle());
+			nodes = [];
+			for (let i = 0; i < nodeCount; i++) {
+				nodes.push(new Node());
+			}
+		};
+
+		const drawLines = () => {
+			for (let i = 0; i < nodes.length; i++) {
+				for (let j = i + 1; j < nodes.length; j++) {
+					const dist = Math.hypot(nodes[i].x - nodes[j].x, nodes[i].y - nodes[j].y);
+					if (dist < maxDist) {
+						const opacity = 1 - dist / maxDist;
+						ctx.beginPath();
+						ctx.moveTo(nodes[i].x, nodes[i].y);
+						ctx.lineTo(nodes[j].x, nodes[j].y);
+						ctx.strokeStyle = `rgba(37, 99, 235, ${opacity * 0.5})`; // accent-2
+						ctx.lineWidth = 0.5;
+						ctx.stroke();
+					}
+				}
 			}
 		};
 
 		const animate = () => {
 			ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-			// Parallax effect
-			const targetX = (0.5 - mousePos.current.x) * 0.1;
-			const targetY = (0.5 - mousePos.current.y) * 0.1;
-			ctx.translate(canvas.width / 2, canvas.height / 2);
-			ctx.rotateX(targetY);
-			ctx.rotateY(targetX);
-			ctx.translate(-canvas.width / 2, -canvas.height / 2);
+			// Parallax effect on the entire canvas
+			const targetX = (0.5 - mousePos.current.x) * 20;
+			const targetY = (0.5 - mousePos.current.y) * 20;
+			ctx.save();
+			ctx.translate(targetX, targetY);
 
-			particles.forEach((p) => {
-				p.update();
-				p.draw();
+			nodes.forEach((node) => {
+				node.update();
+				node.draw();
 			});
+			drawLines();
 
+			ctx.restore();
 			animationId = requestAnimationFrame(animate);
 		};
 
 		resize();
 		window.addEventListener('resize', resize);
 
-		if (!prefersReducedMotion) {
+		if (!prefersReducedMotion && !isAuthPage) {
 			animate();
+		} else {
+			// Draw a static frame for auth pages or reduced motion
+			nodes.forEach((node) => node.draw());
+			drawLines();
 		}
 
 		return () => {
@@ -128,20 +132,20 @@ const Background3D = () => {
 	return (
 		<div className="fixed inset-0 -z-10 overflow-hidden pointer-events-none" aria-hidden="true">
 			{/* Base gradient layers */}
-			<div className="absolute inset-0 bg-gradient-to-b from-gray-950 via-slate-900 to-gray-950" />
+			<div className="absolute inset-0 bg-bg-base" />
 			<div
-				className="absolute inset-0 opacity-20"
+				className="absolute inset-0 opacity-25"
 				style={{
 					background:
 						'radial-gradient(ellipse 80% 50% at 50% 40%, var(--accent-1), transparent)',
 				}}
 			/>
 
-			{/* 3D Particle Canvas */}
-			<canvas ref={canvasRef} className="absolute inset-0 w-full h-full opacity-60" />
+			{/* Constellation Canvas */}
+			<canvas ref={canvasRef} className="absolute inset-0 w-full h-full opacity-50" />
 
-			{/* Logo watermark - positioned lower and responsive */}
-			<div className="absolute inset-0 flex items-start justify-center pt-28 sm:pt-32 lg:pt-40">
+			{/* Logo watermark - refined for better blending */}
+			<div className="absolute inset-0 flex items-center justify-center">
 				<div
 					className="relative w-[min(80vw,800px)] aspect-[2/1] opacity-5"
 					style={{
@@ -150,7 +154,6 @@ const Background3D = () => {
 						WebkitMaskSize: 'contain',
 						maskSize: 'contain',
 						WebkitMaskRepeat: 'no-repeat',
-						maskRepeat: 'no-repeat',
 						WebkitMaskPosition: 'center',
 						maskPosition: 'center',
 						background: 'linear-gradient(45deg, var(--accent-1), var(--accent-2))',
