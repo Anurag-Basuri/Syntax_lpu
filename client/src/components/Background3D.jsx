@@ -66,6 +66,132 @@ const toRgb = (input) => {
 	return `${r},${g},${b}`;
 };
 
+// Cloth-like wire mesh (SVG + filter displacement)
+const ClothWireMesh = ({ breakpoint, theme }) => {
+	const a1 = toRgb(readCssVar('--accent-1'));
+	const a2 = toRgb(readCssVar('--accent-2'));
+	const isLight = theme === 'light';
+
+	// Size/position: below the centered logo, not full-screen
+	const meshTop = breakpoint === 'mobile' ? '62%' : breakpoint === 'tablet' ? '60%' : '60%';
+	const meshWidth =
+		breakpoint === 'mobile'
+			? 'min(86vw, 680px)'
+			: breakpoint === 'tablet'
+			? 'min(72vw, 860px)'
+			: 'min(60vw, 1000px)';
+
+	// Grid density (bigger squares on larger screens)
+	const step = breakpoint === 'mobile' ? 95 : breakpoint === 'tablet' ? 105 : 120;
+
+	// ViewBox grid dimensions
+	const vbW = 1000;
+	const vbH = 500;
+
+	const verticals = Array.from({ length: Math.floor(vbW / step) + 1 }, (_, i) => i * step);
+	const horizontals = Array.from({ length: Math.floor(vbH / step) + 1 }, (_, i) => i * step);
+
+	const stroke = `rgba(${a1}, ${isLight ? 0.16 : 0.22})`;
+	const weaveColor = `rgba(${a2}, ${isLight ? 0.05 : 0.07})`;
+
+	return (
+		<div
+			aria-hidden="true"
+			className="absolute pointer-events-none"
+			style={{
+				top: meshTop,
+				left: '50%',
+				transform: 'translate(-50%, -50%)',
+				width: meshWidth,
+				aspectRatio: '2 / 1', // keep it shallow, not full-screen
+				opacity: isLight ? 0.9 : 0.95, // overall subtlety
+				filter: `drop-shadow(0 10px 30px rgba(${a1}, ${isLight ? 0.06 : 0.08}))`,
+			}}
+		>
+			<svg
+				viewBox={`0 0 ${vbW} ${vbH}`}
+				width="100%"
+				height="100%"
+				preserveAspectRatio="xMidYMid slice"
+			>
+				<defs>
+					{/* Soft cloth-like displacement */}
+					<filter id="clothDisplace" x="-20%" y="-30%" width="140%" height="160%">
+						<feTurbulence
+							type="fractalNoise"
+							baseFrequency="0.006"
+							numOctaves="2"
+							seed="3"
+							result="noise"
+						>
+							<animate
+								attributeName="baseFrequency"
+								values="0.005;0.008;0.005"
+								dur="14s"
+								repeatCount="indefinite"
+							/>
+						</feTurbulence>
+						<feDisplacementMap
+							in="SourceGraphic"
+							in2="noise"
+							scale="10"
+							xChannelSelector="R"
+							yChannelSelector="G"
+						>
+							<animate
+								attributeName="scale"
+								values="8;12;8"
+								dur="14s"
+								repeatCount="indefinite"
+							/>
+						</feDisplacementMap>
+					</filter>
+
+					{/* Subtle weave pattern */}
+					<pattern id="weave" width="10" height="10" patternUnits="userSpaceOnUse">
+						<rect width="10" height="10" fill="transparent" />
+						<line x1="0" y1="0" x2="10" y2="0" stroke={weaveColor} strokeWidth="0.6" />
+						<line x1="0" y1="5" x2="10" y2="5" stroke={weaveColor} strokeWidth="0.6" />
+						<line x1="0" y1="0" x2="0" y2="10" stroke={weaveColor} strokeWidth="0.6" />
+						<line x1="5" y1="0" x2="5" y2="10" stroke={weaveColor} strokeWidth="0.6" />
+					</pattern>
+
+					{/* Soft fade at edges */}
+					<linearGradient id="fadeY" x1="0" y1="0" x2="0" y2="1">
+						<stop offset="0%" stopColor="white" stopOpacity="0" />
+						<stop offset="15%" stopColor="white" stopOpacity="1" />
+						<stop offset="85%" stopColor="white" stopOpacity="1" />
+						<stop offset="100%" stopColor="white" stopOpacity="0" />
+					</linearGradient>
+					<mask id="softMask">
+						<rect width="100%" height="100%" fill="url(#fadeY)" />
+					</mask>
+				</defs>
+
+				<g filter="url(#clothDisplace)" mask="url(#softMask)">
+					{/* Weave underlay (very subtle) */}
+					<rect
+						width={vbW}
+						height={vbH}
+						fill="url(#weave)"
+						opacity={isLight ? 0.06 : 0.08}
+					/>
+
+					{/* Wire grid */}
+					<g stroke={stroke} strokeWidth="1.2" fill="none">
+						{verticals.map((x) => (
+							<line key={`v-${x}`} x1={x} y1="0" x2={x} y2={vbH} />
+						))}
+						{horizontals.map((y) => (
+							<line key={`h-${y}`} x1="0" y1={y} x2={vbW} y2={y} />
+						))}
+					</g>
+				</g>
+			</svg>
+		</div>
+	);
+};
+
 const Background3D = () => {
 	const theme = useTheme();
 	const breakpoint = useResponsive();
@@ -189,7 +315,10 @@ const Background3D = () => {
 				style={{ background: styles.aura, opacity: 0.35 }}
 			/>
 
-			{/* Centered logo (no background), under grid, with throttled parallax */}
+			{/* NEW: Wavy cloth wire mesh under the logo */}
+			<ClothWireMesh breakpoint={breakpoint} theme={theme} />
+
+			{/* Centered logo */}
 			<img
 				src={logo}
 				alt=""
