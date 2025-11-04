@@ -46,7 +46,7 @@ const useResponsive = () => {
 };
 
 /* =========================
-   Logo (no background, simple)
+   Logo (clean, no background)
    ========================= */
 const Logo3D = () => {
 	const meshRef = useRef();
@@ -72,11 +72,11 @@ const Logo3D = () => {
 	const { scale, yPosition, opacity } = useMemo(() => {
 		switch (breakpoint) {
 			case 'mobile':
-				return { scale: 3.2, yPosition: 0.4, opacity: 0.78 }; // increased
+				return { scale: 3.5, yPosition: 0.5, opacity: 0.85 };
 			case 'tablet':
-				return { scale: 4.6, yPosition: 0.75, opacity: 0.82 }; // increased
+				return { scale: 5.0, yPosition: 0.85, opacity: 0.88 };
 			default:
-				return { scale: 6.2, yPosition: 1.0, opacity: 0.86 }; // increased
+				return { scale: 6.5, yPosition: 1.2, opacity: 0.9 };
 		}
 	}, [breakpoint]);
 
@@ -86,44 +86,43 @@ const Logo3D = () => {
 		const p = state.pointer ?? { x: 0, y: 0 };
 
 		if (meshRef.current) {
-			const targetY = (p.x * Math.PI) / 18;
-			const targetX = (-p.y * Math.PI) / 22;
+			const targetY = (p.x * Math.PI) / 20;
+			const targetX = (-p.y * Math.PI) / 24;
 			meshRef.current.rotation.y = THREE.MathUtils.damp(
 				meshRef.current.rotation.y,
 				targetY,
-				4,
+				5,
 				dt
 			);
 			meshRef.current.rotation.x = THREE.MathUtils.damp(
 				meshRef.current.rotation.x,
 				targetX,
-				4,
+				5,
 				dt
 			);
-			meshRef.current.rotation.z = Math.sin(t * 0.25) * 0.01;
+			meshRef.current.rotation.z = Math.sin(t * 0.3) * 0.008;
 		}
 		if (groupRef.current) {
-			groupRef.current.position.y = yPosition + Math.sin(t * 0.4) * 0.05;
-			const s = 1 + Math.sin(t * 0.3) * 0.01;
+			groupRef.current.position.y = yPosition + Math.sin(t * 0.5) * 0.04;
+			const s = 1 + Math.sin(t * 0.35) * 0.008;
 			groupRef.current.scale.set(s, s, 1);
 		}
 	});
 
 	return (
 		<Float
-			speed={0.9}
-			rotationIntensity={0.06}
-			floatIntensity={0.1}
-			floatingRange={[-0.02, 0.02]}
+			speed={1.0}
+			rotationIntensity={0.05}
+			floatIntensity={0.08}
+			floatingRange={[-0.015, 0.015]}
 		>
 			<group ref={groupRef} position={[0, yPosition, 0]}>
 				<mesh ref={meshRef} scale={[scale * aspect, scale, 1]} renderOrder={10}>
 					<planeGeometry />
-					{/* Transparent PNG: no background. alphaTest removes halo edges. */}
 					<meshBasicMaterial
 						map={texture}
 						transparent
-						alphaTest={0.08}
+						alphaTest={0.1}
 						opacity={opacity}
 						side={THREE.DoubleSide}
 						depthWrite={false}
@@ -135,135 +134,10 @@ const Logo3D = () => {
 };
 
 /* =========================
-   Cloth mesh (bigger squares, wavy, clean)
-   ========================= */
-const ClothMesh = ({ segments }) => {
-	const meshRef = useRef();
-	const theme = useTheme();
-	const breakpoint = useResponsive();
-
-	const uniforms = useMemo(() => {
-		const base = getThemeColor('--bg-soft');
-		const warp = getThemeColor('--accent-1'); // thread 1
-		const weft = getThemeColor('--accent-2'); // thread 2
-		return {
-			uTime: { value: 0 },
-			uAmp: { value: breakpoint === 'mobile' ? 0.45 : 0.55 }, // gentle height
-			uFreq: { value: 0.012 }, // larger waves
-			uSpeed: { value: 0.07 },
-			uWeaveDensity: { value: breakpoint === 'mobile' ? 38.0 : 46.0 }, // bigger squares (lower = bigger)
-			uBase: { value: base },
-			uWarp: { value: warp },
-			uWeft: { value: weft },
-			uAlpha: { value: theme === 'light' ? 0.38 : 0.5 },
-		};
-	}, [theme, breakpoint]);
-
-	useFrame((state) => {
-		const t = state.clock.elapsedTime;
-		uniforms.uTime.value = t;
-		// subtle responsiveness
-		const k = Math.min(0.6, (Math.abs(state.pointer.x) + Math.abs(state.pointer.y)) * 0.2);
-		const base = breakpoint === 'mobile' ? 0.45 : 0.55;
-		uniforms.uAmp.value = THREE.MathUtils.lerp(uniforms.uAmp.value, base + k, 0.08);
-	});
-
-	const size = useMemo(
-		() => (breakpoint === 'mobile' ? 280 : breakpoint === 'tablet' ? 340 : 420),
-		[breakpoint]
-	);
-
-	return (
-		<mesh ref={meshRef} rotation={[-Math.PI / 2, 0, 0]} position={[0, -9, 0]}>
-			<planeGeometry args={[size, size, segments, segments]} />
-			<shaderMaterial
-				transparent
-				depthWrite={false}
-				side={THREE.DoubleSide}
-				uniforms={uniforms}
-				vertexShader={`
-                    uniform float uTime;
-                    uniform float uAmp;
-                    uniform float uFreq;
-                    uniform float uSpeed;
-                    varying float vH;
-
-                    void main() {
-                        vec3 p = position;
-
-                        // Multi-axial low-frequency waves (cloth drape)
-                        float w1 = sin(p.x * uFreq + uTime * uSpeed);
-                        float w2 = sin(p.y * uFreq * 0.85 + uTime * uSpeed * 0.75);
-                        float w3 = cos((p.x + p.y) * uFreq * 0.6 + uTime * uSpeed * 0.5);
-
-                        vH = (w1 * 0.5 + w2 * 0.35 + w3 * 0.25);
-                        p.z += vH * uAmp;
-
-                        gl_Position = projectionMatrix * modelViewMatrix * vec4(p, 1.0);
-                    }
-                `}
-				fragmentShader={`
-                    uniform float uTime;
-                    uniform float uWeaveDensity;
-                    uniform vec3 uBase;
-                    uniform vec3 uWarp;
-                    uniform vec3 uWeft;
-                    uniform float uAlpha;
-                    varying float vH;
-
-                    // simple weave pattern: two oriented sine gates
-                    float weaveLine(float v) {
-                        // thin thread lines (anti-aliased)
-                        float s = sin(v);
-                        float a = smoothstep(0.96, 1.0, s); // peak selection
-                        return a;
-                    }
-
-                    void main() {
-                        // Use NDC-alike tiling via gl_FragCoord to keep grid uniform
-                        // but keep it cheap by relying on density only.
-                        vec2 uv = gl_FragCoord.xy / 1000.0 * uWeaveDensity;
-
-                        // Warp along X, Weft along Y
-                        float warpLines = weaveLine(uv.x);
-                        float weftLines = weaveLine(uv.y);
-
-                        // Mix warp/weft threads
-                        vec3 threadColor = mix(uWarp, uWeft, 0.5 + 0.5 * sin(uTime * 0.15));
-                        vec3 threads = mix(uBase, threadColor, clamp(warpLines + weftLines, 0.0, 1.0) * 0.45);
-
-                        // Subtle shading from wave height
-                        float shade = 0.5 + vH * 0.25;
-                        vec3 color = mix(uBase, threads, 0.6) * shade;
-
-                        // Gentle fade near top to avoid overlaps with content
-                        float fade = 1.0;
-                        // optional vertical fade can be applied if needed on UV
-                        gl_FragColor = vec4(color, uAlpha * fade);
-                    }
-                `}
-			/>
-		</mesh>
-	);
-};
-
-/* =========================
    Scene
    ========================= */
 const SceneContent = () => {
-	const breakpoint = useResponsive();
-	// segments tuned for smooth cloth while staying light
-	const segments = useMemo(
-		() => (breakpoint === 'mobile' ? 64 : breakpoint === 'tablet' ? 84 : 104),
-		[breakpoint]
-	);
-
-	return (
-		<>
-			<Logo3D />
-			<ClothMesh segments={segments} />
-		</>
-	);
+	return <Logo3D />;
 };
 
 const Background3D = () => {
@@ -280,12 +154,6 @@ const Background3D = () => {
 		const bgBase = getComputedStyle(document.documentElement)
 			.getPropertyValue('--bg-base')
 			.trim();
-		const bgSoft = getComputedStyle(document.documentElement)
-			.getPropertyValue('--bg-soft')
-			.trim();
-		const bgSofter = getComputedStyle(document.documentElement)
-			.getPropertyValue('--bg-softer')
-			.trim();
 
 		const c1 = new THREE.Color(accent1)
 			.toArray()
@@ -296,39 +164,35 @@ const Background3D = () => {
 			.map((c) => Math.round(c * 255))
 			.join(',');
 
-		// Next.js-like: subtle gradient + top spotlight + faint grid
+		// Next.js-inspired: cleaner gradients with stronger spotlight
 		if (theme === 'light') {
 			return {
-				baseGradient: `linear-gradient(180deg, ${bgBase} 0%, ${bgSoft} 55%, ${bgSofter} 100%)`,
-				spotlight: `radial-gradient(600px 420px at 50% -10%, rgba(${c1},.35), transparent 60%)`,
-				aura: `radial-gradient(900px 700px at 110% 0%, rgba(${c2},.12), transparent 70%)`,
-				gridColor: 'rgba(15, 23, 42, 0.06)', // Slate-900 @ 6%
-				gridSize: '28px 28px',
-				gridMask: 'radial-gradient(ellipse 60% 55% at 50% 0%, black 35%, transparent 90%)',
-				bottomFade: `linear-gradient(to top, ${bgBase} 0%, transparent 45%)`,
-				topFade: `linear-gradient(to bottom, ${bgBase} 0%, transparent 25%)`,
+				baseGradient: `radial-gradient(ellipse 80% 50% at 50% -20%, ${bgBase}, #ffffff)`,
+				spotlight: `radial-gradient(circle 800px at 50% 0%, rgba(${c1}, 0.15), transparent 70%)`,
+				accentGlow: `radial-gradient(circle 1200px at 100% 0%, rgba(${c2}, 0.08), transparent 50%)`,
+				gridColor: 'rgba(15, 23, 42, 0.04)',
+				gridSize: '32px 32px',
+				gridMask: 'radial-gradient(ellipse 70% 60% at 50% 0%, black 20%, transparent 85%)',
 			};
 		}
 		return {
-			baseGradient: `linear-gradient(180deg, ${bgBase} 0%, ${bgSoft} 55%, ${bgSofter} 100%)`,
-			spotlight: `radial-gradient(600px 420px at 50% -10%, rgba(${c1},.45), transparent 60%)`,
-			aura: `radial-gradient(900px 700px at 110% 0%, rgba(${c2},.18), transparent 70%)`,
-			gridColor: 'rgba(241, 245, 249, 0.06)', // Slate-100 @ 6%
-			gridSize: '28px 28px',
-			gridMask: 'radial-gradient(ellipse 60% 55% at 50% 0%, black 35%, transparent 90%)',
-			bottomFade: `linear-gradient(to top, ${bgBase} 0%, transparent 45%)`,
-			topFade: `linear-gradient(to bottom, ${bgBase} 0%, transparent 25%)`,
+			baseGradient: `radial-gradient(ellipse 80% 50% at 50% -20%, #1e293b, ${bgBase})`,
+			spotlight: `radial-gradient(circle 800px at 50% 0%, rgba(${c1}, 0.25), transparent 70%)`,
+			accentGlow: `radial-gradient(circle 1200px at 100% 0%, rgba(${c2}, 0.12), transparent 50%)`,
+			gridColor: 'rgba(148, 163, 184, 0.03)',
+			gridSize: '32px 32px',
+			gridMask: 'radial-gradient(ellipse 70% 60% at 50% 0%, black 20%, transparent 85%)',
 		};
 	}, [theme]);
 
 	const cameraConfig = useMemo(() => {
 		switch (breakpoint) {
 			case 'mobile':
-				return { position: [0, 2, 16], fov: 62 };
+				return { position: [0, 2, 15], fov: 65 };
 			case 'tablet':
-				return { position: [0, 2.4, 14.5], fov: 56 };
+				return { position: [0, 2.5, 14], fov: 58 };
 			default:
-				return { position: [0, 3, 13.5], fov: 52 };
+				return { position: [0, 3, 13], fov: 52 };
 		}
 	}, [breakpoint]);
 
@@ -336,30 +200,44 @@ const Background3D = () => {
 		<div className="fixed inset-0 -z-10 overflow-hidden" aria-hidden="true">
 			{/* Base gradient */}
 			<div
-				className="absolute inset-0 transition-all duration-700 ease-in-out"
+				className="absolute inset-0 transition-all duration-1000 ease-out"
 				style={{ background: styles.baseGradient }}
 			/>
-			{/* Next.js-style spotlight and aura */}
+
+			{/* Top spotlight */}
 			<div
-				className="absolute inset-0 transition-opacity duration-700"
+				className="absolute inset-0 transition-opacity duration-1000"
 				style={{ background: styles.spotlight }}
 			/>
+
+			{/* Accent glow */}
 			<div
-				className="absolute inset-0 transition-opacity duration-700"
-				style={{ background: styles.aura }}
+				className="absolute inset-0 transition-opacity duration-1000"
+				style={{ background: styles.accentGlow }}
 			/>
-			{/* Subtle grid overlay with radial mask */}
+
+			{/* Animated grid with mask */}
 			<div
-				className="absolute inset-0 pointer-events-none transition-opacity duration-700"
+				className="absolute inset-0 pointer-events-none animate-grid-flow"
 				style={{
-					backgroundImage: `linear-gradient(to right, ${styles.gridColor} 1px, transparent 1px),
-                                      linear-gradient(to bottom, ${styles.gridColor} 1px, transparent 1px)`,
+					backgroundImage: `
+                        linear-gradient(to right, ${styles.gridColor} 1px, transparent 1px),
+                        linear-gradient(to bottom, ${styles.gridColor} 1px, transparent 1px)
+                    `,
 					backgroundSize: styles.gridSize,
 					maskImage: styles.gridMask,
 					WebkitMaskImage: styles.gridMask,
-					opacity: theme === 'light' ? 0.55 : 0.5,
 				}}
 			/>
+
+			{/* Subtle noise texture */}
+			<div
+				className="absolute inset-0 pointer-events-none opacity-[0.015] mix-blend-overlay"
+				style={{
+					backgroundImage: `url("data:image/svg+xml,%3Csvg viewBox='0 0 400 400' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)'/%3E%3C/svg%3E")`,
+				}}
+			/>
+
 			<Suspense fallback={null}>
 				<Canvas
 					camera={{
@@ -374,13 +252,21 @@ const Background3D = () => {
 						alpha: true,
 						powerPreference: 'high-performance',
 						toneMapping: THREE.ACESFilmicToneMapping,
-						toneMappingExposure: theme === 'light' ? 1.02 : 1.18,
+						toneMappingExposure: theme === 'light' ? 1.0 : 1.15,
 					}}
 					dpr={[1, 2]}
 				>
 					<SceneContent />
 				</Canvas>
 			</Suspense>
+
+			{/* Bottom fade */}
+			<div
+				className="absolute inset-x-0 bottom-0 h-64 pointer-events-none"
+				style={{
+					background: `linear-gradient(to top, var(--bg-base) 0%, transparent 100%)`,
+				}}
+			/>
 		</div>
 	);
 };

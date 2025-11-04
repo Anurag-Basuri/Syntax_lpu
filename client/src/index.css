@@ -162,7 +162,25 @@ html[data-theme] * {
 	outline-offset: 2px;
 	border-radius: 0.5rem;
 }
+
+/* Grid flow animation */
+@keyframes grid-flow {
+	0% {
+		background-position: 0 0;
+	}
+	100% {
+		background-position: 32px 32px;
+	}
+}
+
+.animate-grid-flow {
+	animation: grid-flow 20s linear infinite;
+}
+
 @media (prefers-reduced-motion: reduce) {
+	.animate-grid-flow {
+		animation: none;
+	}
 	*,
 	*::before,
 	*::after {
