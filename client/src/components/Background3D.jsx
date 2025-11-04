@@ -148,6 +148,9 @@ const Background3D = () => {
 		const accent1 = getComputedStyle(document.documentElement)
 			.getPropertyValue('--accent-1')
 			.trim();
+		const accent2 = getComputedStyle(document.documentElement)
+			.getPropertyValue('--accent-2')
+			.trim();
 		const bgBase = getComputedStyle(document.documentElement)
 			.getPropertyValue('--bg-base')
 			.trim();
@@ -159,24 +162,30 @@ const Background3D = () => {
 			.toArray()
 			.map((c) => Math.round(c * 255))
 			.join(',');
+		const c2 = new THREE.Color(accent2)
+			.toArray()
+			.map((c) => Math.round(c * 255))
+			.join(',');
 
-		// Refined Next.js-inspired theme
+		// Enhanced Next.js-inspired theme with dual accents
 		if (theme === 'light') {
 			return {
-				baseGradient: `radial-gradient(ellipse 100% 60% at 50% -20%, ${bgSoft}, ${bgBase})`,
-				spotlight: `radial-gradient(circle 900px at 50% -10%, rgba(${c1}, 0.12), transparent 65%)`,
-				gridColor: 'rgba(15, 23, 42, 0.035)',
-				gridSize: '36px 36px',
+				baseGradient: `radial-gradient(ellipse 120% 70% at 50% -20%, ${bgSoft}, ${bgBase})`,
+				spotlight: `radial-gradient(circle 800px at 50% -20%, rgba(${c1}, 0.15), transparent 60%)`,
+				accentGlow: `radial-gradient(circle 1000px at 100% -15%, rgba(${c2}, 0.1), transparent 60%)`,
+				gridColor: 'rgba(15, 23, 42, 0.04)',
+				gridSize: '40px 40px',
 				gridMask:
-					'radial-gradient(ellipse 80% 70% at 50% -10%, black 15%, transparent 80%)',
+					'radial-gradient(ellipse 80% 70% at 50% -15%, black 20%, transparent 75%)',
 			};
 		}
 		return {
-			baseGradient: `radial-gradient(ellipse 100% 60% at 50% -20%, ${bgSoft}, ${bgBase})`,
-			spotlight: `radial-gradient(circle 900px at 50% -10%, rgba(${c1}, 0.2), transparent 65%)`,
-			gridColor: 'rgba(203, 213, 225, 0.025)',
-			gridSize: '36px 36px',
-			gridMask: 'radial-gradient(ellipse 80% 70% at 50% -10%, black 15%, transparent 80%)',
+			baseGradient: `radial-gradient(ellipse 120% 70% at 50% -20%, ${bgSoft}, ${bgBase})`,
+			spotlight: `radial-gradient(circle 800px at 50% -20%, rgba(${c1}, 0.22), transparent 60%)`,
+			accentGlow: `radial-gradient(circle 1000px at 100% -15%, rgba(${c2}, 0.15), transparent 60%)`,
+			gridColor: 'rgba(203, 213, 225, 0.03)',
+			gridSize: '40px 40px',
+			gridMask: 'radial-gradient(ellipse 80% 70% at 50% -15%, black 20%, transparent 75%)',
 		};
 	}, [theme]);
 
@@ -199,10 +208,16 @@ const Background3D = () => {
 				style={{ background: styles.baseGradient }}
 			/>
 
-			{/* Top spotlight */}
+			{/* Top spotlight (Accent 1) */}
 			<div
 				className="absolute inset-0 transition-opacity duration-700"
 				style={{ background: styles.spotlight }}
+			/>
+
+			{/* Accent glow (Accent 2) */}
+			<div
+				className="absolute inset-0 transition-opacity duration-700"
+				style={{ background: styles.accentGlow }}
 			/>
 
 			{/* Animated grid with mask */}
@@ -254,7 +269,7 @@ const Background3D = () => {
 			<div
 				className="absolute inset-x-0 bottom-0 h-64 pointer-events-none"
 				style={{
-					background: `linear-gradient(to top, var(--bg-base) 10%, transparent 100%)`,
+					background: `linear-gradient(to top, var(--bg-base) 20%, transparent 100%)`,
 				}}
 			/>
 		</div>
