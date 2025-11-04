@@ -4,6 +4,12 @@ import { Float, useTexture, PerformanceMonitor } from '@react-three/drei';
 import * as THREE from 'three';
 import logo from '../assets/logo.png';
 
+// Helper to get CSS variable and convert to THREE.Color
+const getThemeColor = (varName) => {
+	const colorStr = getComputedStyle(document.documentElement).getPropertyValue(varName).trim();
+	return new THREE.Color(colorStr);
+};
+
 // Hook to detect current theme
 const useTheme = () => {
 	const [theme, setTheme] = React.useState(
@@ -129,44 +135,30 @@ const Logo3D = () => {
 	);
 };
 
-// Optimized wave mesh with improved theme colors
+// Optimized wave mesh with theme-synced colors
 const WaveMesh = ({ segments }) => {
 	const meshRef = useRef();
 	const theme = useTheme();
 	const breakpoint = useResponsive();
 
-	const uniforms = useMemo(
-		() => ({
+	const uniforms = useMemo(() => {
+		const accent1 = getThemeColor('--accent-1');
+		const accent2 = getThemeColor('--accent-2');
+		const bgSoft = getThemeColor('--bg-soft');
+
+		return {
 			uTime: { value: 0 },
 			uAmplitude: { value: breakpoint === 'mobile' ? 1.0 : 1.5 },
 			uFrequency: { value: 0.04 },
-		}),
-		[breakpoint]
-	);
+			uColorBase: { value: bgSoft },
+			uColorAccent1: { value: accent1 },
+			uColorAccent2: { value: accent2 },
+		};
+	}, [theme, breakpoint]);
 
 	useFrame((state) => {
 		uniforms.uTime.value = state.clock.elapsedTime * 0.7;
 	});
-
-	// Enhanced color palette for both themes
-	const colors = useMemo(() => {
-		if (theme === 'light') {
-			return {
-				// Light theme: Soft, elegant purples and blues
-				base: 'vec3(0.72, 0.67, 0.95)', // Soft lavender
-				highlight: 'vec3(0.45, 0.75, 0.98)', // Sky blue
-				ambient: 'vec3(0.91, 0.89, 0.99)', // Very light purple
-				accent: 'vec3(0.62, 0.52, 0.93)', // Medium purple
-			};
-		}
-		return {
-			// Dark theme: Deep, rich blues with cyan accents
-			base: 'vec3(0.12, 0.22, 0.45)', // Deep blue
-			highlight: 'vec3(0.22, 0.68, 0.90)', // Bright cyan
-			ambient: 'vec3(0.08, 0.14, 0.32)', // Very dark blue
-			accent: 'vec3(0.38, 0.55, 0.95)', // Electric blue
-		};
-	}, [theme]);
 
 	const geometryArgs = useMemo(() => {
 		const size = breakpoint === 'mobile' ? 100 : 140;
@@ -230,23 +222,19 @@ const WaveMesh = ({ segments }) => {
 				fragmentShader={`
                     varying vec2 vUv;
                     varying float vElevation;
+                    uniform vec3 uColorBase;
+                    uniform vec3 uColorAccent1;
+                    uniform vec3 uColorAccent2;
                     
                     void main() {
                         vec2 grid = abs(fract(vUv * 20.0 - 0.5) - 0.5);
                         float line = min(grid.x, grid.y);
                         float gridPattern = 1.0 - min(line * 2.0, 1.0);
                         
-                        vec3 baseColor = ${colors.base};
-                        vec3 highlightColor = ${colors.highlight};
-                        vec3 ambientColor = ${colors.ambient};
-                        vec3 accentColor = ${colors.accent};
-                        
                         float elevationFactor = clamp(vElevation * 0.5 + 0.5, 0.0, 1.0);
                         
-                        // Smooth color transitions
-                        vec3 color = mix(ambientColor, baseColor, smoothstep(0.0, 0.6, elevationFactor));
-                        color = mix(color, accentColor, smoothstep(0.4, 0.7, elevationFactor) * 0.6);
-                        color = mix(color, highlightColor, smoothstep(0.6, 1.0, elevationFactor) * 0.7);
+                        vec3 color = mix(uColorBase, uColorAccent1, smoothstep(0.0, 0.6, elevationFactor));
+                        color = mix(color, uColorAccent2, smoothstep(0.6, 1.0, elevationFactor));
                         
                         float centerDist = distance(vUv, vec2(0.5));
                         float edgeFade = 1.0 - smoothstep(0.25, 0.65, centerDist);
@@ -262,7 +250,7 @@ const WaveMesh = ({ segments }) => {
 	);
 };
 
-// Optimized particle system with improved theme colors
+// Optimized particle system with theme-synced colors
 const ParticleNebula = ({ count, radius }) => {
 	const ref = useRef();
 	const theme = useTheme();
@@ -291,8 +279,7 @@ const ParticleNebula = ({ count, radius }) => {
 		ref.current.rotation.x += delta * 0.01;
 	});
 
-	// Improved particle colors
-	const color = useMemo(() => (theme === 'light' ? '#9f7aea' : '#38bdf8'), [theme]);
+	const color = useMemo(() => getThemeColor('--accent-1'), [theme]);
 
 	return (
 		<points ref={ref}>
@@ -323,11 +310,49 @@ const ParticleNebula = ({ count, radius }) => {
 	);
 };
 
-// Optimized dynamic lights with improved theme colors
+// Interactive cursor glow
+const CursorGlow = () => {
+	const glowRef = useRef();
+	const theme = useTheme();
+	const color = useMemo(() => getThemeColor('--accent-1'), [theme]);
+
+	useFrame(({ viewport, pointer }) => {
+		if (glowRef.current) {
+			const { width, height } = viewport.getCurrentViewport();
+			glowRef.current.position.set((pointer.x * width) / 2, (pointer.y * height) / 2, -5);
+			glowRef.current.material.color = color;
+		}
+	});
+
+	return (
+		<mesh ref={glowRef}>
+			<sphereGeometry args={[8, 32, 32]} />
+			<meshBasicMaterial
+				color={color}
+				transparent
+				opacity={0.08}
+				blending={THREE.AdditiveBlending}
+				depthWrite={false}
+			/>
+		</mesh>
+	);
+};
+
+// Optimized dynamic lights with theme-synced colors
 const DynamicLights = () => {
 	const spot1 = useRef();
-	const spot2 = useRef();
 	const theme = useTheme();
+
+	const lightColors = useMemo(() => {
+		return {
+			ambient: theme === 'light' ? 0.9 : 0.6,
+			hemisphere: {
+				sky: getThemeColor('--accent-1'),
+				ground: getThemeColor('--accent-2'),
+			},
+			spot1: getThemeColor('--accent-1'),
+		};
+	}, [theme]);
 
 	useFrame((state) => {
 		const time = state.clock.elapsedTime;
@@ -335,27 +360,7 @@ const DynamicLights = () => {
 			spot1.current.intensity = (theme === 'light' ? 1.6 : 2.0) + Math.sin(time * 0.5) * 0.3;
 			spot1.current.position.x = Math.sin(time * 0.3) * 3;
 		}
-		if (spot2.current) {
-			spot2.current.intensity = (theme === 'light' ? 1.2 : 1.5) + Math.cos(time * 0.4) * 0.2;
-		}
 	});
-
-	const lightColors = useMemo(() => {
-		if (theme === 'light') {
-			return {
-				hemisphere: { sky: '#8b5cf6', ground: '#fcd34d' }, // Purple sky, golden ground
-				ambient: 0.9,
-				spot1: '#7c3aed', // Rich purple
-				spot2: '#3b82f6', // Bright blue
-			};
-		}
-		return {
-			hemisphere: { sky: '#0ea5e9', ground: '#0c4a6e' }, // Cyan sky, deep blue ground
-			ambient: 0.6,
-			spot1: '#06b6d4', // Cyan
-			spot2: '#6366f1', // Indigo
-		};
-	}, [theme]);
 
 	return (
 		<>
@@ -372,14 +377,6 @@ const DynamicLights = () => {
 				penumbra={1}
 				intensity={theme === 'light' ? 1.6 : 2.0}
 				color={lightColors.spot1}
-			/>
-			<spotLight
-				ref={spot2}
-				position={[-8, 12, -5]}
-				angle={0.35}
-				penumbra={1}
-				intensity={theme === 'light' ? 1.2 : 1.5}
-				color={lightColors.spot2}
 			/>
 		</>
 	);
@@ -415,6 +412,7 @@ const SceneContent = ({ perfLevel }) => {
 	return (
 		<>
 			<DynamicLights />
+			<CursorGlow />
 			<Logo3D />
 			<WaveMesh segments={segments} />
 			<ParticleNebula count={particleCount} radius={particleRadius} />
@@ -427,31 +425,50 @@ const Background3D = () => {
 	const breakpoint = useResponsive();
 	const [perfLevel, setPerfLevel] = useState('high');
 
-	// Enhanced gradient colors for both themes
-	const gradients = useMemo(() => {
+	// Gradients and colors are now derived from CSS variables for consistency
+	const styles = useMemo(() => {
+		const accent1 = getComputedStyle(document.documentElement)
+			.getPropertyValue('--accent-1')
+			.trim();
+		const accent2 = getComputedStyle(document.documentElement)
+			.getPropertyValue('--accent-2')
+			.trim();
+		const bgBase = getComputedStyle(document.documentElement)
+			.getPropertyValue('--bg-base')
+			.trim();
+		const bgSoft = getComputedStyle(document.documentElement)
+			.getPropertyValue('--bg-soft')
+			.trim();
+		const bgSofter = getComputedStyle(document.documentElement)
+			.getPropertyValue('--bg-softer')
+			.trim();
+
+		const accent1Rgb = new THREE.Color(accent1)
+			.toArray()
+			.map((c) => Math.round(c * 255))
+			.join(',');
+		const accent2Rgb = new THREE.Color(accent2)
+			.toArray()
+			.map((c) => Math.round(c * 255))
+			.join(',');
+
 		if (theme === 'light') {
 			return {
-				radial1:
-					'radial-gradient(ellipse 85% 75% at 50% 35%, rgba(139,92,246,.18), transparent)', // Purple glow
-				radial2:
-					'radial-gradient(circle at 20% 80%, rgba(59,130,246,.12), transparent 60%)', // Blue accent
-				radial3:
-					'radial-gradient(circle at 80% 20%, rgba(236,72,153,.08), transparent 55%)', // Pink accent
-				fog: '#f5f3ff', // Very light purple
-				bottomFade:
-					'linear-gradient(to top, rgba(255,255,255,0.95), rgba(249,245,255,0.85), transparent)',
-				topFade: 'linear-gradient(to bottom, rgba(255,255,255,0.9), transparent)',
+				baseGradient: `linear-gradient(to bottom, ${bgBase} 0%, ${bgSoft} 50%, ${bgSofter} 100%)`,
+				radial1: `radial-gradient(ellipse 85% 75% at 50% 35%, rgba(${accent1Rgb},.15), transparent)`,
+				radial2: `radial-gradient(circle at 20% 80%, rgba(${accent2Rgb},.1), transparent 60%)`,
+				fog: bgSofter,
+				bottomFade: `linear-gradient(to top, ${bgBase}, transparent)`,
+				topFade: `linear-gradient(to bottom, ${bgBase}, transparent)`,
 			};
 		}
 		return {
-			radial1:
-				'radial-gradient(ellipse 85% 75% at 50% 35%, rgba(14,165,233,.22), transparent)', // Cyan glow
-			radial2: 'radial-gradient(circle at 20% 80%, rgba(99,102,241,.15), transparent 60%)', // Indigo accent
-			radial3: 'radial-gradient(circle at 80% 20%, rgba(6,182,212,.12), transparent 55%)', // Cyan accent
-			fog: '#0a1929', // Deep navy
-			bottomFade:
-				'linear-gradient(to top, rgba(3,7,18,0.98), rgba(10,25,41,0.92), transparent)',
-			topFade: 'linear-gradient(to bottom, rgba(3,7,18,0.85), transparent)',
+			baseGradient: `linear-gradient(to bottom, ${bgBase} 0%, ${bgSoft} 50%, ${bgSofter} 100%)`,
+			radial1: `radial-gradient(ellipse 85% 75% at 50% 35%, rgba(${accent1Rgb},.2), transparent)`,
+			radial2: `radial-gradient(circle at 20% 80%, rgba(${accent2Rgb},.15), transparent 60%)`,
+			fog: bgBase,
+			bottomFade: `linear-gradient(to top, ${bgBase}, transparent)`,
+			topFade: `linear-gradient(to bottom, ${bgBase}, transparent)`,
 		};
 	}, [theme]);
 
@@ -469,38 +486,20 @@ const Background3D = () => {
 
 	return (
 		<div className="fixed inset-0 -z-10 overflow-hidden" aria-hidden="true">
-			{/* Enhanced base gradient */}
+			{/* Base gradient from theme */}
 			<div
 				className="absolute inset-0 transition-all duration-700 ease-in-out"
-				style={{
-					background:
-						theme === 'light'
-							? 'linear-gradient(to bottom, #ffffff 0%, #faf5ff 35%, #f3e8ff 70%, #ede9fe 100%)'
-							: 'linear-gradient(to bottom, #030712 0%, #0a1929 35%, #0f1f3d 70%, #1e293b 100%)',
-				}}
+				style={{ background: styles.baseGradient }}
 			/>
 
-			{/* Multiple radial gradient overlays for depth */}
+			{/* Radial gradient overlays from theme */}
 			<div
 				className="absolute inset-0 opacity-100 transition-opacity duration-700"
-				style={{ background: gradients.radial1 }}
+				style={{ background: styles.radial1 }}
 			/>
 			<div
 				className="absolute inset-0 opacity-100 transition-opacity duration-700"
-				style={{ background: gradients.radial2 }}
-			/>
-			<div
-				className="absolute inset-0 opacity-100 transition-opacity duration-700"
-				style={{ background: gradients.radial3 }}
-			/>
-
-			{/* Subtle noise texture for depth */}
-			<div
-				className="absolute inset-0 opacity-[0.02] mix-blend-soft-light pointer-events-none"
-				style={{
-					backgroundImage: `url("data:image/svg+xml,%3Csvg viewBox='0 0 400 400' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)'/%3E%3C/svg%3E")`,
-					backgroundSize: '180px 180px',
-				}}
+				style={{ background: styles.radial2 }}
 			/>
 
 			<Suspense fallback={null}>
@@ -528,23 +527,21 @@ const Background3D = () => {
 					>
 						<fog
 							attach="fog"
-							args={[gradients.fog, 15, breakpoint === 'mobile' ? 50 : 60]}
+							args={[styles.fog, 15, breakpoint === 'mobile' ? 50 : 60]}
 						/>
 						<SceneContent perfLevel={perfLevel} />
 					</PerformanceMonitor>
 				</Canvas>
 			</Suspense>
 
-			{/* Enhanced bottom fade */}
+			{/* Fades from theme */}
 			<div
 				className="absolute inset-x-0 bottom-0 h-[28rem] pointer-events-none transition-all duration-700"
-				style={{ background: gradients.bottomFade }}
+				style={{ background: styles.bottomFade }}
 			/>
-
-			{/* Enhanced top fade */}
 			<div
 				className="absolute inset-x-0 top-0 h-48 pointer-events-none transition-all duration-700"
-				style={{ background: gradients.topFade }}
+				style={{ background: styles.topFade }}
 			/>
 		</div>
 	);
