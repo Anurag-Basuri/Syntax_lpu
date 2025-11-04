@@ -148,40 +148,35 @@ const Background3D = () => {
 		const accent1 = getComputedStyle(document.documentElement)
 			.getPropertyValue('--accent-1')
 			.trim();
-		const accent2 = getComputedStyle(document.documentElement)
-			.getPropertyValue('--accent-2')
-			.trim();
 		const bgBase = getComputedStyle(document.documentElement)
 			.getPropertyValue('--bg-base')
+			.trim();
+		const bgSoft = getComputedStyle(document.documentElement)
+			.getPropertyValue('--bg-soft')
 			.trim();
 
 		const c1 = new THREE.Color(accent1)
 			.toArray()
 			.map((c) => Math.round(c * 255))
 			.join(',');
-		const c2 = new THREE.Color(accent2)
-			.toArray()
-			.map((c) => Math.round(c * 255))
-			.join(',');
 
-		// Next.js-inspired: cleaner gradients with stronger spotlight
+		// Refined Next.js-inspired theme
 		if (theme === 'light') {
 			return {
-				baseGradient: `radial-gradient(ellipse 80% 50% at 50% -20%, ${bgBase}, #ffffff)`,
-				spotlight: `radial-gradient(circle 800px at 50% 0%, rgba(${c1}, 0.15), transparent 70%)`,
-				accentGlow: `radial-gradient(circle 1200px at 100% 0%, rgba(${c2}, 0.08), transparent 50%)`,
-				gridColor: 'rgba(15, 23, 42, 0.04)',
-				gridSize: '32px 32px',
-				gridMask: 'radial-gradient(ellipse 70% 60% at 50% 0%, black 20%, transparent 85%)',
+				baseGradient: `radial-gradient(ellipse 100% 60% at 50% -20%, ${bgSoft}, ${bgBase})`,
+				spotlight: `radial-gradient(circle 900px at 50% -10%, rgba(${c1}, 0.12), transparent 65%)`,
+				gridColor: 'rgba(15, 23, 42, 0.035)',
+				gridSize: '36px 36px',
+				gridMask:
+					'radial-gradient(ellipse 80% 70% at 50% -10%, black 15%, transparent 80%)',
 			};
 		}
 		return {
-			baseGradient: `radial-gradient(ellipse 80% 50% at 50% -20%, #1e293b, ${bgBase})`,
-			spotlight: `radial-gradient(circle 800px at 50% 0%, rgba(${c1}, 0.25), transparent 70%)`,
-			accentGlow: `radial-gradient(circle 1200px at 100% 0%, rgba(${c2}, 0.12), transparent 50%)`,
-			gridColor: 'rgba(148, 163, 184, 0.03)',
-			gridSize: '32px 32px',
-			gridMask: 'radial-gradient(ellipse 70% 60% at 50% 0%, black 20%, transparent 85%)',
+			baseGradient: `radial-gradient(ellipse 100% 60% at 50% -20%, ${bgSoft}, ${bgBase})`,
+			spotlight: `radial-gradient(circle 900px at 50% -10%, rgba(${c1}, 0.2), transparent 65%)`,
+			gridColor: 'rgba(203, 213, 225, 0.025)',
+			gridSize: '36px 36px',
+			gridMask: 'radial-gradient(ellipse 80% 70% at 50% -10%, black 15%, transparent 80%)',
 		};
 	}, [theme]);
 
@@ -200,20 +195,14 @@ const Background3D = () => {
 		<div className="fixed inset-0 -z-10 overflow-hidden" aria-hidden="true">
 			{/* Base gradient */}
 			<div
-				className="absolute inset-0 transition-all duration-1000 ease-out"
+				className="absolute inset-0 transition-all duration-700 ease-out"
 				style={{ background: styles.baseGradient }}
 			/>
 
 			{/* Top spotlight */}
 			<div
-				className="absolute inset-0 transition-opacity duration-1000"
+				className="absolute inset-0 transition-opacity duration-700"
 				style={{ background: styles.spotlight }}
-			/>
-
-			{/* Accent glow */}
-			<div
-				className="absolute inset-0 transition-opacity duration-1000"
-				style={{ background: styles.accentGlow }}
 			/>
 
 			{/* Animated grid with mask */}
@@ -227,14 +216,15 @@ const Background3D = () => {
 					backgroundSize: styles.gridSize,
 					maskImage: styles.gridMask,
 					WebkitMaskImage: styles.gridMask,
+					opacity: theme === 'light' ? 0.8 : 1,
 				}}
 			/>
 
 			{/* Subtle noise texture */}
 			<div
-				className="absolute inset-0 pointer-events-none opacity-[0.015] mix-blend-overlay"
+				className="absolute inset-0 pointer-events-none opacity-[0.02] mix-blend-overlay"
 				style={{
-					backgroundImage: `url("data:image/svg+xml,%3Csvg viewBox='0 0 400 400' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)'/%3E%3C/svg%3E")`,
+					backgroundImage: `url("data:image/svg+xml,%3Csvg viewBox='0 0 400 400' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)'/%3E%3C/svg%3E")`,
 				}}
 			/>
 
@@ -264,7 +254,7 @@ const Background3D = () => {
 			<div
 				className="absolute inset-x-0 bottom-0 h-64 pointer-events-none"
 				style={{
-					background: `linear-gradient(to top, var(--bg-base) 0%, transparent 100%)`,
+					background: `linear-gradient(to top, var(--bg-base) 10%, transparent 100%)`,
 				}}
 			/>
 		</div>
