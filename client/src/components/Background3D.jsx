@@ -50,7 +50,7 @@ const useResponsive = () => {
 	return breakpoint;
 };
 
-// Clean 3D Logo - no background, softer opacity
+// Clean 3D Logo - Simplified shader for guaranteed visibility
 const Logo3D = () => {
 	const meshRef = useRef();
 	const groupRef = useRef();
@@ -74,11 +74,11 @@ const Logo3D = () => {
 	const { scale, yPosition } = useMemo(() => {
 		switch (breakpoint) {
 			case 'mobile':
-				return { scale: 3.6, yPosition: 0.45 };
+				return { scale: 3.8, yPosition: 0.5 };
 			case 'tablet':
-				return { scale: 4.8, yPosition: 0.75 };
+				return { scale: 5.0, yPosition: 0.8 };
 			default:
-				return { scale: 6.2, yPosition: 0.95 };
+				return { scale: 6.5, yPosition: 1.0 };
 		}
 	}, [breakpoint]);
 
@@ -119,10 +119,10 @@ const Logo3D = () => {
 
 	return (
 		<Float
-			speed={1.35}
-			rotationIntensity={0.14}
-			floatIntensity={0.18}
-			floatingRange={[-0.05, 0.05]}
+			speed={1.4}
+			rotationIntensity={0.12}
+			floatIntensity={0.16}
+			floatingRange={[-0.04, 0.04]}
 		>
 			<group ref={groupRef} position={[0, yPosition, 0]}>
 				<group ref={meshRef}>
@@ -135,11 +135,8 @@ const Logo3D = () => {
 							side={THREE.DoubleSide}
 							uniforms={{
 								uMap: { value: texture },
-								uKeyColor: { value: keyColor },
-								uTolerance: { value: theme === 'light' ? 0.55 : 0.45 },
-								uSmoothness: { value: 0.12 },
-								uAlphaCutoff: { value: 0.02 },
-								uOpacity: { value: 0.75 }, // Increased logo opacity for better presence
+								uOpacity: { value: 0.85 }, // Balanced opacity
+								uAlphaTest: { value: 0.1 }, // Ensures transparent parts are cut
 							}}
 							vertexShader={`
                                 varying vec2 vUv;
@@ -151,42 +148,18 @@ const Logo3D = () => {
 							fragmentShader={`
                                 varying vec2 vUv;
                                 uniform sampler2D uMap;
-                                uniform vec3 uKeyColor;
-                                uniform float uTolerance;
-                                uniform float uSmoothness;
-                                uniform float uAlphaCutoff;
                                 uniform float uOpacity;
-
-                                // Perceptual luma
-                                float luma(vec3 c){ return dot(c, vec3(0.299, 0.587, 0.114)); }
+                                uniform float uAlphaTest;
 
                                 void main() {
-                                    vec4 tex = texture2D(uMap, vUv);
+                                    vec4 texColor = texture2D(uMap, vUv);
+                                    
+                                    // Simple, reliable alpha test. This works best with a proper transparent PNG.
+                                    if (texColor.a < uAlphaTest) discard;
 
-                                    // Distance to key color and luma-based keying help remove off-white/off-black
-                                    float keyDist = distance(tex.rgb, uKeyColor);
-                                    float nearKeyChrom = 1.0 - smoothstep(uTolerance - uSmoothness, uTolerance + uSmoothness, keyDist);
-
-                                    float Y = luma(tex.rgb);
-                                    float nearKeyLuma;
-                                    #ifdef LIGHT_MODE
-                                        nearKeyLuma = smoothstep(1.0 - (uTolerance + uSmoothness), 1.0 - (uTolerance - uSmoothness), Y);
-                                    #else
-                                        nearKeyLuma = smoothstep(uTolerance - uSmoothness, uTolerance + uSmoothness, Y);
-                                    #endif
-
-                                    // Combine keys, but respect existing alpha
-                                    float keyMask = max(nearKeyChrom, nearKeyLuma);
-                                    float alpha = tex.a * (1.0 - keyMask) * uOpacity;
-
-                                    if(alpha < uAlphaCutoff) discard;
-
-                                    gl_FragColor = vec4(tex.rgb, alpha);
+                                    gl_FragColor = vec4(texColor.rgb, texColor.a * uOpacity);
                                 }
                             `}
-							defines={{
-								LIGHT_MODE: theme === 'light' ? 1 : 0,
-							}}
 						/>
 					</mesh>
 				</group>
@@ -209,13 +182,13 @@ const WaveMesh = ({ segments }) => {
 
 		return {
 			uTime: { value: 0 },
-			uAmplitude: { value: breakpoint === 'mobile' ? 0.75 : 1.1 },
-			uFreq1: { value: 0.052 },
-			uFreq2: { value: 0.032 },
-			uFreq3: { value: 0.024 },
-			uSpeed1: { value: 0.42 },
-			uSpeed2: { value: 0.26 },
-			uSpeed3: { value: 0.18 },
+			uAmplitude: { value: breakpoint === 'mobile' ? 0.7 : 1.0 },
+			uFreq1: { value: 0.05 },
+			uFreq2: { value: 0.03 },
+			uFreq3: { value: 0.022 },
+			uSpeed1: { value: 0.38 },
+			uSpeed2: { value: 0.24 },
+			uSpeed3: { value: 0.16 },
 			uDir1: { value: new THREE.Vector2(1.0, 0.2).normalize() },
 			uDir2: { value: new THREE.Vector2(-0.6, 1.0).normalize() },
 			uDir3: { value: new THREE.Vector2(0.2, -1.0).normalize() },
@@ -223,8 +196,8 @@ const WaveMesh = ({ segments }) => {
 			uColorAccent1: { value: accent1 },
 			uColorAccentMid: { value: accentMid },
 			uColorAccent2: { value: accent2 },
-			uMeshOpacity: { value: theme === 'light' ? 0.6 : 0.7 },
-			uGridStrength: { value: theme === 'light' ? 0.18 : 0.22 },
+			uMeshOpacity: { value: theme === 'light' ? 0.75 : 0.85 },
+			uGridStrength: { value: theme === 'light' ? 0.15 : 0.2 },
 		};
 	}, [theme, breakpoint]);
 
