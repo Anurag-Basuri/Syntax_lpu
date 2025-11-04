@@ -177,22 +177,22 @@ const LineMesh = ({ segments }) => {
 
 		return {
 			uTime: { value: 0 },
-			uAmplitude: { value: breakpoint === 'mobile' ? 0.5 : 0.7 },
-			uFrequency: { value: 0.035 },
-			uSpeed: { value: 0.2 },
+			uAmplitude: { value: breakpoint === 'mobile' ? 1.2 : 1.8 }, // Increased from 0.5/0.7
+			uFrequency: { value: 0.025 }, // Decreased for larger waves
+			uSpeed: { value: 0.15 }, // Slower for more visible motion
 			uColorStart: { value: accent1 },
 			uColorEnd: { value: accent2 },
-			uLineOpacity: { value: theme === 'light' ? 0.15 : 0.25 },
+			uLineOpacity: { value: theme === 'light' ? 0.2 : 0.3 }, // Slightly increased
 		};
 	}, [theme, breakpoint]);
 
 	useFrame((state) => {
 		uniforms.uTime.value = state.clock.elapsedTime;
 
-		// Subtle responsive animation
+		// Subtle responsive animation with higher amplitude
 		const targetAmp =
-			(breakpoint === 'mobile' ? 0.5 : 0.7) +
-			(Math.abs(state.pointer.x) + Math.abs(state.pointer.y)) * 0.08;
+			(breakpoint === 'mobile' ? 1.2 : 1.8) +
+			(Math.abs(state.pointer.x) + Math.abs(state.pointer.y)) * 0.15;
 		uniforms.uAmplitude.value = THREE.MathUtils.lerp(
 			uniforms.uAmplitude.value,
 			targetAmp,
@@ -200,7 +200,7 @@ const LineMesh = ({ segments }) => {
 		);
 	});
 
-	const size = breakpoint === 'mobile' ? 150 : 200;
+	const size = breakpoint === 'mobile' ? 200 : 280; // Increased from 150/200
 
 	return (
 		<mesh ref={meshRef} rotation={[-Math.PI / 2, 0, 0]} position={[0, -10, 0]}>
@@ -224,11 +224,13 @@ const LineMesh = ({ segments }) => {
                         vUv = uv;
                         vec3 pos = position;
                         
-                        // Simple wave animation
-                        float wave = sin(pos.x * uFrequency + uTime * uSpeed) * 
-                                    cos(pos.y * uFrequency + uTime * uSpeed * 0.7);
+                        // Multi-directional waves for more dynamic motion
+                        float wave1 = sin(pos.x * uFrequency + uTime * uSpeed) * 
+                                     cos(pos.y * uFrequency + uTime * uSpeed * 0.7);
+                        float wave2 = sin(pos.y * uFrequency * 0.8 + uTime * uSpeed * 0.6) *
+                                     cos(pos.x * uFrequency * 0.8 + uTime * uSpeed * 0.5);
                         
-                        vElevation = wave * uAmplitude;
+                        vElevation = (wave1 * 0.6 + wave2 * 0.4) * uAmplitude;
                         pos.z += vElevation;
                         
                         gl_Position = projectionMatrix * modelViewMatrix * vec4(pos, 1.0);
@@ -247,8 +249,8 @@ const LineMesh = ({ segments }) => {
                         vec3 color = mix(uColorStart, uColorEnd, mixFactor);
                         
                         // Fade at edges
-                        float edgeFade = smoothstep(0.0, 0.3, vUv.y) * smoothstep(1.0, 0.7, vUv.y);
-                        edgeFade *= smoothstep(0.0, 0.1, vUv.x) * smoothstep(1.0, 0.9, vUv.x);
+                        float edgeFade = smoothstep(0.0, 0.25, vUv.y) * smoothstep(1.0, 0.75, vUv.y);
+                        edgeFade *= smoothstep(0.0, 0.15, vUv.x) * smoothstep(1.0, 0.85, vUv.x);
                         
                         gl_FragColor = vec4(color, uLineOpacity * edgeFade);
                     }
