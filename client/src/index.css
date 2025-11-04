@@ -4,50 +4,50 @@
    1. THEME & GLOBAL VARIABLES
    ========================================================================== */
 :root {
-	/* Primary accent colors - Refined Palette */
-	--accent-1: #0ea5e9; /* Sky-500 */
-	--accent-2: #6366f1; /* Indigo-500 */
+	/* Primary accent colors - NEW, more vibrant palette */
+	--accent-1: #38bdf8; /* Sky-400 */
+	--accent-2: #8b5cf6; /* Violet-500 */
 
 	/* Dark theme (default) - Deeper & Cleaner */
 	--bg-base: #020617; /* Slate-950 */
 	--bg-soft: #0f172a; /* Slate-900 */
 	--bg-softer: #1e293b; /* Slate-800 */
 
-	--glass-bg: rgba(15, 23, 42, 0.6); /* Slate-900 @ 60% */
-	--glass-border: rgba(51, 65, 85, 0.5); /* Slate-700 @ 50% */
-	--glass-hover: rgba(30, 41, 59, 0.7); /* Slate-800 @ 70% */
+	--glass-bg: rgba(15, 23, 42, 0.65); /* Slate-900 @ 65% */
+	--glass-border: rgba(51, 65, 85, 0.55); /* Slate-700 @ 55% */
+	--glass-hover: rgba(30, 41, 59, 0.75); /* Slate-800 @ 75% */
 	--glass-shine: rgba(255, 255, 255, 0.03);
 
 	--text-primary: #f8fafc; /* Slate-50 */
 	--text-secondary: #cbd5e1; /* Slate-300 */
-	--text-muted: #64748b; /* Slate-500 */
+	--text-muted: #94a3b8; /* Slate-400 */
 
-	--shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.4);
-	--shadow-md: 0 6px 18px rgba(0, 0, 0, 0.5);
-	--shadow-lg: 0 12px 40px rgba(0, 0, 0, 0.6);
+	--shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.5);
+	--shadow-md: 0 6px 18px rgba(0, 0, 0, 0.6);
+	--shadow-lg: 0 12px 40px rgba(0, 0, 0, 0.7);
 }
 
 :root[data-theme='light'] {
 	/* Light theme - Brighter & Higher Contrast */
-	--accent-1: #0284c7; /* Sky-600 */
-	--accent-2: #4f46e5; /* Indigo-600 */
+	--accent-1: #0ea5e9; /* Sky-500 */
+	--accent-2: #7c3aed; /* Violet-600 */
 
 	--bg-base: #ffffff; /* White */
 	--bg-soft: #f8fafc; /* Slate-50 */
 	--bg-softer: #f1f5f9; /* Slate-100 */
 
-	--glass-bg: rgba(255, 255, 255, 0.7);
-	--glass-border: rgba(0, 0, 0, 0.07);
-	--glass-hover: rgba(248, 250, 252, 0.9); /* Slate-50 @ 90% */
+	--glass-bg: rgba(255, 255, 255, 0.75);
+	--glass-border: rgba(0, 0, 0, 0.08);
+	--glass-hover: rgba(248, 250, 252, 0.95); /* Slate-50 @ 95% */
 	--glass-shine: rgba(0, 0, 0, 0.02);
 
 	--text-primary: #0f172a; /* Slate-900 */
 	--text-secondary: #475569; /* Slate-600 */
 	--text-muted: #94a3b8; /* Slate-400 */
 
-	--shadow-sm: 0 2px 8px rgba(15, 23, 42, 0.05);
-	--shadow-md: 0 4px 16px rgba(15, 23, 42, 0.07);
-	--shadow-lg: 0 10px 36px rgba(15, 23, 42, 0.1);
+	--shadow-sm: 0 2px 8px rgba(15, 23, 42, 0.06);
+	--shadow-md: 0 4px 16px rgba(15, 23, 42, 0.08);
+	--shadow-lg: 0 10px 36px rgba(15, 23, 42, 0.12);
 }
 
 /* ==========================================================================
