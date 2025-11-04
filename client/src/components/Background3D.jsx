@@ -72,11 +72,11 @@ const Logo3D = () => {
 	const { scale, yPosition, opacity } = useMemo(() => {
 		switch (breakpoint) {
 			case 'mobile':
-				return { scale: 3.2, yPosition: 0.4, opacity: 0.6 };
+				return { scale: 3.2, yPosition: 0.4, opacity: 0.78 }; // increased
 			case 'tablet':
-				return { scale: 4.6, yPosition: 0.75, opacity: 0.62 };
+				return { scale: 4.6, yPosition: 0.75, opacity: 0.82 }; // increased
 			default:
-				return { scale: 6.2, yPosition: 1.0, opacity: 0.64 };
+				return { scale: 6.2, yPosition: 1.0, opacity: 0.86 }; // increased
 		}
 	}, [breakpoint]);
 
@@ -296,21 +296,26 @@ const Background3D = () => {
 			.map((c) => Math.round(c * 255))
 			.join(',');
 
+		// Next.js-like: subtle gradient + top spotlight + faint grid
 		if (theme === 'light') {
 			return {
-				baseGradient: `linear-gradient(180deg, ${bgBase} 0%, ${bgSoft} 50%, ${bgSofter} 100%)`,
-				radial1: `radial-gradient(ellipse 70% 50% at 58% 12%, rgba(${c1},.08), transparent 70%)`,
-				radial2: `radial-gradient(circle at 12% 88%, rgba(${c2},.06), transparent 60%)`,
-				fog: bgSofter,
+				baseGradient: `linear-gradient(180deg, ${bgBase} 0%, ${bgSoft} 55%, ${bgSofter} 100%)`,
+				spotlight: `radial-gradient(600px 420px at 50% -10%, rgba(${c1},.35), transparent 60%)`,
+				aura: `radial-gradient(900px 700px at 110% 0%, rgba(${c2},.12), transparent 70%)`,
+				gridColor: 'rgba(15, 23, 42, 0.06)', // Slate-900 @ 6%
+				gridSize: '28px 28px',
+				gridMask: 'radial-gradient(ellipse 60% 55% at 50% 0%, black 35%, transparent 90%)',
 				bottomFade: `linear-gradient(to top, ${bgBase} 0%, transparent 45%)`,
 				topFade: `linear-gradient(to bottom, ${bgBase} 0%, transparent 25%)`,
 			};
 		}
 		return {
-			baseGradient: `linear-gradient(180deg, ${bgBase} 0%, ${bgSoft} 50%, ${bgSofter} 100%)`,
-			radial1: `radial-gradient(ellipse 70% 50% at 58% 12%, rgba(${c1},.12), transparent 70%)`,
-			radial2: `radial-gradient(circle at 12% 88%, rgba(${c2},.09), transparent 60%)`,
-			fog: bgBase,
+			baseGradient: `linear-gradient(180deg, ${bgBase} 0%, ${bgSoft} 55%, ${bgSofter} 100%)`,
+			spotlight: `radial-gradient(600px 420px at 50% -10%, rgba(${c1},.45), transparent 60%)`,
+			aura: `radial-gradient(900px 700px at 110% 0%, rgba(${c2},.18), transparent 70%)`,
+			gridColor: 'rgba(241, 245, 249, 0.06)', // Slate-100 @ 6%
+			gridSize: '28px 28px',
+			gridMask: 'radial-gradient(ellipse 60% 55% at 50% 0%, black 35%, transparent 90%)',
 			bottomFade: `linear-gradient(to top, ${bgBase} 0%, transparent 45%)`,
 			topFade: `linear-gradient(to bottom, ${bgBase} 0%, transparent 25%)`,
 		};
@@ -329,21 +334,32 @@ const Background3D = () => {
 
 	return (
 		<div className="fixed inset-0 -z-10 overflow-hidden" aria-hidden="true">
-			{/* Gradient background */}
+			{/* Base gradient */}
 			<div
 				className="absolute inset-0 transition-all duration-700 ease-in-out"
 				style={{ background: styles.baseGradient }}
 			/>
-			{/* Radial accents */}
+			{/* Next.js-style spotlight and aura */}
 			<div
 				className="absolute inset-0 transition-opacity duration-700"
-				style={{ background: styles.radial1 }}
+				style={{ background: styles.spotlight }}
 			/>
 			<div
 				className="absolute inset-0 transition-opacity duration-700"
-				style={{ background: styles.radial2 }}
+				style={{ background: styles.aura }}
 			/>
-
+			{/* Subtle grid overlay with radial mask */}
+			<div
+				className="absolute inset-0 pointer-events-none transition-opacity duration-700"
+				style={{
+					backgroundImage: `linear-gradient(to right, ${styles.gridColor} 1px, transparent 1px),
+                                      linear-gradient(to bottom, ${styles.gridColor} 1px, transparent 1px)`,
+					backgroundSize: styles.gridSize,
+					maskImage: styles.gridMask,
+					WebkitMaskImage: styles.gridMask,
+					opacity: theme === 'light' ? 0.55 : 0.5,
+				}}
+			/>
 			<Suspense fallback={null}>
 				<Canvas
 					camera={{
@@ -358,23 +374,13 @@ const Background3D = () => {
 						alpha: true,
 						powerPreference: 'high-performance',
 						toneMapping: THREE.ACESFilmicToneMapping,
-						toneMappingExposure: theme === 'light' ? 1.03 : 1.2,
+						toneMappingExposure: theme === 'light' ? 1.02 : 1.18,
 					}}
 					dpr={[1, 2]}
 				>
 					<SceneContent />
 				</Canvas>
 			</Suspense>
-
-			{/* Edge fades */}
-			<div
-				className="absolute inset-x-0 bottom-0 h-56 pointer-events-none transition-all duration-700"
-				style={{ background: styles.bottomFade }}
-			/>
-			<div
-				className="absolute inset-x-0 top-0 h-28 pointer-events-none transition-all duration-700"
-				style={{ background: styles.topFade }}
-			/>
 		</div>
 	);
 };
