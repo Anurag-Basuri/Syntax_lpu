@@ -1,8 +1,8 @@
 import { useRef, Suspense, useMemo } from 'react';
 import { Canvas, useFrame } from '@react-three/fiber';
-import { Plane, Float, Environment } from '@react-three/drei';
-import { EffectComposer, Bloom } from '@react-three/postprocessing';
+import { Plane, Float } from '@react-three/drei';
 import * as THREE from 'three';
+import logo from '../assets/logo.png';
 
 // Component for the 3D Logo Geometry
 const Logo3D = () => {
@@ -61,23 +61,11 @@ const Logo3D = () => {
 			<group ref={ref} position={[0, 0.2, 0]} scale={1.8}>
 				<mesh position={[-0.5, 0, 0]}>
 					<extrudeGeometry args={[chevronLeft, extrudeSettings]} />
-					<meshStandardMaterial
-						color="var(--accent-1)"
-						emissive="var(--accent-1)"
-						emissiveIntensity={0.6}
-						metalness={0.8}
-						roughness={0.25}
-					/>
+					<meshStandardMaterial color="var(--accent-1)" metalness={0.7} roughness={0.3} />
 				</mesh>
 				<mesh position={[0.5, 0, 0]}>
 					<extrudeGeometry args={[chevronRight, extrudeSettings]} />
-					<meshStandardMaterial
-						color="var(--accent-2)"
-						emissive="var(--accent-2)"
-						emissiveIntensity={0.4}
-						metalness={0.8}
-						roughness={0.25}
-					/>
+					<meshStandardMaterial color="var(--accent-2)" metalness={0.7} roughness={0.3} />
 				</mesh>
 			</group>
 		</Float>
@@ -119,7 +107,7 @@ const InfiniteGrid = () => {
             float dist = distance(vUv, vec2(0.5));
             opacity *= 1.0 - smoothstep(0.4, 0.5, dist);
 
-            gl_FragColor = vec4(vec3(0.2, 0.4, 0.8), opacity * 0.2);
+            gl_FragColor = vec4(vec3(0.2, 0.4, 0.8), opacity * 0.25);
           }
         `}
 			/>
@@ -166,22 +154,24 @@ const Background3D = () => {
 			<div className="absolute inset-0 bg-bg-base" />
 			<Suspense fallback={null}>
 				<Canvas camera={{ position: [0, 0, 8], fov: 45 }} style={{ pointerEvents: 'auto' }}>
-					<ambientLight intensity={0.2} />
-					<directionalLight position={[5, 5, 5]} intensity={0.5} />
-					<Environment preset="city" blur={0.6} />
+					{/* New, more direct lighting setup */}
+					<hemisphereLight
+						skyColor={new THREE.Color(0x0ea5e9)}
+						groundColor={new THREE.Color(0x030712)}
+						intensity={1}
+					/>
+					<spotLight
+						position={[10, 10, 10]}
+						angle={0.3}
+						penumbra={1}
+						intensity={2}
+						castShadow
+					/>
+					<directionalLight position={[-5, -5, -5]} intensity={0.5} />
 
 					<Logo3D />
 					<InfiniteGrid />
 					<Starfield />
-
-					<EffectComposer>
-						<Bloom
-							intensity={0.8}
-							luminanceThreshold={0.3}
-							luminanceSmoothing={0.9}
-							height={1024}
-						/>
-					</EffectComposer>
 				</Canvas>
 			</Suspense>
 			<div className="absolute inset-x-0 bottom-0 h-48 bg-gradient-to-t from-bg-base to-transparent" />
