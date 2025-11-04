@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { QrReader } from 'react-qr-reader';
+import { QrReader } from 'react-zxing';
 import { motion, AnimatePresence } from 'framer-motion';
 import { apiClient } from '../services/api.js';
 import { useAuth } from '../hooks/useAuth.js';
@@ -230,8 +230,8 @@ const QRScanner = () => {
 			err?.name === 'NotAllowedError'
 				? 'Camera access denied. Please allow camera permission.'
 				: err?.name === 'NotFoundError'
-					? 'No camera device found.'
-					: 'Camera error. Please check your device.';
+				? 'No camera device found.'
+				: 'Camera error. Please check your device.';
 		setCameraError(msg);
 		setScanning(false);
 		setToast({ message: msg, type: 'error' });

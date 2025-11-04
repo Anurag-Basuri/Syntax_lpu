@@ -29,9 +29,9 @@
 		"react-hot-toast": "^2.6.0",
 		"react-icons": "^5.5.0",
 		"react-intersection-observer": "^9.16.0",
-		"react-qr-reader": "^3.0.0-beta-1",
 		"react-router-dom": "^7.7.0",
 		"react-toastify": "^11.0.5",
+		"react-zxing": "^2.1.0",
 		"recharts": "^3.1.2",
 		"tailwindcss": "^4.1.11"
 	},
