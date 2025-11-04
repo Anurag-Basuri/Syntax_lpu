@@ -105,22 +105,22 @@ const Background3D = () => {
 			baseGradient: `radial-gradient(ellipse 120% 70% at 50% -15%, ${bgSoft} 0%, ${bgBase} 60%)`,
 			// Next.js-like spotlight from the top, reacts to pointer via CSS vars
 			spotlight: `radial-gradient(800px 520px at var(--spot-x, 50%) var(--spot-y, 0%), rgba(${a1}, ${
-				isLight ? 0.06 : 0.08
+				isLight ? 0.05 : 0.08
 			}), transparent 65%)`,
 			// Secondary aura for depth
 			aura: `radial-gradient(1100px 800px at 105% -10%, rgba(${a2}, ${
-				isLight ? 0.035 : 0.05
+				isLight ? 0.03 : 0.045
 			}), transparent 70%)`,
 			// Grid config
-			gridColor: isLight ? 'rgba(15, 23, 42, 0.012)' : 'rgba(203, 213, 225, 0.01)',
+			gridColor: isLight ? 'rgba(15, 23, 42, 0.012)' : 'rgba(203, 213, 225, 0.012)',
 			gridSize: breakpoint === 'mobile' ? '32px 32px' : '36px 36px',
 			gridMask: 'radial-gradient(ellipse 80% 65% at 50% -10%, black 25%, transparent 85%)',
-			gridOpacity: isLight ? 0.22 : 0.26,
+			gridOpacity: isLight ? 0.2 : 0.24,
 			// Vignette to de-emphasize edges
 			vignette:
 				'radial-gradient(ellipse 120% 85% at 50% 50%, transparent 55%, rgba(0,0,0,0.08) 100%)',
 			// Ultra subtle film grain
-			noiseOpacity: isLight ? 0.006 : 0.008,
+			noiseOpacity: isLight ? 0.005 : 0.007,
 		};
 	}, [theme, breakpoint]);
 
