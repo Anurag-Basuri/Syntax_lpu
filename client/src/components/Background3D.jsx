@@ -393,6 +393,103 @@ const WireframeMesh = ({ segments }) => {
 	);
 };
 
+// Clean cloth-like mesh with large, smooth waves
+const WaveMesh = ({ segments }) => {
+	const meshRef = useRef();
+	const theme = useTheme();
+	const breakpoint = useResponsive();
+
+	const uniforms = useMemo(() => {
+		const accent1 = getThemeColor('--accent-1');
+		const accent2 = getThemeColor('--accent-2');
+		const bgSoft = getThemeColor('--bg-soft');
+
+		return {
+			uTime: { value: 0 },
+			uAmplitude: { value: breakpoint === 'mobile' ? 0.4 : 0.6 }, // Lower amplitude for softer waves
+			uFrequency: { value: 0.012 }, // Lower frequency for bigger waves
+			uSpeed: { value: 0.07 }, // Slower, more graceful speed
+			uColorStart: { value: accent1 },
+			uColorEnd: { value: accent2 },
+			uColorBase: { value: bgSoft },
+			uMeshOpacity: { value: theme === 'light' ? 0.4 : 0.55 },
+		};
+	}, [theme, breakpoint]);
+
+	useFrame((state) => {
+		uniforms.uTime.value = state.clock.elapsedTime;
+
+		// Responsive wave amplitude
+		const pointerInfluence = (Math.abs(state.pointer.x) + Math.abs(state.pointer.y)) * 0.15;
+		const targetAmp = (breakpoint === 'mobile' ? 0.4 : 0.6) + pointerInfluence;
+		uniforms.uAmplitude.value = THREE.MathUtils.lerp(
+			uniforms.uAmplitude.value,
+			targetAmp,
+			0.05
+		);
+	});
+
+	const size = breakpoint === 'mobile' ? 240 : 320;
+
+	return (
+		<mesh ref={meshRef} rotation={[-Math.PI / 2, 0, 0]} position={[0, -8, 0]}>
+			<planeGeometry args={[size, size, segments, segments]} />
+			<shaderMaterial
+				transparent
+				side={THREE.DoubleSide}
+				uniforms={uniforms}
+				depthWrite={false}
+				vertexShader={`
+                    uniform float uTime;
+                    uniform float uAmplitude;
+                    uniform float uFrequency;
+                    uniform float uSpeed;
+                    
+                    varying vec2 vUv;
+                    varying float vElevation;
+
+                    void main() {
+                        vUv = uv;
+                        vec3 pos = position;
+                        
+                        // Smooth, flowing waves
+                        float wave1 = sin(pos.x * uFrequency + uTime * uSpeed);
+                        float wave2 = sin(pos.y * uFrequency * 0.8 + uTime * uSpeed * 0.7);
+                        float wave3 = cos((pos.x + pos.y) * uFrequency * 0.5 + uTime * uSpeed * 0.5);
+                        
+                        vElevation = (wave1 * 0.5 + wave2 * 0.3 + wave3 * 0.2) * uAmplitude;
+                        pos.z += vElevation;
+                        
+                        gl_Position = projectionMatrix * modelViewMatrix * vec4(pos, 1.0);
+                    }
+                `}
+				fragmentShader={`
+                    varying vec2 vUv;
+                    varying float vElevation;
+                    uniform vec3 uColorStart;
+                    uniform vec3 uColorEnd;
+                    uniform vec3 uColorBase;
+                    uniform float uMeshOpacity;
+
+                    void main() {
+                        // Blend between accent colors based on wave height
+                        float mixFactor = clamp(vElevation * 0.6 + 0.5, 0.0, 1.0);
+                        vec3 waveColor = mix(uColorStart, uColorEnd, mixFactor);
+                        
+                        // Mix the wave color with a base color for a more subtle effect
+                        vec3 color = mix(uColorBase, waveColor, 0.4);
+
+                        // Fade out towards the top and bottom edges
+                        float edgeFade = smoothstep(0.0, 0.2, vUv.y) * smoothstep(1.0, 0.8, vUv.y);
+                        
+                        gl_FragColor = vec4(color, edgeFade * uMeshOpacity);
+                    }
+                `}
+			/>
+		</mesh>
+	);
+};
+
 // Refined particle field
 const ParticleField = ({ count, radius }) => {
 	const ref = useRef();
@@ -519,7 +616,7 @@ const SceneContent = ({ perfLevel }) => {
 		<>
 			<SceneLights />
 			<Logo3D perfLevel={perfLevel} />
-			<WireframeMesh segments={segments} />
+			<WaveMesh segments={segments} />
 			<ParticleField count={particleCount} radius={particleRadius} />
 		</>
 	);
