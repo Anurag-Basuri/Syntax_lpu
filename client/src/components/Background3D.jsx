@@ -1,13 +1,13 @@
 import React, { useRef, Suspense, useMemo, useEffect, useState } from 'react';
 import { Canvas, useFrame, useThree } from '@react-three/fiber';
 import { Float, useTexture, PerformanceMonitor } from '@react-three/drei';
-import * * THREE from 'three';
+import * as THREE from 'three';
 import logo from '../assets/logo.png';
 
 // Helper to get CSS variable and convert to THREE.Color
 const getThemeColor = (varName) => {
     const colorStr = getComputedStyle(document.documentElement).getPropertyValue(varName).trim();
-    return new THREE.Color(colorStr);
+    return new THREE.Color(colorStr || '#000');
 };
 
 // Hook to detect current theme
@@ -50,7 +50,7 @@ const useResponsive = () => {
     return breakpoint;
 };
 
-// Clean 3D Logo - Reduced opacity, no background
+// Clean 3D Logo - no background, softer opacity
 const Logo3D = () => {
     const meshRef = useRef();
     const groupRef = useRef();
@@ -85,22 +85,13 @@ const Logo3D = () => {
     useFrame((state) => {
         const pointer = state.pointer ?? { x: 0, y: 0 };
         const t = state.clock.elapsedTime;
+        const dt = state.clock.getDelta();
 
         if (meshRef.current) {
             const targetY = (pointer.x * Math.PI) / 12;
             const targetX = (-pointer.y * Math.PI) / 16;
-            meshRef.current.rotation.y = THREE.MathUtils.damp(
-                meshRef.current.rotation.y,
-                targetY,
-                6,
-                state.clock.getDelta()
-            );
-            meshRef.current.rotation.x = THREE.MathUtils.damp(
-                meshRef.current.rotation.x,
-                targetX,
-                6,
-                state.clock.getDelta()
-            );
+            meshRef.current.rotation.y = THREE.MathUtils.damp(meshRef.current.rotation.y, targetY, 6, dt);
+            meshRef.current.rotation.x = THREE.MathUtils.damp(meshRef.current.rotation.x, targetX, 6, dt);
             meshRef.current.rotation.z = Math.sin(t * 0.25) * 0.01;
         }
         if (groupRef.current) {
@@ -110,19 +101,14 @@ const Logo3D = () => {
         }
     });
 
-    // More aggressive chroma key for complete background removal
+    // Key white in light mode, black in dark mode
     const keyColor = useMemo(
         () => (theme === 'light' ? new THREE.Color(0xffffff) : new THREE.Color(0x000000)),
         [theme]
     );
 
     return (
-        <Float
-            speed={1.4}
-            rotationIntensity={0.15}
-            floatIntensity={0.2}
-            floatingRange={[-0.05, 0.05]}
-        >
+        <Float speed={1.35} rotationIntensity={0.14} floatIntensity={0.18} floatingRange={[-0.05, 0.05]}>
             <group ref={groupRef} position={[0, yPosition, 0]}>
                 <group ref={meshRef}>
                     <mesh scale={[scale * aspect, scale, 1]} renderOrder={10}>
@@ -135,10 +121,10 @@ const Logo3D = () => {
                             uniforms={{
                                 uMap: { value: texture },
                                 uKeyColor: { value: keyColor },
-                                uTolerance: { value: theme === 'light' ? 0.5 : 0.4 },
-                                uSmoothness: { value: 0.1 },
+                                uTolerance: { value: theme === 'light' ? 0.55 : 0.45 }, // wider tolerance
+                                uSmoothness: { value: 0.12 },
                                 uAlphaCutoff: { value: 0.02 },
-                                uOpacity: { value: 0.85 }, // Reduced base opacity
+                                uOpacity: { value: 0.72 }, // decreased logo opacity
                             }}
                             vertexShader={`
                                 varying vec2 vUv;
@@ -156,24 +142,36 @@ const Logo3D = () => {
                                 uniform float uAlphaCutoff;
                                 uniform float uOpacity;
 
+                                // Perceptual luma
+                                float luma(vec3 c){ return dot(c, vec3(0.299, 0.587, 0.114)); }
+
                                 void main() {
                                     vec4 tex = texture2D(uMap, vUv);
 
-                                    // Remove background completely
+                                    // Distance to key color and luma-based keying help remove off-white/off-black
                                     float keyDist = distance(tex.rgb, uKeyColor);
-                                    float nearKey = 1.0 - smoothstep(
-                                        uTolerance - uSmoothness, 
-                                        uTolerance + uSmoothness, 
-                                        keyDist
-                                    );
+                                    float nearKeyChrom = 1.0 - smoothstep(uTolerance - uSmoothness, uTolerance + uSmoothness, keyDist);
 
-                                    // Apply reduced opacity
-                                    float alpha = tex.a * (1.0 - nearKey) * uOpacity;
+                                    float Y = luma(tex.rgb);
+                                    float nearKeyLuma;
+                                    #ifdef LIGHT_MODE
+                                        nearKeyLuma = smoothstep(1.0 - (uTolerance + uSmoothness), 1.0 - (uTolerance - uSmoothness), Y);
+                                    #else
+                                        nearKeyLuma = smoothstep(uTolerance - uSmoothness, uTolerance + uSmoothness, Y);
+                                    #endif
 
-                                    if (alpha < uAlphaCutoff) discard;
+                                    // Combine keys, but respect existing alpha
+                                    float keyMask = max(nearKeyChrom, nearKeyLuma);
+                                    float alpha = tex.a * (1.0 - keyMask) * uOpacity;
+
+                                    if(alpha < uAlphaCutoff) discard;
+
                                     gl_FragColor = vec4(tex.rgb, alpha);
                                 }
                             `}
+                            defines={{
+                                LIGHT_MODE: theme === 'light' ? 1 : 0,
+                            }}
                         />
                     </mesh>
                 </group>
@@ -182,52 +180,53 @@ const Logo3D = () => {
     );
 };
 
-// Enhanced wave mesh with cleaner appearance
+// Enhanced wave mesh: cleaner colors, smoother motion
 const WaveMesh = ({ segments }) => {
     const meshRef = useRef();
     const theme = useTheme();
     const breakpoint = useResponsive();
 
     const uniforms = useMemo(() => {
-        // Better color coordination with theme
         const accent1 = getThemeColor('--accent-1');
         const accent2 = getThemeColor('--accent-2');
         const bgSoft = getThemeColor('--bg-soft');
+        const accentMid = accent1.clone().lerp(accent2, 0.5);
 
         return {
             uTime: { value: 0 },
-            uAmplitude: { value: breakpoint === 'mobile' ? 0.8 : 1.2 },
-            uFreq1: { value: 0.05 },
-            uFreq2: { value: 0.03 },
-            uFreq3: { value: 0.02 },
-            uSpeed1: { value: 0.4 },
-            uSpeed2: { value: 0.25 },
-            uSpeed3: { value: 0.15 },
+            uAmplitude: { value: breakpoint === 'mobile' ? 0.75 : 1.1 },
+            uFreq1: { value: 0.052 },
+            uFreq2: { value: 0.032 },
+            uFreq3: { value: 0.024 },
+            uSpeed1: { value: 0.42 },
+            uSpeed2: { value: 0.26 },
+            uSpeed3: { value: 0.18 },
             uDir1: { value: new THREE.Vector2(1.0, 0.2).normalize() },
             uDir2: { value: new THREE.Vector2(-0.6, 1.0).normalize() },
             uDir3: { value: new THREE.Vector2(0.2, -1.0).normalize() },
             uColorBase: { value: bgSoft },
             uColorAccent1: { value: accent1 },
+            uColorAccentMid: { value: accentMid },
             uColorAccent2: { value: accent2 },
+            uMeshOpacity: { value: theme === 'light' ? 0.6 : 0.7 },
+            uGridStrength: { value: theme === 'light' ? 0.18 : 0.22 },
         };
     }, [theme, breakpoint]);
 
     useFrame((state) => {
-        uniforms.uTime.value = state.clock.elapsedTime;
+        const t = state.clock.elapsedTime;
+        const dt = state.clock.getDelta();
+        uniforms.uTime.value = t;
+
+        // Slight responsiveness to pointer
         const targetAmp =
-            (breakpoint === 'mobile' ? 0.7 : 1.1) +
-            Math.abs(state.pointer.x) * 0.15 +
-            Math.abs(state.pointer.y) * 0.15;
-        uniforms.uAmplitude.value = THREE.MathUtils.damp(
-            uniforms.uAmplitude.value,
-            targetAmp,
-            2.5,
-            state.clock.getDelta()
-        );
+            (breakpoint === 'mobile' ? 0.7 : 1.05) +
+            (Math.abs(state.pointer.x) + Math.abs(state.pointer.y)) * 0.15;
+        uniforms.uAmplitude.value = THREE.MathUtils.damp(uniforms.uAmplitude.value, targetAmp, 2.2, dt);
     });
 
     const geometryArgs = useMemo(() => {
-        const size = breakpoint === 'mobile' ? 110 : 160;
+        const size = breakpoint === 'mobile' ? 120 : 170;
         return [size, size, segments, segments];
     }, [breakpoint, segments]);
 
@@ -272,28 +271,35 @@ const WaveMesh = ({ segments }) => {
                     varying float vElevation;
                     uniform vec3 uColorBase;
                     uniform vec3 uColorAccent1;
+                    uniform vec3 uColorAccentMid;
                     uniform vec3 uColorAccent2;
+                    uniform float uMeshOpacity;
+                    uniform float uGridStrength;
+
+                    // Simple desaturation towards base for cleaner look in light mode
+                    vec3 desat(vec3 color, float amount, vec3 towards) {
+                        return mix(color, mix(vec3(dot(color, vec3(0.299,0.587,0.114))), color, 0.0), amount);
+                    }
 
                     void main() {
-                        // Cleaner, more subtle grid
-                        vec2 g = abs(fract(vUv * 18.0 - 0.5) - 0.5);
+                        // Softer grid
+                        vec2 g = abs(fract(vUv * 14.0 - 0.5) - 0.5);
                         float line = min(g.x, g.y);
-                        float grid = 1.0 - smoothstep(0.0, 0.15, line);
+                        float grid = 1.0 - smoothstep(0.0, 0.17, line);
 
-                        // Smoother elevation-based gradient
-                        float e = clamp(vElevation * 0.4 + 0.5, 0.0, 1.0);
-                        vec3 c = mix(uColorBase, uColorAccent1, smoothstep(0.0, 0.65, e));
-                        c = mix(c, uColorAccent2, smoothstep(0.6, 1.0, e) * 0.6);
+                        // Elevation-based color blend (base -> mid -> accent)
+                        float e = clamp(vElevation * 0.42 + 0.5, 0.0, 1.0);
+                        vec3 c = mix(uColorBase, uColorAccentMid, smoothstep(0.2, 0.7, e));
+                        c = mix(c, uColorAccent2, smoothstep(0.65, 1.0, e));
 
-                        // Softer falloff
-                        float center = 1.0 - smoothstep(0.2, 0.7, distance(vUv, vec2(0.5)));
-                        float vfade = smoothstep(0.05, 0.95, vUv.y);
+                        // Center focus and vertical vignette
+                        float center = 1.0 - smoothstep(0.22, 0.7, distance(vUv, vec2(0.5)));
+                        float vfade = smoothstep(0.06, 0.95, vUv.y);
 
-                        // Reduced overall opacity for cleaner look
-                        float alpha = (0.22 + vfade * 0.2) * center;
-                        alpha *= mix(0.6, 0.95, grid * 0.3);
+                        float alpha = (0.2 + vfade * 0.22) * center;
+                        alpha *= mix(0.65, 1.0, grid * uGridStrength);
 
-                        gl_FragColor = vec4(c, alpha * 0.75);
+                        gl_FragColor = vec4(c, alpha * uMeshOpacity);
                     }
                 `}
             />
@@ -326,7 +332,7 @@ const ParticleNebula = ({ count, radius }) => {
 
     useFrame((state, delta) => {
         if (!ref.current) return;
-        ref.current.rotation.y += delta * 0.025;
+        ref.current.rotation.y += delta * 0.02;
         ref.current.rotation.x += delta * 0.008;
     });
 
@@ -347,7 +353,7 @@ const ParticleNebula = ({ count, radius }) => {
                 size={0.02}
                 transparent
                 color={color}
-                opacity={theme === 'light' ? 0.4 : 0.55}
+                opacity={theme === 'light' ? 0.35 : 0.5}
                 sizeAttenuation
                 blending={THREE.AdditiveBlending}
                 depthWrite={false}
@@ -383,14 +389,14 @@ const CursorGlow = () => {
     );
 };
 
-// Dynamic lights with better theme coordination
+// Dynamic lights with theme sync
 const DynamicLights = () => {
     const spot1 = useRef();
     const theme = useTheme();
 
     const lightColors = useMemo(() => {
         return {
-            ambient: theme === 'light' ? 1.0 : 0.65,
+            ambient: theme === 'light' ? 0.95 : 0.65,
             hemisphere: {
                 sky: getThemeColor('--accent-1'),
                 ground: getThemeColor('--accent-2'),
@@ -402,8 +408,8 @@ const DynamicLights = () => {
     useFrame((state) => {
         const time = state.clock.elapsedTime;
         if (spot1.current) {
-            spot1.current.intensity = (theme === 'light' ? 1.4 : 1.8) + Math.sin(time * 0.4) * 0.25;
-            spot1.current.position.x = Math.sin(time * 0.25) * 2.5;
+            spot1.current.intensity = (theme === 'light' ? 1.35 : 1.75) + Math.sin(time * 0.4) * 0.22;
+            spot1.current.position.x = Math.sin(time * 0.25) * 2.4;
         }
     });
 
@@ -413,14 +419,14 @@ const DynamicLights = () => {
             <hemisphereLight
                 skyColor={lightColors.hemisphere.sky}
                 groundColor={lightColors.hemisphere.ground}
-                intensity={theme === 'light' ? 1.0 : 0.7}
+                intensity={theme === 'light' ? 1.0 : 0.75}
             />
             <spotLight
                 ref={spot1}
                 position={[0, 15, 10]}
                 angle={0.35}
                 penumbra={1}
-                intensity={theme === 'light' ? 1.4 : 1.8}
+                intensity={theme === 'light' ? 1.35 : 1.75}
                 color={lightColors.spot1}
             />
         </>
@@ -435,21 +441,21 @@ const SceneContent = ({ perfLevel }) => {
         const isMobile = breakpoint === 'mobile';
         if (perfLevel === 'low') {
             return {
-                segments: isMobile ? 40 : 50,
-                particleCount: isMobile ? 250 : 400,
+                segments: isMobile ? 44 : 56,
+                particleCount: isMobile ? 220 : 380,
                 particleRadius: 28,
             };
         }
         if (perfLevel === 'medium') {
             return {
-                segments: isMobile ? 60 : 80,
-                particleCount: isMobile ? 500 : 800,
+                segments: isMobile ? 64 : 86,
+                particleCount: isMobile ? 480 : 780,
                 particleRadius: 32,
             };
         }
         return {
-            segments: isMobile ? 80 : 110,
-            particleCount: isMobile ? 800 : 1400,
+            segments: isMobile ? 80 : 120,
+            particleCount: isMobile ? 760 : 1300,
             particleRadius: 38,
         };
     }, [perfLevel, breakpoint]);
@@ -471,47 +477,31 @@ const Background3D = () => {
     const [perfLevel, setPerfLevel] = useState('high');
 
     const styles = useMemo(() => {
-        const accent1 = getComputedStyle(document.documentElement)
-            .getPropertyValue('--accent-1')
-            .trim();
-        const accent2 = getComputedStyle(document.documentElement)
-            .getPropertyValue('--accent-2')
-            .trim();
-        const bgBase = getComputedStyle(document.documentElement)
-            .getPropertyValue('--bg-base')
-            .trim();
-        const bgSoft = getComputedStyle(document.documentElement)
-            .getPropertyValue('--bg-soft')
-            .trim();
-        const bgSofter = getComputedStyle(document.documentElement)
-            .getPropertyValue('--bg-softer')
-            .trim();
+        const accent1 = getComputedStyle(document.documentElement).getPropertyValue('--accent-1').trim();
+        const accent2 = getComputedStyle(document.documentElement).getPropertyValue('--accent-2').trim();
+        const bgBase = getComputedStyle(document.documentElement).getPropertyValue('--bg-base').trim();
+        const bgSoft = getComputedStyle(document.documentElement).getPropertyValue('--bg-soft').trim();
+        const bgSofter = getComputedStyle(document.documentElement).getPropertyValue('--bg-softer').trim();
 
-        const accent1Rgb = new THREE.Color(accent1)
-            .toArray()
-            .map((c) => Math.round(c * 255))
-            .join(',');
-        const accent2Rgb = new THREE.Color(accent2)
-            .toArray()
-            .map((c) => Math.round(c * 255))
-            .join(',');
+        const c1 = new THREE.Color(accent1).toArray().map(c => Math.round(c * 255)).join(',');
+        const c2 = new THREE.Color(accent2).toArray().map(c => Math.round(c * 255)).join(',');
 
         if (theme === 'light') {
             return {
-                baseGradient: `linear-gradient(to bottom, ${bgBase} 0%, ${bgSoft} 40%, ${bgSofter} 100%)`,
-                radial1: `radial-gradient(ellipse 80% 70% at 50% 30%, rgba(${accent1Rgb},.12), transparent)`,
-                radial2: `radial-gradient(circle at 20% 80%, rgba(${accent2Rgb},.08), transparent 65%)`,
+                baseGradient: `linear-gradient(to bottom, ${bgBase} 0%, ${bgSoft} 42%, ${bgSofter} 100%)`,
+                radial1: `radial-gradient(ellipse 80% 70% at 50% 30%, rgba(${c1},.12), transparent)`,
+                radial2: `radial-gradient(circle at 20% 80%, rgba(${c2},.08), transparent 65%)`,
                 fog: bgSofter,
-                bottomFade: `linear-gradient(to top, ${bgBase} 0%, rgba(${bgBase.replace('#', '').match(/.{2}/g).map(x => parseInt(x, 16)).join(',')}, 0.8) 50%, transparent)`,
+                bottomFade: `linear-gradient(to top, ${bgBase} 0%, transparent 60%)`,
                 topFade: `linear-gradient(to bottom, ${bgBase} 0%, transparent 40%)`,
             };
         }
         return {
             baseGradient: `linear-gradient(to bottom, ${bgBase} 0%, ${bgSoft} 45%, ${bgSofter} 100%)`,
-            radial1: `radial-gradient(ellipse 80% 70% at 50% 30%, rgba(${accent1Rgb},.15), transparent)`,
-            radial2: `radial-gradient(circle at 20% 80%, rgba(${accent2Rgb},.12), transparent 65%)`,
+            radial1: `radial-gradient(ellipse 80% 70% at 50% 30%, rgba(${c1},.16), transparent)`,
+            radial2: `radial-gradient(circle at 20% 80%, rgba(${c2},.12), transparent 65%)`,
             fog: bgBase,
-            bottomFade: `linear-gradient(to top, ${bgBase} 0%, rgba(${bgBase.replace('#', '').match(/.{2}/g).map(x => parseInt(x, 16)).join(',')}, 0.9) 50%, transparent)`,
+            bottomFade: `linear-gradient(to top, ${bgBase} 0%, transparent 55%)`,
             topFade: `linear-gradient(to bottom, ${bgBase} 0%, transparent 35%)`,
         };
     }, [theme]);
@@ -530,44 +520,27 @@ const Background3D = () => {
     return (
         <div className="fixed inset-0 -z-10 overflow-hidden" aria-hidden="true">
             {/* Base gradient */}
-            <div
-                className="absolute inset-0 transition-all duration-700 ease-in-out"
-                style={{ background: styles.baseGradient }}
-            />
+            <div className="absolute inset-0 transition-all duration-700 ease-in-out" style={{ background: styles.baseGradient }} />
 
             {/* Radial overlays */}
-            <div
-                className="absolute inset-0 opacity-100 transition-opacity duration-700"
-                style={{ background: styles.radial1 }}
-            />
-            <div
-                className="absolute inset-0 opacity-100 transition-opacity duration-700"
-                style={{ background: styles.radial2 }}
-            />
+            <div className="absolute inset-0 opacity-100 transition-opacity duration-700" style={{ background: styles.radial1 }} />
+            <div className="absolute inset-0 opacity-100 transition-opacity duration-700" style={{ background: styles.radial2 }} />
 
             <Suspense fallback={null}>
                 <Canvas
-                    camera={{
-                        position: cameraConfig.position,
-                        fov: cameraConfig.fov,
-                        near: 0.1,
-                        far: 120,
-                    }}
+                    camera={{ position: cameraConfig.position, fov: cameraConfig.fov, near: 0.1, far: 120 }}
                     style={{ pointerEvents: 'auto' }}
                     gl={{
                         antialias: true,
                         alpha: true,
                         powerPreference: 'high-performance',
                         toneMapping: THREE.ACESFilmicToneMapping,
-                        toneMappingExposure: theme === 'light' ? 1.1 : 1.3,
+                        toneMappingExposure: theme === 'light' ? 1.08 : 1.28,
                     }}
                     dpr={[1, 2]}
                     frameloop="always"
                 >
-                    <PerformanceMonitor
-                        onIncline={() => setPerfLevel('high')}
-                        onDecline={() => setPerfLevel('low')}
-                    >
+                    <PerformanceMonitor onIncline={() => setPerfLevel('high')} onDecline={() => setPerfLevel('low')}>
                         <fog attach="fog" args={[styles.fog, 18, breakpoint === 'mobile' ? 55 : 65]} />
                         <SceneContent perfLevel={perfLevel} />
                     </PerformanceMonitor>
@@ -575,16 +548,10 @@ const Background3D = () => {
             </Suspense>
 
             {/* Bottom fade */}
-            <div
-                className="absolute inset-x-0 bottom-0 h-[26rem] pointer-events-none transition-all duration-700"
-                style={{ background: styles.bottomFade }}
-            />
+            <div className="absolute inset-x-0 bottom-0 h-[26rem] pointer-events-none transition-all duration-700" style={{ background: styles.bottomFade }} />
 
             {/* Top fade */}
-            <div
-                className="absolute inset-x-0 top-0 h-44 pointer-events-none transition-all duration-700"
-                style={{ background: styles.topFade }}
-            />
+            <div className="absolute inset-x-0 top-0 h-44 pointer-events-none transition-all duration-700" style={{ background: styles.topFade }} />
         </div>
     );
 };
