@@ -14,6 +14,7 @@ const useTheme = () => {
 			: 'dark'
 	);
 	useEffect(() => {
+		if (typeof document === 'undefined') return;
 		const observer = new MutationObserver(() => {
 			setTheme(document.documentElement.getAttribute('data-theme') || 'dark');
 		});
@@ -60,10 +61,10 @@ const isWebGLAvailable = () => {
 
 // Faint, anti-aliased animated grid (Next.js vibe)
 const Grid = ({ theme }) => {
-	const prefersReduced = useMemo(
-		() => window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches,
-		[]
-	);
+	const prefersReduced = useMemo(() => {
+		if (typeof window === 'undefined' || !window.matchMedia) return false;
+		return window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+	}, []);
 	const uniforms = useMemo(() => {
 		const isLight = theme === 'light';
 		const gridHex = isLight ? '#0f172a' : '#cbd5e1';
@@ -73,7 +74,7 @@ const Grid = ({ theme }) => {
 			uGridSize: { value: 36.0 },
 			uFadeDistance: { value: 0.65 },
 			uFadeSharpness: { value: 0.8 },
-			uAlpha: { value: isLight ? 0.22 : 0.2 }, // slightly increased for visibility
+			uAlpha: { value: isLight ? 0.22 : 0.2 },
 			uSpeed: { value: prefersReduced ? 0.0 : 0.01 },
 		};
 	}, [theme, prefersReduced]);
@@ -87,6 +88,7 @@ const Grid = ({ theme }) => {
 			<planeGeometry args={[500, 500, 1, 1]} />
 			<shaderMaterial
 				transparent
+				// Enable OES_standard_derivatives for AA lines (safe in WebGL2; extension in WebGL1)
 				extensions={{ derivatives: true }}
 				uniforms={uniforms}
 				vertexShader={`
@@ -100,7 +102,6 @@ const Grid = ({ theme }) => {
           #ifdef GL_OES_standard_derivatives
           #extension GL_OES_standard_derivatives : enable
           #endif
-
           uniform float uTime;
           uniform vec3  uGridColor;
           uniform float uGridSize;
@@ -137,7 +138,7 @@ const Grid = ({ theme }) => {
 	);
 };
 
-// Radial glow shaders (cleaner than flat planes)
+// Radial glow shaders
 const RadialGlow = ({
 	position = [0, 0, -30],
 	size = [120, 120],
@@ -174,7 +175,7 @@ const RadialGlow = ({
           void main(){
             vec2 p = vUv - 0.5;
             float d = length(p) * 2.0;
-            float a = smoothstep(1.0, 0.0, d); // center bright, soft edge
+            float a = smoothstep(1.0, 0.0, d);
             gl_FragColor = vec4(uColor, a * uOpacity);
           }
         `}
@@ -205,116 +206,108 @@ const Glows = ({ theme }) => {
 	);
 };
 
-// Subtle, enhanced logo with halo + sheen (replaces SubtleLogo)
+// Centered, responsive logo with halo + sheen
 const EnhancedLogo = ({ breakpoint }) => {
-    const base = useRef();
-    const anim = useRef();
-    const texture = useTexture(logo);
-    const theme = useTheme();
-    const isLight = theme === 'light';
+	const base = useRef();
+	const anim = useRef();
+	const texture = useTexture(logo);
+	const theme = useTheme();
+	const isLight = theme === 'light';
 
-    // Texture quality
-    useEffect(() => {
-        if (!texture) return;
-        texture.colorSpace = THREE.SRGBColorSpace;
-        texture.anisotropy = 8;
-        texture.minFilter = THREE.LinearMipmapLinearFilter;
-        texture.magFilter = THREE.LinearFilter;
-        texture.generateMipmaps = true;
-        texture.needsUpdate = true;
-    }, [texture]);
+	useEffect(() => {
+		if (!texture) return;
+		texture.colorSpace = THREE.SRGBColorSpace;
+		texture.anisotropy = 8;
+		texture.minFilter = THREE.LinearMipmapLinearFilter;
+		texture.magFilter = THREE.LinearFilter;
+		texture.generateMipmaps = true;
+		texture.needsUpdate = true;
+	}, [texture]);
 
-    // Get aspect from image when ready
-    const [aspect, setAspect] = useState(1);
-    useEffect(() => {
-        if (texture?.image?.width && texture?.image?.height) {
-            setAspect(texture.image.width / texture.image.height);
-        }
-    }, [texture]);
+	const [aspect, setAspect] = useState(1);
+	useEffect(() => {
+		if (texture?.image?.width && texture?.image?.height) {
+			setAspect(texture.image.width / texture.image.height);
+		}
+	}, [texture]);
 
-    // Responsive screen-based sizing (world units from camera fov)
-    const { camera } = useThree();
-    const targetZ = -15;
-    const frac = breakpoint === 'mobile' ? 0.36 : breakpoint === 'tablet' ? 0.32 : 0.28; // slightly larger, still safe
-    const clamp = (v, min, max) => Math.min(max, Math.max(min, v));
-    const scaleXY = useMemo(() => {
-        const dist = Math.abs(targetZ - (camera?.position?.z ?? 5));
-        const worldH = 2 * Math.tan(THREE.MathUtils.degToRad((camera?.fov ?? 60) / 2)) * dist;
-        const h = clamp(worldH * frac, 8, 24); // bounds to avoid extremes
-        return [h * aspect, h];
-    }, [camera?.fov, camera?.position?.z, aspect, frac]);
+	const { camera } = useThree();
+	const targetZ = -15;
+	const frac = breakpoint === 'mobile' ? 0.36 : breakpoint === 'tablet' ? 0.32 : 0.28;
+	const clamp = (v, min, max) => Math.min(max, Math.max(min, v));
+	const scaleXY = useMemo(() => {
+		const dist = Math.abs(targetZ - (camera?.position?.z ?? 5));
+		const worldH = 2 * Math.tan(THREE.MathUtils.degToRad((camera?.fov ?? 60) / 2)) * dist;
+		const h = clamp(worldH * frac, 8, 24);
+		return [h * aspect, h];
+	}, [camera?.fov, camera?.position?.z, aspect, frac]);
 
-    // Apply responsive base scale (preserves aspect)
-    useEffect(() => {
-        if (base.current) base.current.scale.set(scaleXY[0], scaleXY[1], 1);
-    }, [scaleXY]);
+	useEffect(() => {
+		if (base.current) base.current.scale.set(scaleXY[0], scaleXY[1], 1);
+	}, [scaleXY]);
 
-    // Subtle parallax + gentle float/tilt on inner group only
-    const prefersReduced =
-        typeof window !== 'undefined' &&
-        window.matchMedia &&
-        window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+	const prefersReduced =
+		typeof window !== 'undefined' && window.matchMedia
+			? window.matchMedia('(prefers-reduced-motion: reduce)').matches
+			: false;
 
-    useFrame((state) => {
-        if (!anim.current) return;
-        const { pointer, clock } = state;
-        const t = clock.elapsedTime;
+	useFrame((state) => {
+		if (!anim.current) return;
+		const { pointer, clock } = state;
+		const t = clock.elapsedTime;
 
-        const px = prefersReduced ? 0 : (breakpoint === 'mobile' ? 0.18 : 0.3) * pointer.x;
-        const py = prefersReduced ? 0 : (breakpoint === 'mobile' ? 0.18 : 0.3) * pointer.y;
+		const px = prefersReduced ? 0 : (breakpoint === 'mobile' ? 0.18 : 0.3) * pointer.x;
+		const py = prefersReduced ? 0 : (breakpoint === 'mobile' ? 0.18 : 0.3) * pointer.y;
 
-        anim.current.position.x = THREE.MathUtils.damp(anim.current.position.x, px, 4, 0.12);
-        anim.current.position.y = THREE.MathUtils.damp(anim.current.position.y, py, 4, 0.12);
+		anim.current.position.x = THREE.MathUtils.damp(anim.current.position.x, px, 4, 0.12);
+		anim.current.position.y = THREE.MathUtils.damp(anim.current.position.y, py, 4, 0.12);
 
-        const tiltX = prefersReduced ? 0 : THREE.MathUtils.degToRad(py * 2.2);
-        const tiltY = prefersReduced ? 0 : THREE.MathUtils.degToRad(px * -2.8);
-        anim.current.rotation.x = THREE.MathUtils.damp(anim.current.rotation.x, tiltX, 4, 0.12);
-        anim.current.rotation.y = THREE.MathUtils.damp(anim.current.rotation.y, tiltY, 4, 0.12);
+		const tiltX = prefersReduced ? 0 : THREE.MathUtils.degToRad(py * 2.2);
+		const tiltY = prefersReduced ? 0 : THREE.MathUtils.degToRad(px * -2.8);
+		anim.current.rotation.x = THREE.MathUtils.damp(anim.current.rotation.x, tiltX, 4, 0.12);
+		anim.current.rotation.y = THREE.MathUtils.damp(anim.current.rotation.y, tiltY, 4, 0.12);
 
-        // Gentle breathing (keeps aspect via uniform scale)
-        const s = 1 + (prefersReduced ? 0 : Math.sin(t * 0.35) * 0.008);
-        anim.current.scale.set(s, s, 1);
-    });
+		const s = 1 + (prefersReduced ? 0 : Math.sin(t * 0.35) * 0.008);
+		anim.current.scale.set(s, s, 1);
+	});
 
-    const haloColor = readCssVar('--accent-1');
+	const haloColor = readCssVar('--accent-1');
 
-    // Animated sheen shader
-    const uniforms = useMemo(
-        () => ({
-            uMap: { value: texture ?? null },
-            uTime: { value: 0 },
-            uOpacity: { value: isLight ? 0.12 : 0.14 },
-            uSheen: { value: prefersReduced ? 0.0 : 0.12 },
-        }),
-        [texture, isLight, prefersReduced]
-    );
+	const uniforms = useMemo(
+		() => ({
+			uMap: { value: texture ?? null },
+			uTime: { value: 0 },
+			uOpacity: { value: isLight ? 0.12 : 0.14 },
+			uSheen: { value: prefersReduced ? 0.0 : 0.12 },
+		}),
+		[texture, isLight, prefersReduced]
+	);
 
-    useFrame((state) => {
-        uniforms.uTime.value = state.clock.elapsedTime;
-    });
+	useFrame((state) => {
+		uniforms.uTime.value = state.clock.elapsedTime;
+	});
 
-    return (
-        <group ref={base} position={[0, 0, 0]} renderOrder={-1}>
-            <group ref={anim}>
-                {/* Soft halo behind the logo (scaled by base group) */}
-                <mesh position={[0, 0, targetZ - 0.8]}>
-                    <planeGeometry args={[1.25, 1.25]} />
-                    <shaderMaterial
-                        transparent
-                        blending={THREE.AdditiveBlending}
-                        depthWrite={false}
-                        uniforms={{
-                            uColor: { value: new THREE.Color(haloColor) },
-                            uOpacity: { value: isLight ? 0.1 : 0.12 },
-                        }}
-                        vertexShader={`
+	return (
+		<group ref={base} position={[0, 0, 0]} renderOrder={-1}>
+			<group ref={anim}>
+				<mesh position={[0, 0, targetZ - 0.8]}>
+					<planeGeometry args={[1.25, 1.25]} />
+					<shaderMaterial
+						transparent
+						blending={THREE.AdditiveBlending}
+						depthWrite={false}
+						uniforms={{
+							uColor: { value: new THREE.Color(haloColor) },
+							uOpacity: { value: isLight ? 0.1 : 0.12 },
+						}}
+						vertexShader={`
               varying vec2 vUv;
               void main(){
                 vUv = uv;
                 gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
               }
             `}
-                        fragmentShader={`
+						fragmentShader={`
               uniform vec3 uColor;
               uniform float uOpacity;
               varying vec2 vUv;
@@ -325,10 +318,9 @@ const EnhancedLogo = ({ breakpoint }) => {
                 gl_FragColor = vec4(uColor, a * uOpacity);
               }
             `}
-                    />
-                </mesh>
+					/>
+				</mesh>
 
-				{/* Logo with subtle sheen and edge softening */}
 				<mesh position={[0, 0, targetZ]}>
 					<planeGeometry args={[1, 1]} />
 					<shaderMaterial
@@ -336,45 +328,45 @@ const EnhancedLogo = ({ breakpoint }) => {
 						depthWrite={false}
 						uniforms={uniforms}
 						vertexShader={`
-			  varying vec2 vUv;
-			  void main(){
-				vUv = uv;
-				gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
-			  }
-			`}
+              varying vec2 vUv;
+              void main(){
+                vUv = uv;
+                gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+              }
+            `}
 						fragmentShader={`
-			  precision mediump float;
-			  uniform sampler2D uMap;
-			  uniform float uTime;
-			  uniform float uOpacity;
-			  uniform float uSheen;
-			  varying vec2 vUv;
+              precision mediump float;
+              uniform sampler2D uMap;
+              uniform float uTime;
+              uniform float uOpacity;
+              uniform float uSheen;
+              varying vec2 vUv;
 
-			  float band(float x, float c, float w){
-				return smoothstep(c - w, c, x) * (1.0 - smoothstep(c, c + w, x));
-			  }
+              float band(float x, float c, float w){
+                return smoothstep(c - w, c, x) * (1.0 - smoothstep(c, c + w, x));
+              }
 
-			  void main(){
-				vec4 tex = texture2D(uMap, vUv);
-				if (tex.a < 0.01) discard;
+              void main(){
+                vec4 tex = texture2D(uMap, vUv);
+                if (tex.a < 0.01) discard;
 
-				vec2 p = vUv - 0.5;
-				float r = length(p) * 2.0;
-				float edge = smoothstep(1.05, 0.7, r);
+                vec2 p = vUv - 0.5;
+                float r = length(p) * 2.0;
+                float edge = smoothstep(1.05, 0.7, r);
 
-				float sweepCenter = fract(uTime * 0.045);
-				float diag = (vUv.x + vUv.y) * 0.5;
-				float sweep = band(diag, sweepCenter, 0.05);
-				vec3 color = tex.rgb + uSheen * sweep;
+                float sweepCenter = fract(uTime * 0.045);
+                float diag = (vUv.x + vUv.y) * 0.5;
+                float sweep = band(diag, sweepCenter, 0.05);
+                vec3 color = tex.rgb + uSheen * sweep;
 
-				gl_FragColor = vec4(color, tex.a * edge * uOpacity);
-			  }
-			`}
+                gl_FragColor = vec4(color, tex.a * edge * uOpacity);
+              }
+            `}
 					/>
 				</mesh>
-            </group>
-        </group>
-    );
+			</group>
+		</group>
+	);
 };
 
 // Main component orchestrator with fallback + ready fade
@@ -387,9 +379,7 @@ const Background3D = () => {
 	const [ready, setReady] = useState(false);
 
 	useEffect(() => {
-		// Check WebGL support
 		setWebglOk(isWebGLAvailable());
-		// Safety timeout so we never hang invisible
 		const t = setTimeout(() => setReady(true), 700);
 		return () => clearTimeout(t);
 	}, []);
@@ -403,13 +393,10 @@ const Background3D = () => {
 		}
 	}, [breakpoint]);
 
-	// Base gradient always visible (prevents “blank”)
 	const baseGradient =
 		'radial-gradient(ellipse 120% 70% at 50% -15%, var(--bg-soft) 0%, var(--bg-base) 60%)';
 
 	const showFallback = !webglOk || ctxLost;
-
-	// Opacity for CSS preview (always under Canvas). Fades once first frame is ready.
 	const cssPreviewOpacity = showFallback ? 0.9 : ready ? 0.25 : 0.6;
 
 	return (
@@ -418,7 +405,7 @@ const Background3D = () => {
 			aria-hidden="true"
 			style={{ background: baseGradient }}
 		>
-			{/* Always-on CSS preview under Canvas: instant paint, then soft fade */}
+			{/* Instant CSS preview */}
 			<div
 				className="absolute inset-0 pointer-events-none transition-opacity duration-500 ease-out"
 				style={{ opacity: cssPreviewOpacity }}
@@ -434,17 +421,13 @@ const Background3D = () => {
 					className="absolute inset-0 pointer-events-none animate-grid-flow"
 					style={{
 						backgroundImage: `
-                            linear-gradient(to right, ${
-								theme === 'light'
-									? 'rgba(15, 23, 42, 0.06)'
-									: 'rgba(241, 245, 249, 0.06)'
-							} 1px, transparent 1px),
-                            linear-gradient(to bottom, ${
-								theme === 'light'
-									? 'rgba(15, 23, 42, 0.06)'
-									: 'rgba(241, 245, 249, 0.06)'
-							} 1px, transparent 1px)
-                        `,
+              linear-gradient(to right, ${
+					theme === 'light' ? 'rgba(15, 23, 42, 0.06)' : 'rgba(241, 245, 249, 0.06)'
+				} 1px, transparent 1px),
+              linear-gradient(to bottom, ${
+					theme === 'light' ? 'rgba(15, 23, 42, 0.06)' : 'rgba(241, 245, 249, 0.06)'
+				} 1px, transparent 1px)
+            `,
 						backgroundSize: '36px 36px',
 						maskImage:
 							'radial-gradient(ellipse 80% 65% at 50% -10%, black 25%, transparent 85%)',
@@ -454,18 +437,17 @@ const Background3D = () => {
 				/>
 			</div>
 
-			{/* WebGL scene (on top of CSS preview). If WebGL unavailable, CSS preview remains. */}
+			{/* WebGL scene */}
 			{!showFallback && (
 				<Canvas
 					camera={cameraConfig}
 					style={{ position: 'absolute', inset: 0 }}
 					gl={{ antialias: true, alpha: true, powerPreference: 'high-performance' }}
 					dpr={[1, Math.min(1.5, window.devicePixelRatio || 1)]}
-					// Allow pointer parallax without intercepting page interactions
 					eventSource={typeof window !== 'undefined' ? document.body : undefined}
 					eventPrefix="client"
 					onCreated={({ gl }) => {
-						gl.setClearColor(0x000000, 0); // transparent
+						gl.setClearColor(0x000000, 0);
 						gl.outputColorSpace = THREE.SRGBColorSpace;
 						requestAnimationFrame(() => setReady(true));
 						const el = gl.domElement;
@@ -486,7 +468,7 @@ const Background3D = () => {
 				</Canvas>
 			)}
 
-			{/* Bottom fade and noise overlay */}
+			{/* Bottom fade + noise */}
 			<div
 				className="absolute inset-x-0 bottom-0 h-56 pointer-events-none"
 				style={{
