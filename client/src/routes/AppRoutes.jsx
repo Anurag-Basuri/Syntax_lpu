@@ -11,7 +11,7 @@ import MemberDashboard from '../pages/member.jsx';
 import Event from '../pages/event.jsx';
 import Team from '../pages/team.jsx';
 import Contact from '../pages/contact.jsx';
-import QrScanner from '../components/QrScanner.jsx';
+// import QrScanner from '../components/QrScanner.jsx';
 import Show from '../pages/show.jsx';
 import Socials from '../pages/socials.jsx';
 import Cookie from '../pages/policies/cookie.jsx';
@@ -80,15 +80,6 @@ const AppRoutes = () => {
 				}
 			/>
 
-			{/* Shared protected routes */}
-			<Route
-				path="/vib/qrscanner"
-				element={
-					<ProtectedRoute requireAuth>
-						<QrScanner />
-					</ProtectedRoute>
-				}
-			/>
 			<Route
 				path="/show"
 				element={

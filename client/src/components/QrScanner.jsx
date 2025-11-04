@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { QrReader } from 'react-zxing';
+import { BarcodeScanner } from 'react-zxing';
 import { motion, AnimatePresence } from 'framer-motion';
 import { apiClient } from '../services/api.js';
 import { useAuth } from '../hooks/useAuth.js';
@@ -357,8 +357,8 @@ const QRScanner = () => {
 						) : scanning ? (
 							<div className="relative">
 								<div className="relative overflow-hidden rounded-xl bg-black">
-									<QrReader
-										onResult={(result, err) => {
+									<BarcodeScanner
+										onUpdate={(err, result) => {
 											if (result) {
 												handleScan(result);
 											} else if (
@@ -371,8 +371,17 @@ const QRScanner = () => {
 												handleCameraError(err);
 											}
 										}}
-										constraints={{ facingMode: 'environment', aspectRatio: 1 }}
-										style={{ width: '100%' }}
+										constraints={{
+											video: {
+												facingMode: 'environment',
+												aspectRatio: 1,
+											},
+										}}
+										videoStyle={{
+											width: '100%',
+											height: '100%',
+											objectFit: 'cover',
+										}}
 									/>
 								</div>
 								{loading && (
