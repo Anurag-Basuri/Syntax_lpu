@@ -71,19 +71,19 @@ const Background3D = () => {
 	const breakpoint = useResponsive();
 	const containerRef = useRef(null);
 
-	// Pointer-driven spotlight (subtle)
+	// Pointer-driven spotlight (subtle) + throttled parallax
 	useEffect(() => {
 		const el = containerRef.current;
 		if (!el) return;
 
-		const handleMove = (e) => {
-			const rect = el.getBoundingClientRect();
-			const x = ((e.clientX - rect.left) / rect.width) * 100;
-			const y = ((e.clientY - rect.top) / rect.height) * 100;
+		let rafId = 0;
+		let last = { x: 50, y: 0 };
+
+		const apply = (x, y) => {
 			el.style.setProperty('--spot-x', `${x.toFixed(2)}%`);
 			el.style.setProperty('--spot-y', `${Math.max(0, y - 20).toFixed(2)}%`);
 
-			// Lightweight parallax for logo
+			// Lightweight parallax for logo (respects reduced motion)
 			const relX = x / 100 - 0.5;
 			const relY = y / 100 - 0.5;
 			const prefReduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -92,14 +92,35 @@ const Background3D = () => {
 			el.style.setProperty('--logo-oy', `${(relY * strength).toFixed(2)}px`);
 		};
 
-		window.addEventListener('pointermove', handleMove, { passive: true });
-		// initial
-		el.style.setProperty('--spot-x', '50%');
-		el.style.setProperty('--spot-y', '0%');
-		el.style.setProperty('--logo-ox', '0px');
-		el.style.setProperty('--logo-oy', '0px');
+		const onMove = (e) => {
+			const rect = el.getBoundingClientRect();
+			last.x = ((e.clientX - rect.left) / rect.width) * 100;
+			last.y = ((e.clientY - rect.top) / rect.height) * 100;
+			if (!rafId) {
+				rafId = requestAnimationFrame(() => {
+					apply(last.x, last.y);
+					rafId = 0;
+				});
+			}
+		};
 
-		return () => window.removeEventListener('pointermove', handleMove);
+		const onLeave = () => {
+			apply(50, 0);
+			el.style.setProperty('--logo-ox', '0px');
+			el.style.setProperty('--logo-oy', '0px');
+		};
+
+		window.addEventListener('pointermove', onMove, { passive: true });
+		window.addEventListener('pointerleave', onLeave, { passive: true });
+
+		// initial
+		apply(50, 0);
+
+		return () => {
+			window.removeEventListener('pointermove', onMove);
+			window.removeEventListener('pointerleave', onLeave);
+			if (rafId) cancelAnimationFrame(rafId);
+		};
 	}, [breakpoint]);
 
 	// Theme-aware styles (very subtle)
@@ -113,6 +134,14 @@ const Background3D = () => {
 		const a2 = toRgb(accent2);
 
 		const isLight = theme === 'light';
+
+		// Responsive, center-aligned logo sizing (caps by viewport height)
+		const logoWidth =
+			breakpoint === 'mobile'
+				? 'min(64vw, 28vh)'
+				: breakpoint === 'tablet'
+				? 'min(40vw, 32vh)'
+				: 'min(28vw, 34vh)';
 
 		return {
 			// Base radial wash
@@ -136,11 +165,10 @@ const Background3D = () => {
 			// Ultra subtle film grain
 			noiseOpacity: isLight ? 0.005 : 0.007,
 
-			// Logo presentation (subtle, responsive)
-			logoOpacity: isLight ? 0.14 : 0.2,
-			logoTop: breakpoint === 'mobile' ? '14vh' : '16vh',
-			logoWidth:
-				breakpoint === 'mobile' ? 'clamp(160px, 42vw, 360px)' : 'clamp(220px, 28vw, 520px)',
+			// Logo presentation (centered, subtle, responsive)
+			logoOpacity: isLight ? 0.16 : 0.22,
+			logoTop: '50%', // centered vertically
+			logoWidth,
 			logoShadow: `drop-shadow(0 6px 28px rgba(${a1}, ${isLight ? 0.08 : 0.1}))`,
 		};
 	}, [theme, breakpoint]);
@@ -161,22 +189,26 @@ const Background3D = () => {
 				style={{ background: styles.aura, opacity: 0.35 }}
 			/>
 
-			{/* Subtle logo (no background), under grid, with tiny parallax */}
+			{/* Centered logo (no background), under grid, with throttled parallax */}
 			<img
 				src={logo}
 				alt=""
 				aria-hidden="true"
+				decoding="async"
+				loading="lazy"
 				draggable="false"
 				className="absolute select-none pointer-events-none"
 				style={{
 					top: styles.logoTop,
 					left: '50%',
 					width: styles.logoWidth,
+					height: 'auto',
 					opacity: styles.logoOpacity,
 					transform:
 						'translate(-50%, -50%) translate(var(--logo-ox, 0px), var(--logo-oy, 0px))',
 					filter: styles.logoShadow,
 					transition: 'transform 220ms ease-out, opacity 220ms ease',
+					willChange: 'transform',
 				}}
 			/>
 
