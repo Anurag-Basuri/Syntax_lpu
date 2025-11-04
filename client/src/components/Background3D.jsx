@@ -44,9 +44,10 @@ const useResponsive = () => {
 	return breakpoint;
 };
 
-// Enhanced 3D Logo with theme-aware materials
+// Enhanced 3D Logo with improved placement and animation
 const Logo3D = () => {
 	const ref = useRef();
+	const groupRef = useRef();
 	const texture = useTexture(logo);
 	const { gl } = useThree();
 	const theme = useTheme();
@@ -64,15 +65,15 @@ const Logo3D = () => {
 
 	const aspect = texture?.image ? texture.image.width / texture.image.height : 1;
 
-	// Responsive scale and position
+	// Responsive scale and position - improved placement
 	const { scale, yPosition } = useMemo(() => {
 		switch (breakpoint) {
 			case 'mobile':
-				return { scale: 2.2, yPosition: 0.5 };
+				return { scale: 2.8, yPosition: 1.2 };
 			case 'tablet':
-				return { scale: 3.0, yPosition: 0.8 };
+				return { scale: 3.8, yPosition: 1.5 };
 			default:
-				return { scale: 4.0, yPosition: 1.0 };
+				return { scale: 5.0, yPosition: 2.0 };
 		}
 	}, [breakpoint]);
 
@@ -81,47 +82,74 @@ const Logo3D = () => {
 		const time = state.clock.elapsedTime;
 
 		if (ref.current) {
-			const rotationIntensity = breakpoint === 'mobile' ? 0.05 : 0.08;
+			// Smoother, more fluid rotation
+			const rotationIntensity = breakpoint === 'mobile' ? 0.06 : 0.1;
 			ref.current.rotation.y = THREE.MathUtils.lerp(
 				ref.current.rotation.y,
-				(pointer.x * Math.PI) / 10,
+				(pointer.x * Math.PI) / 8,
 				rotationIntensity
 			);
 			ref.current.rotation.x = THREE.MathUtils.lerp(
 				ref.current.rotation.x,
-				(-pointer.y * Math.PI) / 10,
+				(-pointer.y * Math.PI) / 12,
 				rotationIntensity
 			);
-			ref.current.rotation.z = Math.sin(time * 0.1) * 0.02;
+
+			// Subtle breathing animation
+			ref.current.rotation.z = Math.sin(time * 0.15) * 0.03;
+		}
+
+		if (groupRef.current) {
+			// Gentle floating animation
+			groupRef.current.position.y = yPosition + Math.sin(time * 0.4) * 0.15;
 		}
 	});
 
 	return (
-		<Float speed={1.2} rotationIntensity={0.4} floatIntensity={0.7}>
-			<group ref={ref} position={[0, yPosition, 0]}>
-				<mesh scale={[scale * aspect, scale, 1]} renderOrder={10}>
-					<planeGeometry />
-					<meshPhysicalMaterial
-						map={texture}
-						transparent={true}
-						metalness={theme === 'light' ? 0.5 : 0.85}
-						roughness={theme === 'light' ? 0.4 : 0.25}
-						clearcoat={theme === 'light' ? 0.8 : 1.0}
-						clearcoatRoughness={0.2}
-						reflectivity={theme === 'light' ? 0.5 : 0.75}
-						ior={1.5}
-						transmission={theme === 'light' ? 0.02 : 0.08}
-						thickness={0.5}
-						depthTest={false}
-						envMapIntensity={theme === 'light' ? 1.2 : 1.5}
-					/>
-				</mesh>
+		<Float speed={1.5} rotationIntensity={0.3} floatIntensity={0.5} floatingRange={[-0.1, 0.1]}>
+			<group ref={groupRef} position={[0, yPosition, 0]}>
+				<group ref={ref}>
+					{/* Main logo mesh */}
+					<mesh scale={[scale * aspect, scale, 1]} renderOrder={10}>
+						<planeGeometry />
+						<meshPhysicalMaterial
+							map={texture}
+							transparent={true}
+							metalness={theme === 'light' ? 0.6 : 0.9}
+							roughness={theme === 'light' ? 0.3 : 0.2}
+							clearcoat={theme === 'light' ? 0.9 : 1.0}
+							clearcoatRoughness={0.15}
+							reflectivity={theme === 'light' ? 0.6 : 0.85}
+							ior={1.5}
+							transmission={theme === 'light' ? 0.03 : 0.1}
+							thickness={0.8}
+							depthTest={false}
+							envMapIntensity={theme === 'light' ? 1.4 : 1.8}
+						/>
+					</mesh>
+
+					{/* Glow effect behind logo */}
+					<mesh
+						scale={[scale * aspect * 1.3, scale * 1.3, 1]}
+						position={[0, 0, -0.1]}
+						renderOrder={9}
+					>
+						<planeGeometry />
+						<meshBasicMaterial
+							transparent
+							opacity={theme === 'light' ? 0.15 : 0.25}
+							color={theme === 'light' ? '#8b5cf6' : '#60a5fa'}
+							blending={THREE.AdditiveBlending}
+							depthTest={false}
+						/>
+					</mesh>
+				</group>
 			</group>
 		</Float>
 	);
 };
 
-// Enhanced theme-aware cloth mesh with better light mode support
+// Dramatically enhanced wave mesh with much larger amplitude
 const WaveMesh = () => {
 	const meshRef = useRef();
 	const theme = useTheme();
@@ -130,8 +158,8 @@ const WaveMesh = () => {
 	const uniforms = useMemo(
 		() => ({
 			uTime: { value: 0 },
-			uAmplitude: { value: breakpoint === 'mobile' ? 1.0 : 1.5 },
-			uFrequency: { value: 0.5 },
+			uAmplitude: { value: breakpoint === 'mobile' ? 2.5 : 3.5 }, // Increased amplitude
+			uFrequency: { value: 0.4 }, // Adjusted frequency for larger waves
 		}),
 		[breakpoint]
 	);
@@ -144,34 +172,36 @@ const WaveMesh = () => {
 	const colors = useMemo(() => {
 		if (theme === 'light') {
 			return {
-				base: 'vec3(0.62, 0.64, 0.98)', // Soft periwinkle
-				highlight: 'vec3(0.40, 0.85, 0.99)', // Bright cyan
-				deep: 'vec3(0.35, 0.45, 0.92)', // Rich blue
-				ambient: 'vec3(0.85, 0.87, 0.99)', // Very light lavender
+				base: 'vec3(0.58, 0.62, 0.96)', // Soft periwinkle
+				highlight: 'vec3(0.35, 0.82, 0.98)', // Bright cyan
+				deep: 'vec3(0.30, 0.42, 0.90)', // Rich blue
+				ambient: 'vec3(0.82, 0.85, 0.98)', // Very light lavender
+				accent: 'vec3(0.55, 0.36, 0.96)', // Purple accent
 			};
 		}
 		return {
-			base: 'vec3(0.12, 0.25, 0.55)', // Deep blue
-			highlight: 'vec3(0.30, 0.78, 0.98)', // Bright cyan
-			deep: 'vec3(0.55, 0.58, 0.98)', // Lavender
-			ambient: 'vec3(0.08, 0.18, 0.45)', // Very dark blue
+			base: 'vec3(0.10, 0.22, 0.52)', // Deep blue
+			highlight: 'vec3(0.25, 0.75, 0.96)', // Bright cyan
+			deep: 'vec3(0.52, 0.55, 0.96)', // Lavender
+			ambient: 'vec3(0.06, 0.15, 0.42)', // Very dark blue
+			accent: 'vec3(0.38, 0.74, 0.98)', // Sky blue accent
 		};
 	}, [theme]);
 
-	// Responsive geometry
+	// Responsive geometry with higher detail
 	const geometryArgs = useMemo(() => {
 		switch (breakpoint) {
 			case 'mobile':
-				return [80, 80, 100, 100];
+				return [100, 100, 120, 120];
 			case 'tablet':
-				return [90, 90, 125, 125];
+				return [120, 120, 150, 150];
 			default:
-				return [100, 100, 150, 150];
+				return [140, 140, 180, 180];
 		}
 	}, [breakpoint]);
 
 	return (
-		<mesh ref={meshRef} rotation={[-Math.PI / 2, 0, 0]} position={[0, -5, 0]}>
+		<mesh ref={meshRef} rotation={[-Math.PI / 2, 0, 0]} position={[0, -6, 0]}>
 			<planeGeometry args={geometryArgs} />
 			<shaderMaterial
 				transparent
@@ -218,15 +248,21 @@ const WaveMesh = () => {
                         vUv = uv;
                         vec3 pos = position;
                         
-                        float noise1 = snoise(pos.xy * 0.08 + uTime * 0.15) * 1.2;
-                        float noise2 = snoise(pos.xy * 0.15 - uTime * 0.1) * 0.8;
-                        float noise3 = snoise(pos.xy * 0.25 + uTime * 0.2) * 0.5;
+                        // Enhanced large-scale waves
+                        float noise1 = snoise(pos.xy * 0.05 + uTime * 0.12) * 1.8;
+                        float noise2 = snoise(pos.xy * 0.1 - uTime * 0.08) * 1.2;
+                        float noise3 = snoise(pos.xy * 0.18 + uTime * 0.15) * 0.8;
                         
-                        float wave1 = sin(pos.x * uFrequency * 0.1 + uTime * 0.3) * uAmplitude * 0.6;
-                        float wave2 = cos(pos.y * uFrequency * 0.08 + uTime * 0.25) * uAmplitude * 0.8;
-                        float ripple = sin(length(pos.xy) * 0.15 - uTime * 0.4) * 0.6;
+                        // Dramatic wave patterns
+                        float wave1 = sin(pos.x * uFrequency * 0.08 + uTime * 0.25) * uAmplitude * 1.2;
+                        float wave2 = cos(pos.y * uFrequency * 0.06 + uTime * 0.2) * uAmplitude * 1.4;
+                        float wave3 = sin((pos.x + pos.y) * uFrequency * 0.04 - uTime * 0.18) * uAmplitude * 0.9;
                         
-                        vElevation = (noise1 + noise2 + noise3 + wave1 + wave2 + ripple) * 0.7;
+                        // Large circular ripples
+                        float ripple = sin(length(pos.xy) * 0.1 - uTime * 0.3) * 1.2;
+                        
+                        // Combine all wave effects for dramatic height
+                        vElevation = (noise1 + noise2 + noise3 + wave1 + wave2 + wave3 + ripple) * 0.85;
                         pos.z += vElevation;
                         
                         vec4 mvPosition = modelViewMatrix * vec4(pos, 1.0);
@@ -243,41 +279,47 @@ const WaveMesh = () => {
                     varying vec3 vViewPosition;
                     
                     void main() {
-                        // Enhanced grid with thinner, more refined lines
-                        vec2 grid = abs(fract(vUv * 30.0 - 0.5) - 0.5) / fwidth(vUv * 30.0);
+                        // Refined grid pattern
+                        vec2 grid = abs(fract(vUv * 35.0 - 0.5) - 0.5) / fwidth(vUv * 35.0);
                         float line = min(grid.x, grid.y);
                         float gridPattern = 1.0 - min(line, 1.0);
                         
-                        // Theme-aware colors with better depth
+                        // Enhanced theme-aware colors
                         vec3 baseColor = ${colors.base};
                         vec3 highlightColor = ${colors.highlight};
                         vec3 deepColor = ${colors.deep};
                         vec3 ambientColor = ${colors.ambient};
+                        vec3 accentColor = ${colors.accent};
                         
-                        // Enhanced depth-based coloring
-                        float elevationFactor = clamp(vElevation * 0.6 + 0.5, 0.0, 1.0);
+                        // Dynamic color based on wave height
+                        float elevationFactor = clamp(vElevation * 0.5 + 0.5, 0.0, 1.0);
                         vec3 color = mix(ambientColor, baseColor, elevationFactor);
-                        color = mix(color, deepColor, clamp(vElevation * 0.4, 0.0, 1.0));
-                        color = mix(color, highlightColor, clamp(vElevation * 0.9, 0.0, 0.6));
+                        color = mix(color, deepColor, clamp(vElevation * 0.35, 0.0, 1.0));
+                        color = mix(color, highlightColor, clamp(vElevation * 0.8, 0.0, 0.7));
                         
-                        // Fresnel effect for rim lighting
+                        // Add accent color on peaks
+                        float peakIntensity = smoothstep(0.6, 1.0, elevationFactor);
+                        color = mix(color, accentColor, peakIntensity * 0.4);
+                        
+                        // Enhanced Fresnel effect
                         vec3 viewDir = normalize(vViewPosition);
-                        float fresnel = pow(1.0 - abs(dot(viewDir, vNormal)), 2.5);
-                        color = mix(color, highlightColor, fresnel * 0.3);
+                        float fresnel = pow(1.0 - abs(dot(viewDir, vNormal)), 3.0);
+                        color = mix(color, highlightColor, fresnel * 0.4);
                         
-                        // Enhanced edge fade with smoother gradient
+                        // Smooth edge fade
                         float centerDist = distance(vUv, vec2(0.5));
-                        float edgeFade = 1.0 - smoothstep(0.2, 0.65, centerDist);
+                        float edgeFade = 1.0 - smoothstep(0.15, 0.7, centerDist);
                         
                         // Vertical gradient for depth
-                        float verticalGradient = smoothstep(0.0, 1.0, vUv.y) * 0.35;
+                        float verticalGradient = smoothstep(0.0, 1.0, vUv.y) * 0.4;
                         
-                        // Combine effects
-                        float baseAlpha = 0.35 + verticalGradient;
-                        float alpha = gridPattern * edgeFade * baseAlpha;
+                        // Enhanced alpha with wave peaks
+                        float baseAlpha = 0.4 + verticalGradient;
+                        float waveAlpha = smoothstep(-0.5, 1.0, vElevation) * 0.3;
+                        float alpha = (gridPattern * edgeFade * baseAlpha) + waveAlpha;
                         
-                        // Add subtle glow on grid lines
-                        alpha += gridPattern * fresnel * 0.15;
+                        // Grid line glow on peaks
+                        alpha += gridPattern * fresnel * peakIntensity * 0.2;
                         
                         gl_FragColor = vec4(color, alpha);
                     }
@@ -287,7 +329,7 @@ const WaveMesh = () => {
 	);
 };
 
-// Enhanced particles with better theme support
+// Enhanced particles with improved distribution
 const ParticleNebula = ({
 	count = 1500,
 	size = 0.03,
@@ -305,6 +347,7 @@ const ParticleNebula = ({
 
 		const baseColor = new THREE.Color(color);
 		const accentColor = new THREE.Color(theme === 'light' ? '#8b5cf6' : '#60a5fa');
+		const secondaryAccent = new THREE.Color(theme === 'light' ? '#ec4899' : '#38bdf8');
 
 		for (let i = 0; i < count; i++) {
 			const theta = Math.random() * Math.PI * 2;
@@ -315,10 +358,15 @@ const ParticleNebula = ({
 			pos[i * 3 + 1] = r * Math.sin(phi) * Math.sin(theta);
 			pos[i * 3 + 2] = r * Math.cos(phi);
 
-			siz[i] = size * (0.5 + Math.random() * 1.5);
+			siz[i] = size * (0.4 + Math.random() * 1.8);
 
-			// Color variation
-			const mixColor = Math.random() > 0.7 ? accentColor : baseColor;
+			// Multi-color variation
+			const colorChoice = Math.random();
+			let mixColor;
+			if (colorChoice > 0.8) mixColor = accentColor;
+			else if (colorChoice > 0.6) mixColor = secondaryAccent;
+			else mixColor = baseColor;
+
 			col[i * 3 + 0] = mixColor.r;
 			col[i * 3 + 1] = mixColor.g;
 			col[i * 3 + 2] = mixColor.b;
@@ -329,15 +377,15 @@ const ParticleNebula = ({
 	useFrame((state, delta) => {
 		if (!ref.current) return;
 
-		ref.current.rotation.y += delta * 0.04 * speed;
-		ref.current.rotation.x += delta * 0.015 * speed;
+		ref.current.rotation.y += delta * 0.05 * speed;
+		ref.current.rotation.x += delta * 0.02 * speed;
 
 		ref.current.rotation.x = THREE.MathUtils.lerp(
 			ref.current.rotation.x,
-			state.pointer.y * 0.08,
-			0.03
+			state.pointer.y * 0.1,
+			0.04
 		);
-		ref.current.rotation.y += THREE.MathUtils.lerp(0, state.pointer.x * 0.03, 0.03);
+		ref.current.rotation.y += THREE.MathUtils.lerp(0, state.pointer.x * 0.04, 0.04);
 	});
 
 	return (
@@ -366,7 +414,7 @@ const ParticleNebula = ({
 				size={size}
 				vertexColors
 				transparent
-				opacity={theme === 'light' ? 0.5 : 0.65}
+				opacity={theme === 'light' ? 0.55 : 0.7}
 				sizeAttenuation
 				blending={THREE.AdditiveBlending}
 				depthWrite={false}
@@ -375,11 +423,12 @@ const ParticleNebula = ({
 	);
 };
 
-// Enhanced dynamic lights with better theme support
+// Enhanced dynamic lights
 const DynamicLights = () => {
 	const spot1 = useRef();
 	const spot2 = useRef();
 	const spot3 = useRef();
+	const point1 = useRef();
 	const theme = useTheme();
 	const breakpoint = useResponsive();
 
@@ -387,18 +436,25 @@ const DynamicLights = () => {
 		const time = state.clock.elapsedTime;
 
 		if (spot1.current) {
-			spot1.current.intensity = (theme === 'light' ? 1.0 : 1.3) + Math.sin(time * 0.5) * 0.3;
-			spot1.current.position.x = Math.sin(time * 0.3) * 5 + 10;
+			spot1.current.intensity = (theme === 'light' ? 1.2 : 1.5) + Math.sin(time * 0.6) * 0.4;
+			spot1.current.position.x = Math.sin(time * 0.35) * 6 + 12;
+			spot1.current.position.y = 16 + Math.sin(time * 0.25) * 2;
 		}
 
 		if (spot2.current) {
-			spot2.current.intensity = (theme === 'light' ? 0.7 : 0.9) + Math.cos(time * 0.4) * 0.2;
-			spot2.current.position.x = Math.cos(time * 0.25) * 5 - 10;
+			spot2.current.intensity = (theme === 'light' ? 0.9 : 1.1) + Math.cos(time * 0.5) * 0.3;
+			spot2.current.position.x = Math.cos(time * 0.3) * 6 - 12;
+			spot2.current.position.y = 14 + Math.cos(time * 0.3) * 2;
 		}
 
 		if (spot3.current) {
-			spot3.current.intensity = (theme === 'light' ? 0.5 : 0.6) + Math.sin(time * 0.6) * 0.2;
-			spot3.current.position.z = Math.sin(time * 0.2) * 3;
+			spot3.current.intensity = (theme === 'light' ? 0.7 : 0.8) + Math.sin(time * 0.7) * 0.25;
+			spot3.current.position.z = Math.sin(time * 0.25) * 4;
+		}
+
+		if (point1.current) {
+			point1.current.intensity = (theme === 'light' ? 0.6 : 0.7) + Math.sin(time * 0.8) * 0.2;
+			point1.current.position.y = 6 + Math.sin(time * 0.5) * 2;
 		}
 	});
 
@@ -406,7 +462,7 @@ const DynamicLights = () => {
 		if (theme === 'light') {
 			return {
 				hemisphere: { sky: '#7c3aed', ground: '#fef3c7' },
-				ambient: 0.8,
+				ambient: 0.9,
 				spot1: '#60a5fa',
 				spot2: '#a78bfa',
 				spot3: '#f472b6',
@@ -415,7 +471,7 @@ const DynamicLights = () => {
 		}
 		return {
 			hemisphere: { sky: '#38bdf8', ground: '#083344' },
-			ambient: 0.5,
+			ambient: 0.6,
 			spot1: '#38bdf8',
 			spot2: '#818cf8',
 			spot3: '#ec4899',
@@ -423,8 +479,7 @@ const DynamicLights = () => {
 		};
 	}, [theme]);
 
-	// Adjust light intensity based on screen size
-	const intensityMultiplier = breakpoint === 'mobile' ? 0.8 : 1.0;
+	const intensityMultiplier = breakpoint === 'mobile' ? 0.85 : 1.0;
 
 	return (
 		<>
@@ -432,12 +487,12 @@ const DynamicLights = () => {
 			<hemisphereLight
 				skyColor={lightColors.hemisphere.sky}
 				groundColor={lightColors.hemisphere.ground}
-				intensity={(theme === 'light' ? 1.0 : 0.7) * intensityMultiplier}
+				intensity={(theme === 'light' ? 1.2 : 0.8) * intensityMultiplier}
 			/>
 			<spotLight
 				ref={spot1}
-				position={[10, 15, 10]}
-				angle={0.35}
+				position={[12, 16, 12]}
+				angle={0.4}
 				penumbra={1}
 				intensity={lightColors.ambient * intensityMultiplier}
 				color={lightColors.spot1}
@@ -445,25 +500,26 @@ const DynamicLights = () => {
 			/>
 			<spotLight
 				ref={spot2}
-				position={[-10, 12, 5]}
-				angle={0.4}
+				position={[-12, 14, 6]}
+				angle={0.45}
 				penumbra={1}
-				intensity={(theme === 'light' ? 0.8 : 0.9) * intensityMultiplier}
+				intensity={(theme === 'light' ? 0.9 : 1.1) * intensityMultiplier}
 				color={lightColors.spot2}
 			/>
 			<spotLight
 				ref={spot3}
-				position={[0, 10, -8]}
+				position={[0, 12, -10]}
 				angle={0.5}
 				penumbra={1}
-				intensity={(theme === 'light' ? 0.6 : 0.7) * intensityMultiplier}
+				intensity={(theme === 'light' ? 0.7 : 0.8) * intensityMultiplier}
 				color={lightColors.spot3}
 			/>
 			<pointLight
-				position={[0, 5, -5]}
-				intensity={(theme === 'light' ? 0.5 : 0.6) * intensityMultiplier}
+				ref={point1}
+				position={[0, 6, -6]}
+				intensity={(theme === 'light' ? 0.6 : 0.7) * intensityMultiplier}
 				color={lightColors.point}
-				distance={20}
+				distance={25}
 			/>
 		</>
 	);
@@ -478,24 +534,24 @@ const Background3D = () => {
 		if (theme === 'light') {
 			return {
 				radial1:
-					'radial-gradient(ellipse 70% 60% at 50% 40%, rgba(139,92,246,.18), transparent)',
+					'radial-gradient(ellipse 75% 65% at 50% 35%, rgba(139,92,246,.22), transparent)',
 				radial2:
-					'radial-gradient(circle at 25% 75%, rgba(96,165,250,.15), transparent 55%)',
+					'radial-gradient(circle at 20% 80%, rgba(96,165,250,.18), transparent 60%)',
 				radial3:
-					'radial-gradient(circle at 75% 25%, rgba(244,114,182,.12), transparent 50%)',
+					'radial-gradient(circle at 80% 20%, rgba(244,114,182,.15), transparent 55%)',
 				fog: '#ede9fe',
 				bottomFade:
-					'linear-gradient(to top, rgba(255,255,255,0.95), rgba(255,255,255,0.7), transparent)',
+					'linear-gradient(to top, rgba(255,255,255,0.98), rgba(255,255,255,0.75), transparent)',
 			};
 		}
 		return {
 			radial1:
-				'radial-gradient(ellipse 70% 60% at 50% 40%, rgba(129,140,248,.2), transparent)',
-			radial2: 'radial-gradient(circle at 25% 75%, rgba(56,189,248,.15), transparent 55%)',
-			radial3: 'radial-gradient(circle at 75% 25%, rgba(236,72,153,.12), transparent 50%)',
+				'radial-gradient(ellipse 75% 65% at 50% 35%, rgba(129,140,248,.25), transparent)',
+			radial2: 'radial-gradient(circle at 20% 80%, rgba(56,189,248,.18), transparent 60%)',
+			radial3: 'radial-gradient(circle at 80% 20%, rgba(236,72,153,.15), transparent 55%)',
 			fog: '#0a1628',
 			bottomFade:
-				'linear-gradient(to top, rgba(3,7,18,0.98), rgba(3,7,18,0.85), transparent)',
+				'linear-gradient(to top, rgba(3,7,18,0.98), rgba(3,7,18,0.88), transparent)',
 		};
 	}, [theme]);
 
@@ -503,33 +559,33 @@ const Background3D = () => {
 	const particleConfig = useMemo(() => {
 		const baseConfig = {
 			mobile: [
-				{ count: 600, size: 0.025, color: '#818cf8', speed: 0.3, radius: 30 },
-				{ count: 400, size: 0.03, color: '#38bdf8', speed: 0.5, radius: 20 },
-				{ count: 300, size: 0.035, color: '#a78bfa', speed: 0.7, radius: 15 },
+				{ count: 700, size: 0.028, color: '#818cf8', speed: 0.35, radius: 32 },
+				{ count: 500, size: 0.035, color: '#38bdf8', speed: 0.55, radius: 22 },
+				{ count: 350, size: 0.04, color: '#a78bfa', speed: 0.75, radius: 16 },
 			],
 			tablet: [
-				{ count: 900, size: 0.025, color: '#818cf8', speed: 0.3, radius: 32 },
-				{ count: 650, size: 0.03, color: '#38bdf8', speed: 0.5, radius: 22 },
-				{ count: 450, size: 0.035, color: '#a78bfa', speed: 0.7, radius: 16 },
+				{ count: 1000, size: 0.028, color: '#818cf8', speed: 0.35, radius: 35 },
+				{ count: 750, size: 0.035, color: '#38bdf8', speed: 0.55, radius: 25 },
+				{ count: 500, size: 0.04, color: '#a78bfa', speed: 0.75, radius: 18 },
 			],
 			desktop: [
-				{ count: 1200, size: 0.025, color: '#818cf8', speed: 0.3, radius: 35 },
-				{ count: 900, size: 0.03, color: '#38bdf8', speed: 0.5, radius: 25 },
-				{ count: 600, size: 0.035, color: '#a78bfa', speed: 0.7, radius: 18 },
+				{ count: 1400, size: 0.028, color: '#818cf8', speed: 0.35, radius: 38 },
+				{ count: 1000, size: 0.035, color: '#38bdf8', speed: 0.55, radius: 28 },
+				{ count: 700, size: 0.04, color: '#a78bfa', speed: 0.75, radius: 20 },
 			],
 		};
 		return baseConfig[breakpoint];
 	}, [breakpoint]);
 
-	// Responsive camera configuration
+	// Responsive camera configuration - adjusted for better logo visibility
 	const cameraConfig = useMemo(() => {
 		switch (breakpoint) {
 			case 'mobile':
-				return { position: [0, 1.5, 12], fov: 55 };
+				return { position: [0, 2, 14], fov: 60 };
 			case 'tablet':
-				return { position: [0, 2, 11], fov: 52 };
+				return { position: [0, 2.5, 12], fov: 56 };
 			default:
-				return { position: [0, 2, 10], fov: 50 };
+				return { position: [0, 3, 11], fov: 52 };
 		}
 	}, [breakpoint]);
 
@@ -541,8 +597,8 @@ const Background3D = () => {
 				style={{
 					background:
 						theme === 'light'
-							? 'linear-gradient(to bottom, #ffffff, #faf5ff, #f3e8ff)'
-							: 'linear-gradient(to bottom, #030712, #0b1220, #0f172a)',
+							? 'linear-gradient(to bottom, #ffffff, #faf5ff, #f3e8ff, #ede9fe)'
+							: 'linear-gradient(to bottom, #030712, #0b1220, #0f172a, #1e293b)',
 				}}
 			/>
 
@@ -560,11 +616,11 @@ const Background3D = () => {
 				style={{ background: gradients.radial3 }}
 			/>
 
-			{/* Noise texture overlay for depth */}
+			{/* Noise texture overlay */}
 			<div
-				className="absolute inset-0 opacity-[0.015] mix-blend-overlay pointer-events-none"
+				className="absolute inset-0 opacity-[0.02] mix-blend-overlay pointer-events-none"
 				style={{
-					backgroundImage: `url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)'/%3E%3C/svg%3E")`,
+					backgroundImage: `url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)'/%3E%3C/svg%3E")`,
 				}}
 			/>
 
@@ -574,7 +630,7 @@ const Background3D = () => {
 						position: cameraConfig.position,
 						fov: cameraConfig.fov,
 						near: 0.1,
-						far: 100,
+						far: 120,
 					}}
 					style={{ pointerEvents: 'auto' }}
 					gl={{
@@ -582,13 +638,13 @@ const Background3D = () => {
 						alpha: true,
 						powerPreference: 'high-performance',
 						toneMapping: THREE.ACESFilmicToneMapping,
-						toneMappingExposure: theme === 'light' ? 1.1 : 1.3,
+						toneMappingExposure: theme === 'light' ? 1.15 : 1.35,
 					}}
 					dpr={[1, Math.min(window.devicePixelRatio, 2)]}
 				>
 					<fog
 						attach="fog"
-						args={[gradients.fog, 10, breakpoint === 'mobile' ? 45 : 55]}
+						args={[gradients.fog, 12, breakpoint === 'mobile' ? 50 : 60]}
 					/>
 
 					<DynamicLights />
@@ -602,20 +658,20 @@ const Background3D = () => {
 				</Canvas>
 			</Suspense>
 
-			{/* Enhanced bottom fade with gradient */}
+			{/* Enhanced bottom fade */}
 			<div
-				className="absolute inset-x-0 bottom-0 h-80 pointer-events-none transition-all duration-500"
+				className="absolute inset-x-0 bottom-0 h-96 pointer-events-none transition-all duration-500"
 				style={{ background: gradients.bottomFade }}
 			/>
 
-			{/* Top subtle fade for better integration */}
+			{/* Top subtle fade */}
 			<div
-				className="absolute inset-x-0 top-0 h-32 pointer-events-none transition-all duration-500"
+				className="absolute inset-x-0 top-0 h-40 pointer-events-none transition-all duration-500"
 				style={{
 					background:
 						theme === 'light'
-							? 'linear-gradient(to bottom, rgba(255,255,255,0.6), transparent)'
-							: 'linear-gradient(to bottom, rgba(3,7,18,0.5), transparent)',
+							? 'linear-gradient(to bottom, rgba(255,255,255,0.7), transparent)'
+							: 'linear-gradient(to bottom, rgba(3,7,18,0.6), transparent)',
 				}}
 			/>
 		</div>
