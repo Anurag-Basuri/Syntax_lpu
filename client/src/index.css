@@ -4,13 +4,13 @@
    1. THEME & GLOBAL VARIABLES
    ========================================================================== */
 :root {
-	/* Primary accent colors */
-	--accent-1: #0ea5e9; /* Sky-500 */
-	--accent-2: #2563eb; /* Blue-600 */
+	/* Primary accent colors - NEW PALETTE */
+	--accent-1: #2dd4bf; /* Teal-400 */
+	--accent-2: #6366f1; /* Indigo-500 */
 
 	/* Dark theme (default) */
-	--bg-base: #030712; /* Gray-950 */
-	--bg-soft: #0b1220; /* Slate-900 */
+	--bg-base: #020617; /* Slate-950 */
+	--bg-soft: #0f172a; /* Slate-900 */
 	--bg-softer: #1e293b; /* Slate-800 */
 
 	--glass-bg: rgba(255, 255, 255, 0.03);
@@ -18,36 +18,36 @@
 	--glass-hover: rgba(255, 255, 255, 0.06);
 	--glass-shine: rgba(255, 255, 255, 0.01);
 
-	--text-primary: #f8fafc; /* Slate-50 */
-	--text-secondary: #cbd5e1; /* Slate-300 */
-	--text-muted: #94a3b8; /* Slate-500 */
+	--text-primary: #f1f5f9; /* Slate-100 */
+	--text-secondary: #94a3b8; /* Slate-400 */
+	--text-muted: #64748b; /* Slate-500 */
 
-	--shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.2);
-	--shadow-md: 0 6px 18px rgba(0, 0, 0, 0.35);
-	--shadow-lg: 0 10px 36px rgba(0, 0, 0, 0.45);
+	--shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.25);
+	--shadow-md: 0 6px 18px rgba(0, 0, 0, 0.4);
+	--shadow-lg: 0 10px 36px rgba(0, 0, 0, 0.5);
 }
 
 :root[data-theme='light'] {
-	/* Light theme */
-	--accent-1: #0284c7; /* Sky-600 */
-	--accent-2: #1d4ed8; /* Blue-700 */
+	/* Light theme - NEW PALETTE */
+	--accent-1: #0d9488; /* Teal-600 */
+	--accent-2: #4f46e5; /* Indigo-600 */
 
-	--bg-base: #ffffff;
-	--bg-soft: #f8fafc; /* Slate-50 */
-	--bg-softer: #f1f5f9; /* Slate-100 */
+	--bg-base: #f8fafc; /* Slate-50 */
+	--bg-soft: #f1f5f9; /* Slate-100 */
+	--bg-softer: #e2e8f0; /* Slate-200 */
 
-	--glass-bg: rgba(255, 255, 255, 0.7);
-	--glass-border: rgba(0, 0, 0, 0.08);
-	--glass-hover: rgba(0, 0, 0, 0.02);
-	--glass-shine: rgba(255, 255, 255, 0.7);
+	--glass-bg: rgba(255, 255, 255, 0.6);
+	--glass-border: rgba(0, 0, 0, 0.07);
+	--glass-hover: rgba(0, 0, 0, 0.03);
+	--glass-shine: rgba(255, 255, 255, 0.6);
 
 	--text-primary: #0f172a; /* Slate-900 */
-	--text-secondary: #334155; /* Slate-700 */
-	--text-muted: #64748b; /* Slate-500 */
+	--text-secondary: #475569; /* Slate-600 */
+	--text-muted: #94a3b8; /* Slate-400 */
 
-	--shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.06);
-	--shadow-md: 0 4px 16px rgba(0, 0, 0, 0.08);
-	--shadow-lg: 0 8px 32px rgba(0, 0, 0, 0.1);
+	--shadow-sm: 0 2px 8px rgba(15, 23, 42, 0.05);
+	--shadow-md: 0 4px 16px rgba(15, 23, 42, 0.07);
+	--shadow-lg: 0 8px 32px rgba(15, 23, 42, 0.1);
 }
 
 /* ==========================================================================
