@@ -50,7 +50,7 @@ const useResponsive = () => {
 	return breakpoint;
 };
 
-// Clean 3D Logo with subtle animations
+// Enhanced 3D Logo with better visibility and animations
 const Logo3D = () => {
 	const meshRef = useRef();
 	const groupRef = useRef();
@@ -73,11 +73,11 @@ const Logo3D = () => {
 	const { scale, yPosition } = useMemo(() => {
 		switch (breakpoint) {
 			case 'mobile':
-				return { scale: 4.0, yPosition: 0.6 };
+				return { scale: 3.2, yPosition: 0.4 };
 			case 'tablet':
-				return { scale: 5.2, yPosition: 0.9 };
+				return { scale: 4.5, yPosition: 0.7 };
 			default:
-				return { scale: 6.8, yPosition: 1.2 };
+				return { scale: 6.0, yPosition: 1.0 };
 		}
 	}, [breakpoint]);
 
@@ -87,42 +87,42 @@ const Logo3D = () => {
 		const dt = state.clock.getDelta();
 
 		if (meshRef.current) {
-			// Smooth pointer tracking
-			const targetY = (pointer.x * Math.PI) / 10;
-			const targetX = (-pointer.y * Math.PI) / 14;
+			// Smooth parallax effect
+			const targetY = (pointer.x * Math.PI) / 12;
+			const targetX = (-pointer.y * Math.PI) / 16;
 			meshRef.current.rotation.y = THREE.MathUtils.damp(
 				meshRef.current.rotation.y,
 				targetY,
-				5,
+				4,
 				dt
 			);
 			meshRef.current.rotation.x = THREE.MathUtils.damp(
 				meshRef.current.rotation.x,
 				targetX,
-				5,
+				4,
 				dt
 			);
 
-			// Subtle rotation animation
-			meshRef.current.rotation.z = Math.sin(t * 0.3) * 0.02;
+			// Gentle continuous rotation
+			meshRef.current.rotation.z = Math.sin(t * 0.2) * 0.015;
 		}
 
 		if (groupRef.current) {
-			// Floating animation
-			groupRef.current.position.y = yPosition + Math.sin(t * 0.6) * 0.08;
+			// Smooth floating
+			groupRef.current.position.y = yPosition + Math.sin(t * 0.4) * 0.06;
 
-			// Breathing scale animation
-			const breathe = 1 + Math.sin(t * 0.5) * 0.015;
+			// Subtle breathing
+			const breathe = 1 + Math.sin(t * 0.3) * 0.01;
 			groupRef.current.scale.set(breathe, breathe, 1);
 		}
 	});
 
 	return (
 		<Float
-			speed={1.2}
-			rotationIntensity={0.1}
-			floatIntensity={0.15}
-			floatingRange={[-0.03, 0.03]}
+			speed={1.0}
+			rotationIntensity={0.08}
+			floatIntensity={0.12}
+			floatingRange={[-0.02, 0.02]}
 		>
 			<group ref={groupRef} position={[0, yPosition, 0]}>
 				<group ref={meshRef}>
@@ -135,7 +135,7 @@ const Logo3D = () => {
 							side={THREE.DoubleSide}
 							uniforms={{
 								uMap: { value: texture },
-								uOpacity: { value: 0.65 }, // Reduced opacity
+								uOpacity: { value: 0.85 },
 								uAlphaTest: { value: 0.1 },
 							}}
 							vertexShader={`
@@ -165,8 +165,8 @@ const Logo3D = () => {
 	);
 };
 
-// Simple line-based mesh - clean and minimal
-const LineMesh = ({ segments }) => {
+// Clean wireframe mesh with smooth waves
+const WireframeMesh = ({ segments }) => {
 	const meshRef = useRef();
 	const theme = useTheme();
 	const breakpoint = useResponsive();
@@ -177,32 +177,32 @@ const LineMesh = ({ segments }) => {
 
 		return {
 			uTime: { value: 0 },
-			uAmplitude: { value: breakpoint === 'mobile' ? 0.6 : 0.9 }, // Lowered height
-			uFrequency: { value: 0.015 }, // Lower frequency for larger waves
-			uSpeed: { value: 0.1 }, // Slower, more deliberate motion
+			uAmplitude: { value: breakpoint === 'mobile' ? 0.5 : 0.75 },
+			uFrequency: { value: 0.018 },
+			uSpeed: { value: 0.08 },
 			uColorStart: { value: accent1 },
 			uColorEnd: { value: accent2 },
-			uLineOpacity: { value: theme === 'light' ? 0.2 : 0.3 },
+			uLineOpacity: { value: theme === 'light' ? 0.18 : 0.28 },
 		};
 	}, [theme, breakpoint]);
 
 	useFrame((state) => {
 		uniforms.uTime.value = state.clock.elapsedTime;
 
-		// Improved responsiveness
-		const pointerInfluence = (Math.abs(state.pointer.x) + Math.abs(state.pointer.y)) * 0.3;
-		const targetAmp = (breakpoint === 'mobile' ? 0.6 : 0.9) + pointerInfluence;
+		// Responsive wave amplitude
+		const pointerInfluence = (Math.abs(state.pointer.x) + Math.abs(state.pointer.y)) * 0.2;
+		const targetAmp = (breakpoint === 'mobile' ? 0.5 : 0.75) + pointerInfluence;
 		uniforms.uAmplitude.value = THREE.MathUtils.lerp(
 			uniforms.uAmplitude.value,
 			targetAmp,
-			0.1 // Faster response
+			0.05
 		);
 	});
 
-	const size = breakpoint === 'mobile' ? 280 : 360; // Made the mesh even larger
+	const size = breakpoint === 'mobile' ? 220 : 300;
 
 	return (
-		<mesh ref={meshRef} rotation={[-Math.PI / 2, 0, 0]} position={[0, -9, 0]}>
+		<mesh ref={meshRef} rotation={[-Math.PI / 2, 0, 0]} position={[0, -8, 0]}>
 			<planeGeometry args={[size, size, segments, segments]} />
 			<shaderMaterial
 				transparent
@@ -219,26 +219,16 @@ const LineMesh = ({ segments }) => {
                     varying vec2 vUv;
                     varying float vElevation;
 
-                    // Square wave function
-                    float squareWave(float x) {
-                        return sign(sin(x));
-                    }
-
                     void main() {
                         vUv = uv;
                         vec3 pos = position;
                         
-                        // Create square waves in both directions
-                        float waveX = squareWave(pos.x * uFrequency + uTime * uSpeed);
-                        float waveY = squareWave(pos.y * uFrequency + uTime * uSpeed * 0.8);
+                        // Smooth, flowing waves
+                        float wave1 = sin(pos.x * uFrequency + uTime * uSpeed);
+                        float wave2 = sin(pos.y * uFrequency * 0.8 + uTime * uSpeed * 0.7);
+                        float wave3 = cos((pos.x + pos.y) * uFrequency * 0.5 + uTime * uSpeed * 0.5);
                         
-                        // Combine waves for checkerboard-like pattern
-                        float combined = waveX * waveY;
-                        
-                        // Sharper smoothing for a more defined square look
-                        float smoothWave = smoothstep(-0.9, -0.8, combined) - smoothstep(0.8, 0.9, combined);
-                        
-                        vElevation = smoothWave * uAmplitude;
+                        vElevation = (wave1 * 0.5 + wave2 * 0.3 + wave3 * 0.2) * uAmplitude;
                         pos.z += vElevation;
                         
                         gl_Position = projectionMatrix * modelViewMatrix * vec4(pos, 1.0);
@@ -252,13 +242,13 @@ const LineMesh = ({ segments }) => {
                     uniform float uLineOpacity;
 
                     void main() {
-                        // Color gradient based on elevation
+                        // Smooth color gradient
                         float mixFactor = clamp(vElevation * 0.5 + 0.5, 0.0, 1.0);
                         vec3 color = mix(uColorStart, uColorEnd, mixFactor);
                         
-                        // Softer edge fade for larger mesh
-                        float edgeFadeY = smoothstep(0.0, 0.2, vUv.y) * smoothstep(1.0, 0.8, vUv.y);
-                        float edgeFadeX = smoothstep(0.0, 0.12, vUv.x) * smoothstep(1.0, 0.88, vUv.x);
+                        // Edge fade with smooth falloff
+                        float edgeFadeY = smoothstep(0.0, 0.15, vUv.y) * smoothstep(1.0, 0.85, vUv.y);
+                        float edgeFadeX = smoothstep(0.0, 0.1, vUv.x) * smoothstep(1.0, 0.9, vUv.x);
                         float edgeFade = edgeFadeY * edgeFadeX;
                         
                         gl_FragColor = vec4(color, uLineOpacity * edgeFade);
@@ -269,7 +259,7 @@ const LineMesh = ({ segments }) => {
 	);
 };
 
-// Minimal particle field
+// Refined particle field
 const ParticleField = ({ count, radius }) => {
 	const ref = useRef();
 	const theme = useTheme();
@@ -287,14 +277,15 @@ const ParticleField = ({ count, radius }) => {
 			pos[i * 3 + 1] = r * Math.sin(phi) * Math.sin(theta);
 			pos[i * 3 + 2] = r * Math.cos(phi);
 
-			siz[i] = 0.015 * (0.5 + Math.random() * 1.5);
+			siz[i] = 0.012 * (0.6 + Math.random() * 1.4);
 		}
 		return { positions: pos, sizes: siz };
 	}, [count, radius]);
 
 	useFrame((state, delta) => {
 		if (!ref.current) return;
-		ref.current.rotation.y += delta * 0.015;
+		ref.current.rotation.y += delta * 0.01;
+		ref.current.rotation.x += delta * 0.005;
 	});
 
 	const color = useMemo(() => getThemeColor('--accent-1'), [theme]);
@@ -316,10 +307,10 @@ const ParticleField = ({ count, radius }) => {
 				/>
 			</bufferGeometry>
 			<pointsMaterial
-				size={0.015}
+				size={0.012}
 				transparent
 				color={color}
-				opacity={theme === 'light' ? 0.25 : 0.4}
+				opacity={theme === 'light' ? 0.3 : 0.45}
 				sizeAttenuation
 				blending={THREE.AdditiveBlending}
 				depthWrite={false}
@@ -328,25 +319,42 @@ const ParticleField = ({ count, radius }) => {
 	);
 };
 
-// Simplified lighting
+// Optimized lighting
 const SceneLights = () => {
 	const theme = useTheme();
+	const lightRef = useRef();
+
 	const accent1 = useMemo(() => getThemeColor('--accent-1'), [theme]);
 	const accent2 = useMemo(() => getThemeColor('--accent-2'), [theme]);
 
+	useFrame((state) => {
+		if (lightRef.current) {
+			const t = state.clock.elapsedTime;
+			lightRef.current.intensity = (theme === 'light' ? 0.9 : 1.2) + Math.sin(t * 0.5) * 0.15;
+		}
+	});
+
 	return (
 		<>
-			<ambientLight intensity={theme === 'light' ? 1.0 : 0.7} />
+			<ambientLight intensity={theme === 'light' ? 1.0 : 0.75} />
 			<hemisphereLight
 				skyColor={accent1}
 				groundColor={accent2}
-				intensity={theme === 'light' ? 0.8 : 0.6}
+				intensity={theme === 'light' ? 0.7 : 0.5}
+			/>
+			<spotLight
+				ref={lightRef}
+				position={[0, 10, 10]}
+				angle={0.3}
+				penumbra={1}
+				intensity={theme === 'light' ? 0.9 : 1.2}
+				color={accent1}
 			/>
 		</>
 	);
 };
 
-// Scene content
+// Scene content with performance tiers
 const SceneContent = ({ perfLevel }) => {
 	const breakpoint = useResponsive();
 
@@ -354,22 +362,22 @@ const SceneContent = ({ perfLevel }) => {
 		const isMobile = breakpoint === 'mobile';
 		if (perfLevel === 'low') {
 			return {
-				segments: isMobile ? 50 : 60, // Increased segments for better square waves
-				particleCount: isMobile ? 150 : 250,
-				particleRadius: 25,
+				segments: isMobile ? 35 : 45,
+				particleCount: isMobile ? 120 : 200,
+				particleRadius: 22,
 			};
 		}
 		if (perfLevel === 'medium') {
 			return {
-				segments: isMobile ? 70 : 90,
-				particleCount: isMobile ? 300 : 500,
-				particleRadius: 30,
+				segments: isMobile ? 55 : 75,
+				particleCount: isMobile ? 250 : 450,
+				particleRadius: 28,
 			};
 		}
 		return {
-			segments: isMobile ? 90 : 140, // Higher segments for smoother square waves
-			particleCount: isMobile ? 500 : 900,
-			particleRadius: 35,
+			segments: isMobile ? 75 : 110,
+			particleCount: isMobile ? 400 : 750,
+			particleRadius: 32,
 		};
 	}, [perfLevel, breakpoint]);
 
@@ -377,7 +385,7 @@ const SceneContent = ({ perfLevel }) => {
 		<>
 			<SceneLights />
 			<Logo3D />
-			<LineMesh segments={segments} />
+			<WireframeMesh segments={segments} />
 			<ParticleField count={particleCount} radius={particleRadius} />
 		</>
 	);
@@ -401,6 +409,9 @@ const Background3D = () => {
 		const bgSoft = getComputedStyle(document.documentElement)
 			.getPropertyValue('--bg-soft')
 			.trim();
+		const bgSofter = getComputedStyle(document.documentElement)
+			.getPropertyValue('--bg-softer')
+			.trim();
 
 		const c1 = new THREE.Color(accent1)
 			.toArray()
@@ -413,44 +424,44 @@ const Background3D = () => {
 
 		if (theme === 'light') {
 			return {
-				baseGradient: `linear-gradient(to bottom, ${bgBase} 0%, ${bgSoft} 100%)`,
-				radial1: `radial-gradient(ellipse 80% 60% at 50% 20%, rgba(${c1},.08), transparent)`,
-				radial2: `radial-gradient(circle at 20% 80%, rgba(${c2},.06), transparent 70%)`,
-				fog: bgSoft,
-				bottomFade: `linear-gradient(to top, ${bgBase} 0%, transparent 50%)`,
-				topFade: `linear-gradient(to bottom, ${bgBase} 0%, transparent 30%)`,
+				baseGradient: `linear-gradient(180deg, ${bgBase} 0%, ${bgSoft} 50%, ${bgSofter} 100%)`,
+				radial1: `radial-gradient(ellipse 70% 50% at 50% 15%, rgba(${c1},.1), transparent 70%)`,
+				radial2: `radial-gradient(circle at 15% 85%, rgba(${c2},.08), transparent 60%)`,
+				fog: bgSofter,
+				bottomFade: `linear-gradient(to top, ${bgBase} 0%, transparent 45%)`,
+				topFade: `linear-gradient(to bottom, ${bgBase} 0%, transparent 25%)`,
 			};
 		}
 		return {
-			baseGradient: `linear-gradient(to bottom, ${bgBase} 0%, ${bgSoft} 100%)`,
-			radial1: `radial-gradient(ellipse 80% 60% at 50% 20%, rgba(${c1},.12), transparent)`,
-			radial2: `radial-gradient(circle at 20% 80%, rgba(${c2},.08), transparent 70%)`,
+			baseGradient: `linear-gradient(180deg, ${bgBase} 0%, ${bgSoft} 50%, ${bgSofter} 100%)`,
+			radial1: `radial-gradient(ellipse 70% 50% at 50% 15%, rgba(${c1},.15), transparent 70%)`,
+			radial2: `radial-gradient(circle at 15% 85%, rgba(${c2},.12), transparent 60%)`,
 			fog: bgBase,
-			bottomFade: `linear-gradient(to top, ${bgBase} 0%, transparent 50%)`,
-			topFade: `linear-gradient(to bottom, ${bgBase} 0%, transparent 30%)`,
+			bottomFade: `linear-gradient(to top, ${bgBase} 0%, transparent 45%)`,
+			topFade: `linear-gradient(to bottom, ${bgBase} 0%, transparent 25%)`,
 		};
 	}, [theme]);
 
 	const cameraConfig = useMemo(() => {
 		switch (breakpoint) {
 			case 'mobile':
-				return { position: [0, 2, 18], fov: 60 };
+				return { position: [0, 1.8, 16], fov: 65 };
 			case 'tablet':
-				return { position: [0, 2.5, 16], fov: 56 };
+				return { position: [0, 2.2, 14], fov: 58 };
 			default:
-				return { position: [0, 3, 14], fov: 52 };
+				return { position: [0, 2.8, 13], fov: 50 };
 		}
 	}, [breakpoint]);
 
 	return (
 		<div className="fixed inset-0 -z-10 overflow-hidden" aria-hidden="true">
-			{/* Simple gradient background */}
+			{/* Gradient background */}
 			<div
-				className="absolute inset-0 transition-all duration-700"
+				className="absolute inset-0 transition-all duration-700 ease-in-out"
 				style={{ background: styles.baseGradient }}
 			/>
 
-			{/* Subtle radial accents */}
+			{/* Radial accent overlays */}
 			<div
 				className="absolute inset-0 transition-opacity duration-700"
 				style={{ background: styles.radial1 }}
@@ -468,15 +479,16 @@ const Background3D = () => {
 						near: 0.1,
 						far: 100,
 					}}
-					style={{ pointerEvents: 'auto' }}
+					style={{ pointerEvents: 'none' }}
 					gl={{
 						antialias: true,
 						alpha: true,
 						powerPreference: 'high-performance',
 						toneMapping: THREE.ACESFilmicToneMapping,
-						toneMappingExposure: theme === 'light' ? 1.0 : 1.2,
+						toneMappingExposure: theme === 'light' ? 1.05 : 1.25,
 					}}
 					dpr={[1, 2]}
+					frameloop="always"
 				>
 					<PerformanceMonitor
 						onIncline={() => setPerfLevel('high')}
@@ -484,20 +496,20 @@ const Background3D = () => {
 					>
 						<fog
 							attach="fog"
-							args={[styles.fog, 20, breakpoint === 'mobile' ? 60 : 70]}
+							args={[styles.fog, 18, breakpoint === 'mobile' ? 55 : 65]}
 						/>
 						<SceneContent perfLevel={perfLevel} />
 					</PerformanceMonitor>
 				</Canvas>
 			</Suspense>
 
-			{/* Clean fades */}
+			{/* Edge fades */}
 			<div
-				className="absolute inset-x-0 bottom-0 h-64 pointer-events-none transition-all duration-700"
+				className="absolute inset-x-0 bottom-0 h-56 pointer-events-none transition-all duration-700"
 				style={{ background: styles.bottomFade }}
 			/>
 			<div
-				className="absolute inset-x-0 top-0 h-32 pointer-events-none transition-all duration-700"
+				className="absolute inset-x-0 top-0 h-28 pointer-events-none transition-all duration-700"
 				style={{ background: styles.topFade }}
 			/>
 		</div>
