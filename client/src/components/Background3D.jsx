@@ -143,11 +143,19 @@ const Glows = ({ theme }) => {
 // Subtle, blended logo with parallax
 const SubtleLogo = ({ breakpoint }) => {
 	const ref = useRef();
+	const [opacity, setOpacity] = useState(0); // Start with 0 opacity
 	const texture = useTexture(logo);
 	const theme = useTheme();
 	const isLight = theme === 'light';
 
-	const { scale, opacity } = useMemo(() => {
+	// Fade in the logo once the texture is loaded
+	useEffect(() => {
+		if (texture) {
+			setOpacity(isLight ? 0.05 : 0.07);
+		}
+	}, [texture, isLight]);
+
+	const { scale } = useMemo(() => {
 		const s =
 			breakpoint === 'mobile'
 				? 'min(70vw, 30vh, 420px)'
@@ -158,9 +166,8 @@ const SubtleLogo = ({ breakpoint }) => {
 		const scaleFactor = breakpoint === 'mobile' ? 14 : breakpoint === 'tablet' ? 18 : 22;
 		return {
 			scale: scaleFactor,
-			opacity: isLight ? 0.05 : 0.07,
 		};
-	}, [breakpoint, isLight]);
+	}, [breakpoint]);
 
 	useFrame((state) => {
 		if (!ref.current) return;
@@ -191,9 +198,17 @@ const SubtleLogo = ({ breakpoint }) => {
 				map={texture}
 				transparent
 				alphaTest={0.1}
-				opacity={opacity}
+				opacity={opacity} // Use state-driven opacity
 				blending={isLight ? THREE.MultiplyBlending : THREE.AdditiveBlending}
 				depthWrite={false}
+				// Animate the opacity change
+				onBeforeCompile={(shader) => {
+					shader.fragmentShader = shader.fragmentShader.replace(
+						'#include <dithering_fragment>',
+						`#include <dithering_fragment>
+            gl_FragColor.a *= smoothstep(0.0, 1.0, opacity);`
+					);
+				}}
 			/>
 		</mesh>
 	);
@@ -203,6 +218,11 @@ const SubtleLogo = ({ breakpoint }) => {
 const Background3D = () => {
 	const theme = useTheme();
 	const breakpoint = useResponsive();
+	const [isMounted, setIsMounted] = useState(false);
+
+	useEffect(() => {
+		setIsMounted(true);
+	}, []);
 
 	const cameraConfig = useMemo(() => {
 		switch (breakpoint) {
@@ -214,7 +234,11 @@ const Background3D = () => {
 	}, [breakpoint]);
 
 	return (
-		<div className="fixed inset-0 -z-10 overflow-hidden" aria-hidden="true">
+		<div
+			className="fixed inset-0 -z-10 overflow-hidden transition-opacity duration-1000 ease-in"
+			style={{ opacity: isMounted ? 1 : 0 }}
+			aria-hidden="true"
+		>
 			<Canvas
 				camera={cameraConfig}
 				gl={{
@@ -224,9 +248,12 @@ const Background3D = () => {
 				}}
 				dpr={[1, 1.5]} // Cap DPR for performance
 			>
+				{/* Render non-async components immediately */}
+				<Glows theme={theme} />
+				<Grid theme={theme} />
+
+				{/* Suspend only the component that loads assets */}
 				<Suspense fallback={null}>
-					<Glows theme={theme} />
-					<Grid theme={theme} />
 					<SubtleLogo breakpoint={breakpoint} />
 				</Suspense>
 			</Canvas>
