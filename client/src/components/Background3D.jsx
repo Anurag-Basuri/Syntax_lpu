@@ -50,122 +50,234 @@ const useResponsive = () => {
 	return breakpoint;
 };
 
-// Enhanced 3D Logo with better visibility and animations
+// Enhanced 3D Logo with improved visibility, animations and cleaner structure
 const Logo3D = () => {
 	const meshRef = useRef();
 	const groupRef = useRef();
+	const materialRef = useRef();
 	const texture = useTexture(logo);
-	const { gl } = useThree();
+	const { gl, viewport } = useThree();
 	const breakpoint = useResponsive();
+	const theme = useTheme();
 
+	// Enhanced texture setup
 	useEffect(() => {
 		if (!texture) return;
+
 		texture.colorSpace = THREE.SRGBColorSpace;
 		texture.anisotropy = gl.capabilities.getMaxAnisotropy?.() || 16;
 		texture.minFilter = THREE.LinearMipmapLinearFilter;
 		texture.magFilter = THREE.LinearFilter;
+		texture.wrapS = THREE.ClampToEdgeWrapping;
+		texture.wrapT = THREE.ClampToEdgeWrapping;
 		texture.generateMipmaps = true;
 		texture.needsUpdate = true;
 	}, [texture, gl]);
 
 	const aspect = texture?.image ? texture.image.width / texture.image.height : 1;
 
-	const { scale, yPosition } = useMemo(() => {
+	// Responsive configuration
+	const { scale, yPosition, opacity } = useMemo(() => {
 		switch (breakpoint) {
 			case 'mobile':
-				return { scale: 3.2, yPosition: 0.4 };
+				return { scale: 3.2, yPosition: 0.4, opacity: 0.65 };
 			case 'tablet':
-				return { scale: 4.5, yPosition: 0.7 };
+				return { scale: 4.5, yPosition: 0.7, opacity: 0.7 };
 			default:
-				return { scale: 6.0, yPosition: 1.0 };
+				return { scale: 6.0, yPosition: 1.0, opacity: 0.75 };
 		}
 	}, [breakpoint]);
 
+	// Enhanced animation frame with smoother effects
 	useFrame((state) => {
 		const pointer = state.pointer ?? { x: 0, y: 0 };
 		const t = state.clock.elapsedTime;
 		const dt = state.clock.getDelta();
 
 		if (meshRef.current) {
-			// Smooth parallax effect
-			const targetY = (pointer.x * Math.PI) / 12;
-			const targetX = (-pointer.y * Math.PI) / 16;
+			// Smoother parallax with reduced intensity
+			const targetY = (pointer.x * Math.PI) / 16;
+			const targetX = (-pointer.y * Math.PI) / 20;
+
 			meshRef.current.rotation.y = THREE.MathUtils.damp(
 				meshRef.current.rotation.y,
 				targetY,
-				4,
+				6,
 				dt
 			);
 			meshRef.current.rotation.x = THREE.MathUtils.damp(
 				meshRef.current.rotation.x,
 				targetX,
-				4,
+				6,
 				dt
 			);
 
-			// Gentle continuous rotation
-			meshRef.current.rotation.z = Math.sin(t * 0.2) * 0.015;
+			// Subtle continuous rotation with multiple frequencies
+			meshRef.current.rotation.z = Math.sin(t * 0.15) * 0.008 + Math.cos(t * 0.1) * 0.005;
 		}
 
 		if (groupRef.current) {
-			// Smooth floating
-			groupRef.current.position.y = yPosition + Math.sin(t * 0.4) * 0.06;
+			// Enhanced floating animation with multiple sine waves
+			const floatY = Math.sin(t * 0.35) * 0.04 + Math.sin(t * 0.2) * 0.02;
+			groupRef.current.position.y = yPosition + floatY;
 
-			// Subtle breathing
-			const breathe = 1 + Math.sin(t * 0.3) * 0.01;
+			// Subtle breathing effect
+			const breathe = 1 + Math.sin(t * 0.25) * 0.008;
 			groupRef.current.scale.set(breathe, breathe, 1);
+		}
+
+		// Update shader uniforms for dynamic effects
+		if (materialRef.current) {
+			materialRef.current.uniforms.uTime.value = t;
+
+			// Pulsing opacity effect
+			const pulse = 0.95 + Math.sin(t * 0.5) * 0.05;
+			materialRef.current.uniforms.uOpacity.value = opacity * pulse;
+
+			// Subtle color shift based on theme
+			const hueShift = Math.sin(t * 0.1) * 0.02;
+			materialRef.current.uniforms.uHueShift.value = hueShift;
 		}
 	});
 
+	// Enhanced shader uniforms
+	const uniforms = useMemo(
+		() => ({
+			uMap: { value: texture },
+			uOpacity: { value: opacity },
+			uAlphaTest: { value: 0.05 },
+			uTime: { value: 0 },
+			uHueShift: { value: 0 },
+			uIntensity: { value: theme === 'light' ? 1.1 : 1.3 },
+		}),
+		[texture, opacity, theme]
+	);
+
 	return (
 		<Float
-			speed={1.0}
-			rotationIntensity={0.08}
-			floatIntensity={0.12}
-			floatingRange={[-0.02, 0.02]}
+			speed={0.8}
+			rotationIntensity={0.05}
+			floatIntensity={0.08}
+			floatingRange={[-0.015, 0.015]}
 		>
 			<group ref={groupRef} position={[0, yPosition, 0]}>
 				<group ref={meshRef}>
-					<mesh scale={[scale * aspect, scale, 1]} renderOrder={10}>
+					{/* Main Logo Plane */}
+					<mesh scale={[scale * aspect, scale, 1]} renderOrder={100}>
+						<planeGeometry />
+						<shaderMaterial
+							ref={materialRef}
+							transparent
+							depthTest={true}
+							depthWrite={false}
+							side={THREE.DoubleSide}
+							uniforms={uniforms}
+							vertexShader={`
+								uniform float uTime;
+								uniform float uHueShift;
+								varying vec2 vUv;
+								varying vec3 vPosition;
+
+								void main() {
+									vUv = uv;
+									vPosition = position;
+									
+									// Subtle vertex displacement
+									float displacement = sin(position.x * 2.0 + uTime) * 0.002;
+									vec3 newPosition = position;
+									newPosition.z += displacement;
+									
+									gl_Position = projectionMatrix * modelViewMatrix * vec4(newPosition, 1.0);
+								}
+							`}
+							fragmentShader={`
+								uniform sampler2D uMap;
+								uniform float uOpacity;
+								uniform float uAlphaTest;
+								uniform float uTime;
+								uniform float uHueShift;
+								uniform float uIntensity;
+								varying vec2 vUv;
+								varying vec3 vPosition;
+
+								// Hue rotation function
+								vec3 hueShift(vec3 color, float hue) {
+									vec3 k = vec3(0.57735, 0.57735, 0.57735);
+									float cosAngle = cos(hue);
+									return color * cosAngle + cross(k, color) * sin(hue) + k * dot(k, color) * (1.0 - cosAngle);
+								}
+
+								void main() {
+									vec4 texColor = texture2D(uMap, vUv);
+									
+									// Enhanced alpha testing with smooth edges
+									if (texColor.a < uAlphaTest) discard;
+									
+									// Apply hue shift
+									vec3 finalColor = hueShift(texColor.rgb, uHueShift);
+									
+									// Intensity adjustment
+									finalColor *= uIntensity;
+									
+									// Edge glow effect
+									float edge = smoothstep(0.0, 0.1, vUv.x) * 
+												smoothstep(1.0, 0.9, vUv.x) *
+												smoothstep(0.0, 0.1, vUv.y) * 
+												smoothstep(1.0, 0.9, vUv.y);
+									
+									float glow = (0.3 + 0.7 * edge) * (0.8 + 0.2 * sin(uTime * 2.0));
+									
+									// Final color with animated opacity
+									float alpha = texColor.a * uOpacity * glow;
+									gl_FragColor = vec4(finalColor, alpha);
+								}
+							`}
+						/>
+					</mesh>
+
+					{/* Subtle Outer Glow */}
+					<mesh scale={[scale * aspect * 1.08, scale * 1.08, 1]} renderOrder={99}>
 						<planeGeometry />
 						<shaderMaterial
 							transparent
 							depthTest={false}
 							depthWrite={false}
 							side={THREE.DoubleSide}
-							uniforms={{
-								uMap: { value: texture },
-								uOpacity: { value: 0.85 },
-								uAlphaTest: { value: 0.1 },
-							}}
+							uniforms={uniforms}
 							vertexShader={`
-                                varying vec2 vUv;
-                                void main() {
-                                    vUv = uv;
-                                    gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
-                                }
-                            `}
+								varying vec2 vUv;
+								void main() {
+									vUv = uv;
+									gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+								}
+							`}
 							fragmentShader={`
-                                varying vec2 vUv;
-                                uniform sampler2D uMap;
-                                uniform float uOpacity;
-                                uniform float uAlphaTest;
-
-                                void main() {
-                                    vec4 texColor = texture2D(uMap, vUv);
-                                    if (texColor.a < uAlphaTest) discard;
-                                    gl_FragColor = vec4(texColor.rgb, texColor.a * uOpacity);
-                                }
-                            `}
+								uniform float uTime;
+								uniform float uOpacity;
+								varying vec2 vUv;
+								
+								void main() {
+									// Circular gradient
+									vec2 center = vec2(0.5, 0.5);
+									float dist = distance(vUv, center);
+									float gradient = 1.0 - smoothstep(0.3, 0.8, dist);
+									
+									// Pulsing effect
+									float pulse = 0.3 + 0.7 * (0.5 + 0.5 * sin(uTime * 1.5));
+									
+									// Very subtle glow
+									float alpha = gradient * pulse * uOpacity * 0.15;
+									
+									gl_FragColor = vec4(1.0, 1.0, 1.0, alpha);
+								}
+							`}
 						/>
 					</mesh>
 				</group>
 			</group>
 		</Float>
 	);
-};
-
-// Clean wireframe mesh with smooth waves
+}; // Clean wireframe mesh with smooth waves
 const WireframeMesh = ({ segments }) => {
 	const meshRef = useRef();
 	const theme = useTheme();
