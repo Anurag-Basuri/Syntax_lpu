@@ -50,13 +50,14 @@ const useResponsive = () => {
 	return breakpoint;
 };
 
-// Clean 3D Logo - No background effects, just the logo
+// Clean 3D Logo - No background effects, just the logo (with chroma-key removal fallback)
 const Logo3D = () => {
 	const meshRef = useRef();
 	const groupRef = useRef();
 	const texture = useTexture(logo);
 	const { gl } = useThree();
 	const breakpoint = useResponsive();
+	const theme = useTheme();
 
 	useEffect(() => {
 		if (!texture) return;
@@ -70,63 +71,106 @@ const Logo3D = () => {
 
 	const aspect = texture?.image ? texture.image.width / texture.image.height : 1;
 
-	// Adjusted position - lowered to account for navbar
+	// Adjusted scale and lowered position for navbar
 	const { scale, yPosition } = useMemo(() => {
 		switch (breakpoint) {
 			case 'mobile':
-				return { scale: 3.5, yPosition: 0.5 };
+				return { scale: 3.6, yPosition: 0.45 };
 			case 'tablet':
-				return { scale: 4.5, yPosition: 0.8 };
+				return { scale: 4.8, yPosition: 0.75 };
 			default:
-				return { scale: 6.0, yPosition: 1.0 };
+				return { scale: 6.2, yPosition: 0.95 };
 		}
 	}, [breakpoint]);
 
+	// Pointer + subtle breathing
 	useFrame((state) => {
 		const pointer = state.pointer ?? { x: 0, y: 0 };
-		const time = state.clock.elapsedTime;
+		const t = state.clock.elapsedTime;
 
 		if (meshRef.current) {
-			const targetRotationY = (pointer.x * Math.PI) / 12;
-			const targetRotationX = (-pointer.y * Math.PI) / 16;
-			meshRef.current.rotation.y = THREE.MathUtils.lerp(
+			const targetY = (pointer.x * Math.PI) / 12;
+			const targetX = (-pointer.y * Math.PI) / 16;
+			meshRef.current.rotation.y = THREE.MathUtils.damp(
 				meshRef.current.rotation.y,
-				targetRotationY,
-				0.06
+				targetY,
+				6,
+				state.clock.getDelta()
 			);
-			meshRef.current.rotation.x = THREE.MathUtils.lerp(
+			meshRef.current.rotation.x = THREE.MathUtils.damp(
 				meshRef.current.rotation.x,
-				targetRotationX,
-				0.06
+				targetX,
+				6,
+				state.clock.getDelta()
 			);
-			meshRef.current.rotation.z = Math.sin(time * 0.2) * 0.01;
+			meshRef.current.rotation.z = Math.sin(t * 0.25) * 0.01;
 		}
-
 		if (groupRef.current) {
-			groupRef.current.position.y = yPosition + Math.sin(time * 0.4) * 0.08;
+			groupRef.current.position.y = yPosition + Math.sin(t * 0.5) * 0.06;
+			const s = 1 + Math.sin(t * 0.8) * 0.01;
+			groupRef.current.scale.set(s, s, 1);
 		}
 	});
 
+	// Chroma-key fallback removes solid bg if PNG lacks alpha (white in light mode, black in dark mode)
+	const keyColor = useMemo(
+		() => (theme === 'light' ? new THREE.Color(0xffffff) : new THREE.Color(0x000000)),
+		[theme]
+	);
+	const tolerance = theme === 'light' ? 0.35 : 0.25; // widen for white bg, tighten for black
+
 	return (
 		<Float
-			speed={1.5}
+			speed={1.4}
 			rotationIntensity={0.15}
 			floatIntensity={0.2}
 			floatingRange={[-0.05, 0.05]}
 		>
 			<group ref={groupRef} position={[0, yPosition, 0]}>
 				<group ref={meshRef}>
-					{/* Clean logo - no glow layers */}
 					<mesh scale={[scale * aspect, scale, 1]} renderOrder={10}>
 						<planeGeometry />
-						<meshBasicMaterial
-							map={texture}
-							transparent={true}
-							alphaTest={0.1}
-							side={THREE.DoubleSide}
+						<shaderMaterial
+							transparent
 							depthTest={false}
 							depthWrite={false}
-							opacity={1.0}
+							side={THREE.DoubleSide}
+							uniforms={{
+								uMap: { value: texture },
+								uKeyColor: { value: keyColor },
+								uTolerance: { value: tolerance },
+								uSmoothness: { value: 0.08 },
+								uAlphaCutoff: { value: 0.05 },
+							}}
+							vertexShader={`
+                                varying vec2 vUv;
+                                void main() {
+                                    vUv = uv;
+                                    gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+                                }
+                            `}
+							fragmentShader={`
+                                varying vec2 vUv;
+                                uniform sampler2D uMap;
+                                uniform vec3 uKeyColor;
+                                uniform float uTolerance;
+                                uniform float uSmoothness;
+                                uniform float uAlphaCutoff;
+
+                                void main() {
+                                    vec4 tex = texture2D(uMap, vUv);
+
+                                    // Chroma key: make pixels near the key color transparent
+                                    float keyDist = distance(tex.rgb, uKeyColor);
+                                    float nearKey = 1.0 - smoothstep(uTolerance - uSmoothness, uTolerance + uSmoothness, keyDist);
+
+                                    // Keep alpha channel if present, otherwise cut based on key color proximity
+                                    float alpha = tex.a * (1.0 - nearKey);
+
+                                    if (alpha < uAlphaCutoff) discard;
+                                    gl_FragColor = vec4(tex.rgb, alpha);
+                                }
+                            `}
 						/>
 					</mesh>
 				</group>
@@ -144,24 +188,43 @@ const WaveMesh = ({ segments }) => {
 	const uniforms = useMemo(() => {
 		const accent1 = getThemeColor('--accent-1');
 		const accent2 = getThemeColor('--accent-2');
-		const bgSoft = getThemeColor('--bg-soft');
+		const base = getThemeColor('--bg-soft');
 
 		return {
 			uTime: { value: 0 },
-			uAmplitude: { value: breakpoint === 'mobile' ? 1.0 : 1.5 },
-			uFrequency: { value: 0.04 },
-			uColorBase: { value: bgSoft },
+			uAmplitude: { value: breakpoint === 'mobile' ? 0.9 : 1.35 },
+			uFreq1: { value: 0.06 },
+			uFreq2: { value: 0.035 },
+			uFreq3: { value: 0.025 },
+			uSpeed1: { value: 0.45 },
+			uSpeed2: { value: 0.28 },
+			uSpeed3: { value: 0.18 },
+			uDir1: { value: new THREE.Vector2(1.0, 0.2).normalize() },
+			uDir2: { value: new THREE.Vector2(-0.6, 1.0).normalize() },
+			uDir3: { value: new THREE.Vector2(0.2, -1.0).normalize() },
+			uColorBase: { value: base },
 			uColorAccent1: { value: accent1 },
 			uColorAccent2: { value: accent2 },
 		};
 	}, [theme, breakpoint]);
 
 	useFrame((state) => {
-		uniforms.uTime.value = state.clock.elapsedTime * 0.7;
+		uniforms.uTime.value = state.clock.elapsedTime;
+		// Slightly react to pointer with amplitude
+		const targetAmp =
+			(breakpoint === 'mobile' ? 0.8 : 1.2) +
+			Math.abs(state.pointer.x) * 0.2 +
+			Math.abs(state.pointer.y) * 0.2;
+		uniforms.uAmplitude.value = THREE.MathUtils.damp(
+			uniforms.uAmplitude.value,
+			targetAmp,
+			2.5,
+			state.clock.getDelta()
+		);
 	});
 
 	const geometryArgs = useMemo(() => {
-		const size = breakpoint === 'mobile' ? 100 : 140;
+		const size = breakpoint === 'mobile' ? 110 : 160;
 		return [size, size, segments, segments];
 	}, [breakpoint, segments]);
 
@@ -176,46 +239,28 @@ const WaveMesh = ({ segments }) => {
 				vertexShader={`
                     uniform float uTime;
                     uniform float uAmplitude;
-                    uniform float uFrequency;
+                    uniform float uFreq1, uFreq2, uFreq3;
+                    uniform float uSpeed1, uSpeed2, uSpeed3;
+                    uniform vec2 uDir1, uDir2, uDir3;
+
                     varying vec2 vUv;
                     varying float vElevation;
 
-                    vec3 mod289(vec3 x) { return x - floor(x * (1.0 / 289.0)) * 289.0; }
-                    vec2 mod289(vec2 x) { return x - floor(x * (1.0 / 289.0)) * 289.0; }
-                    vec3 permute(vec3 x) { return mod289(((x*34.0)+1.0)*x); }
-                    
-                    float snoise(vec2 v) {
-                        const vec4 C = vec4(0.211324865405187, 0.366025403784439, -0.577350269189626, 0.024390243902439);
-                        vec2 i  = floor(v + dot(v, C.yy));
-                        vec2 x0 = v - i + dot(i, C.xx);
-                        vec2 i1 = (x0.x > x0.y) ? vec2(1.0, 0.0) : vec2(0.0, 1.0);
-                        vec4 x12 = x0.xyxy + C.xxzz;
-                        x12.xy -= i1;
-                        i = mod289(i);
-                        vec3 p = permute(permute(i.y + vec3(0.0, i1.y, 1.0)) + i.x + vec3(0.0, i1.x, 1.0));
-                        vec3 m = max(0.5 - vec3(dot(x0,x0), dot(x12.xy,x12.xy), dot(x12.zw,x12.zw)), 0.0);
-                        m = m*m; m = m*m;
-                        vec3 x = 2.0 * fract(p * C.www) - 1.0;
-                        vec3 h = abs(x) - 0.5;
-                        vec3 ox = floor(x + 0.5);
-                        vec3 a0 = x - ox;
-                        m *= 1.79284291400159 - 0.85373472095314 * (a0*a0 + h*h);
-                        vec3 g;
-                        g.x  = a0.x  * x0.x  + h.x  * x0.y;
-                        g.yz = a0.yz * x12.xz + h.yz * x12.yw;
-                        return 130.0 * dot(m, g);
+                    float wave(vec2 dir, float freq, float speed, vec2 pos) {
+                        return sin(dot(dir, pos) * freq + uTime * speed);
                     }
 
                     void main() {
                         vUv = uv;
                         vec3 pos = position;
-                        
-                        float noise = snoise(pos.xy * 0.03 + uTime * 0.1) * 1.5;
-                        float wave = sin(pos.x * uFrequency + uTime * 0.2) * uAmplitude;
-                        
-                        vElevation = (noise + wave) * 0.8;
+
+                        float w1 = wave(uDir1, uFreq1, uSpeed1, pos.xy);
+                        float w2 = wave(uDir2, uFreq2, uSpeed2, pos.xy + vec2(8.0, -4.0));
+                        float w3 = wave(uDir3, uFreq3, uSpeed3, pos.xy + vec2(-12.0, 6.0));
+
+                        vElevation = (w1 * 0.55 + w2 * 0.3 + w3 * 0.25) * uAmplitude;
                         pos.z += vElevation;
-                        
+
                         gl_Position = projectionMatrix * modelViewMatrix * vec4(pos, 1.0);
                     }
                 `}
@@ -225,24 +270,26 @@ const WaveMesh = ({ segments }) => {
                     uniform vec3 uColorBase;
                     uniform vec3 uColorAccent1;
                     uniform vec3 uColorAccent2;
-                    
+
                     void main() {
-                        vec2 grid = abs(fract(vUv * 20.0 - 0.5) - 0.5);
-                        float line = min(grid.x, grid.y);
-                        float gridPattern = 1.0 - min(line * 2.0, 1.0);
-                        
-                        float elevationFactor = clamp(vElevation * 0.5 + 0.5, 0.0, 1.0);
-                        
-                        vec3 color = mix(uColorBase, uColorAccent1, smoothstep(0.0, 0.6, elevationFactor));
-                        color = mix(color, uColorAccent2, smoothstep(0.6, 1.0, elevationFactor));
-                        
-                        float centerDist = distance(vUv, vec2(0.5));
-                        float edgeFade = 1.0 - smoothstep(0.25, 0.65, centerDist);
-                        float verticalGradient = smoothstep(0.1, 0.9, vUv.y) * 0.35;
-                        
-                        float alpha = gridPattern * edgeFade * (0.35 + verticalGradient);
-                        
-                        gl_FragColor = vec4(color, alpha * 0.85);
+                        // Soft grid
+                        vec2 g = abs(fract(vUv * 22.0 - 0.5) - 0.5);
+                        float line = min(g.x, g.y);
+                        float grid = 1.0 - smoothstep(0.0, 0.12, line);
+
+                        // Elevation-based gradient
+                        float e = clamp(vElevation * 0.45 + 0.5, 0.0, 1.0);
+                        vec3 c = mix(uColorBase, uColorAccent1, smoothstep(0.0, 0.7, e));
+                        c = mix(c, uColorAccent2, smoothstep(0.55, 1.0, e));
+
+                        // Center focus + vertical fade
+                        float center = 1.0 - smoothstep(0.25, 0.68, distance(vUv, vec2(0.5)));
+                        float vfade = smoothstep(0.1, 0.9, vUv.y);
+
+                        float alpha = (0.28 + vfade * 0.26) * center;
+                        alpha *= mix(0.65, 1.0, grid * 0.35);
+
+                        gl_FragColor = vec4(c, alpha);
                     }
                 `}
 			/>
@@ -310,18 +357,17 @@ const ParticleNebula = ({ count, radius }) => {
 	);
 };
 
-// Interactive cursor glow
+// Interactive cursor glow - tiny fix to color update
 const CursorGlow = () => {
 	const glowRef = useRef();
 	const theme = useTheme();
 	const color = useMemo(() => getThemeColor('--accent-1'), [theme]);
 
 	useFrame(({ viewport, pointer }) => {
-		if (glowRef.current) {
-			const { width, height } = viewport.getCurrentViewport();
-			glowRef.current.position.set((pointer.x * width) / 2, (pointer.y * height) / 2, -5);
-			glowRef.current.material.color = color;
-		}
+		if (!glowRef.current) return;
+		const { width, height } = viewport.getCurrentViewport();
+		glowRef.current.position.set((pointer.x * width) / 2, (pointer.y * height) / 2, -5);
+		glowRef.current.material.color.copy(color);
 	});
 
 	return (
@@ -330,7 +376,7 @@ const CursorGlow = () => {
 			<meshBasicMaterial
 				color={color}
 				transparent
-				opacity={0.08}
+				opacity={0.07}
 				blending={THREE.AdditiveBlending}
 				depthWrite={false}
 			/>
