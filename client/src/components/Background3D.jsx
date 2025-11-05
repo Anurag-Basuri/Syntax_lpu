@@ -81,8 +81,9 @@ const Grid = ({ theme, breakpoint }) => {
 	const uniforms = useMemo(() => {
 		const isLight = theme === 'light';
 
-		const minorHex = isLight ? '#94a3b8' : '#64748b';
-		const majorHex = isLight ? '#64748b' : '#94a3b8';
+		// Enhanced colors with better contrast
+		const minorHex = isLight ? '#cbd5e1' : '#475569'; // Slate-300 / Slate-600
+		const majorHex = isLight ? '#94a3b8' : '#64748b'; // Slate-400 / Slate-500
 		const accentHex = readCssVar('--accent-1');
 
 		const gridSizes = {
@@ -102,13 +103,15 @@ const Grid = ({ theme, breakpoint }) => {
 			uAccentColor: { value: new THREE.Color(accentHex) },
 			uMinorSize: { value: gridSize },
 			uMajorEvery: { value: 5.0 },
-			uMinorWidth: { value: 0.025 },
-			uMajorWidth: { value: 0.045 },
+			// Increased line width for better visibility
+			uMinorWidth: { value: 0.03 },
+			uMajorWidth: { value: 0.055 },
 			uFadeNear: { value: 0.1 },
 			uFadeFar: { value: 0.95 },
-			uMinorAlpha: { value: isLight ? 0.45 : 0.55 },
-			uMajorAlpha: { value: isLight ? 0.65 : 0.75 },
-			uAccentAlpha: { value: isLight ? 0.15 : 0.2 },
+			// Increased alpha for better visibility
+			uMinorAlpha: { value: isLight ? 0.55 : 0.65 },
+			uMajorAlpha: { value: isLight ? 0.75 : 0.85 },
+			uAccentAlpha: { value: isLight ? 0.2 : 0.25 },
 			uSpeed: { value: prefersReduced ? 0.0 : 0.3 },
 			// Water wave parameters
 			uWaveSpeed: { value: prefersReduced ? 0.0 : 0.4 },
@@ -432,7 +435,7 @@ const Background3D = () => {
 			aria-hidden="true"
 			style={{ background: baseGradient }}
 		>
-			{/* CSS preview grid - bottom only with perspective */}
+			{/* Enhanced CSS preview grid with better visibility */}
 			<div
 				className="absolute inset-0 pointer-events-none transition-opacity duration-500 ease-out"
 				style={{ opacity: cssPreviewOpacity }}
@@ -444,20 +447,18 @@ const Background3D = () => {
 						backgroundImage: `
                             linear-gradient(to right, ${
 								theme === 'light'
-									? 'rgba(148,163,184,0.18)'
-									: 'rgba(100,116,139,0.20)'
-							} 1.5px, transparent 1.5px),
+									? 'rgba(203,213,225,0.35)' // Increased from 0.18
+									: 'rgba(71,85,105,0.4)' // Increased from 0.20
+							} 1.8px, transparent 1.8px),
                             linear-gradient(to bottom, ${
-								theme === 'light'
-									? 'rgba(148,163,184,0.18)'
-									: 'rgba(100,116,139,0.20)'
-							} 1.5px, transparent 1.5px)
+								theme === 'light' ? 'rgba(203,213,225,0.35)' : 'rgba(71,85,105,0.4)'
+							} 1.8px, transparent 1.8px)
                         `,
 						backgroundSize: '24px 24px',
 						transform: 'perspective(600px) rotateX(45deg)',
 						transformOrigin: 'bottom center',
-						maskImage: 'linear-gradient(to top, black 40%, transparent 100%)',
-						WebkitMaskImage: 'linear-gradient(to top, black 40%, transparent 100%)',
+						maskImage: 'linear-gradient(to top, black 45%, transparent 100%)',
+						WebkitMaskImage: 'linear-gradient(to top, black 45%, transparent 100%)',
 					}}
 				/>
 			</div>
