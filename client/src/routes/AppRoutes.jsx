@@ -19,9 +19,12 @@ import Privacy from '../pages/policies/privacy.jsx';
 import Terms from '../pages/policies/terms.jsx';
 import Refund from '../pages/policies/refund.jsx';
 
+import Background3D from '../components/Background3D.jsx';
+
 const AppRoutes = () => {
 	return (
 		<Routes>
+			<Route path="/background" element={<Background3D />} />
 			{/* Public routes */}
 			<Route path="/" element={<Home />} />
 			<Route path="/event" element={<Event />} />

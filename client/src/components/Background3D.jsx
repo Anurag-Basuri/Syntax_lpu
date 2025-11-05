@@ -29,18 +29,26 @@ const useTheme = () => {
 
 const useResponsive = () => {
 	const [breakpoint, setBreakpoint] = useState('desktop');
+	const [dimensions, setDimensions] = useState({ width: 1920, height: 1080 });
+
 	useEffect(() => {
 		const update = () => {
 			const w = window.innerWidth;
-			if (w < 640) setBreakpoint('mobile');
+			const h = window.innerHeight;
+			setDimensions({ width: w, height: h });
+
+			if (w < 480) setBreakpoint('mobile');
+			else if (w < 768) setBreakpoint('tablet-sm');
 			else if (w < 1024) setBreakpoint('tablet');
-			else setBreakpoint('desktop');
+			else if (w < 1440) setBreakpoint('desktop');
+			else setBreakpoint('desktop-lg');
 		};
 		update();
 		window.addEventListener('resize', update);
 		return () => window.removeEventListener('resize', update);
 	}, []);
-	return breakpoint;
+
+	return { breakpoint, dimensions };
 };
 
 const readCssVar = (name) =>
@@ -60,8 +68,8 @@ const isWebGLAvailable = () => {
 
 // --- R3F Scene Components ---
 
-// Enhanced professional grid with better color harmony
-const Grid = ({ theme, breakpoint }) => {
+// Enhanced grid positioned at the bottom with better responsiveness
+const Grid = ({ theme, breakpoint, dimensions }) => {
 	const meshRef = useRef();
 	const materialRef = useRef();
 
@@ -73,17 +81,31 @@ const Grid = ({ theme, breakpoint }) => {
 	const uniforms = useMemo(() => {
 		const isLight = theme === 'light';
 
-		// Improved color scheme - better contrast and harmony
-		const minorHex = isLight ? '#cbd5e1' : '#475569'; // slate-300 / slate-600
-		const majorHex = isLight ? '#94a3b8' : '#64748b'; // slate-400 / slate-500
+		// Enhanced color scheme for better background visibility
+		const minorHex = isLight ? '#e2e8f0' : '#334155'; // slate-200 / slate-700
+		const majorHex = isLight ? '#cbd5e1' : '#475569'; // slate-300 / slate-600
 		const accentHex = readCssVar('--accent-1');
 
-		// Responsive grid sizing
-		const gridSize = breakpoint === 'mobile' ? 22.0 : breakpoint === 'tablet' ? 25.0 : 28.0;
+		// Responsive grid sizing based on screen size
+		const gridSizes = {
+			mobile: 18.0,
+			'tablet-sm': 20.0,
+			tablet: 22.0,
+			desktop: 24.0,
+			'desktop-lg': 26.0,
+		};
 
-		// Where the grid should stop vertically (in UV space)
-		const maskTop = breakpoint === 'mobile' ? 0.56 : breakpoint === 'tablet' ? 0.48 : 0.44;
-		const maskFeather = 0.18;
+		// Grid positioning - always at bottom with adaptive height
+		const gridHeight = {
+			mobile: 0.35,
+			'tablet-sm': 0.32,
+			tablet: 0.3,
+			desktop: 0.28,
+			'desktop-lg': 0.26,
+		};
+
+		const gridSize = gridSizes[breakpoint] || 24.0;
+		const heightFactor = gridHeight[breakpoint] || 0.3;
 
 		return {
 			uTime: { value: 0 },
@@ -91,24 +113,24 @@ const Grid = ({ theme, breakpoint }) => {
 			uMajorColor: { value: new THREE.Color(majorHex) },
 			uAccentColor: { value: new THREE.Color(accentHex) },
 			uMinorSize: { value: gridSize },
-			uMajorEvery: { value: 6.0 },
-			uMinorWidth: { value: 0.012 },
-			uMajorWidth: { value: 0.024 },
-			uFadeNear: { value: 0.12 },
-			uFadeFar: { value: 0.88 },
-			uMinorAlpha: { value: isLight ? 0.18 : 0.28 },
-			uMajorAlpha: { value: isLight ? 0.35 : 0.48 },
-			uAccentAlpha: { value: isLight ? 0.08 : 0.12 },
-			uSpeed: { value: prefersReduced ? 0.0 : 0.015 },
-			uClothFreq: { value: 1.5 },
-			uClothAmp: { value: 0.06 },
-			uWaveAmp: { value: breakpoint === 'mobile' ? 0.2 : 0.35 },
-			uWaveFreq: { value: 0.15 },
-			uWaveSpeed: { value: prefersReduced ? 0.0 : 0.35 },
-			uMaskTop: { value: maskTop },
-			uMaskFeather: { value: maskFeather },
+			uMajorEvery: { value: 5.0 },
+			uMinorWidth: { value: 0.01 },
+			uMajorWidth: { value: 0.02 },
+			uFadeNear: { value: 0.1 },
+			uFadeFar: { value: 0.9 },
+			uMinorAlpha: { value: isLight ? 0.12 : 0.22 },
+			uMajorAlpha: { value: isLight ? 0.25 : 0.38 },
+			uAccentAlpha: { value: isLight ? 0.06 : 0.09 },
+			uSpeed: { value: prefersReduced ? 0.0 : 0.012 },
+			uClothFreq: { value: 1.8 },
+			uClothAmp: { value: 0.04 },
+			uWaveAmp: { value: breakpoint === 'mobile' ? 0.15 : 0.25 },
+			uWaveFreq: { value: 0.12 },
+			uWaveSpeed: { value: prefersReduced ? 0.0 : 0.25 },
+			uHeightFactor: { value: heightFactor },
+			uAspectRatio: { value: dimensions.width / dimensions.height },
 		};
-	}, [theme, prefersReduced, breakpoint]);
+	}, [theme, prefersReduced, breakpoint, dimensions]);
 
 	useFrame((state) => {
 		if (materialRef.current) {
@@ -117,8 +139,8 @@ const Grid = ({ theme, breakpoint }) => {
 	});
 
 	return (
-		<mesh ref={meshRef} position={[0, -6, -12]} renderOrder={-2}>
-			<planeGeometry args={[120, 120, 320, 320]} />
+		<mesh ref={meshRef} position={[0, -14, -15]} renderOrder={-2}>
+			<planeGeometry args={[140, 60, 320, 160]} />
 			<shaderMaterial
 				ref={materialRef}
 				transparent
@@ -132,6 +154,8 @@ const Grid = ({ theme, breakpoint }) => {
                     uniform float uWaveAmp;
                     uniform float uWaveFreq;
                     uniform float uWaveSpeed;
+                    uniform float uHeightFactor;
+                    uniform float uAspectRatio;
                     
                     varying vec2 vUv;
                     varying vec3 vPosition;
@@ -140,14 +164,17 @@ const Grid = ({ theme, breakpoint }) => {
                     void main() {
                         vUv = uv;
                         
-                        // Cloth-like texture displacement
+                        // Position grid at bottom
                         vec3 pos = position;
+                        pos.y += 12.0; // Adjust vertical position
+                        
+                        // Cloth-like texture displacement
                         float cloth = sin(pos.x * uClothFreq + uTime * uSpeed) * 
                                      cos(pos.y * uClothFreq * 1.2 + uTime * uSpeed * 0.8) * uClothAmp;
                         
-                        // Smooth wavy motion
+                        // Subtle wavy motion
                         float wave1 = sin(pos.x * uWaveFreq + uTime * uWaveSpeed) * uWaveAmp;
-                        float wave2 = cos(pos.y * uWaveFreq * 0.7 + uTime * uWaveSpeed * 1.1) * uWaveAmp * 0.6;
+                        float wave2 = cos(pos.y * uWaveFreq * 0.7 + uTime * uWaveSpeed * 1.1) * uWaveAmp * 0.4;
                         
                         float elevation = cloth + wave1 + wave2;
                         pos.z += elevation;
@@ -171,9 +198,7 @@ const Grid = ({ theme, breakpoint }) => {
                     uniform float uMinorAlpha;
                     uniform float uMajorAlpha;
                     uniform float uAccentAlpha;
-                    // New
-                    uniform float uMaskTop;
-                    uniform float uMaskFeather;
+                    uniform float uHeightFactor;
 
                     varying vec2 vUv;
                     varying vec3 vPosition;
@@ -190,22 +215,23 @@ const Grid = ({ theme, breakpoint }) => {
                         vec2 majorGrid = abs(fract(majorCoord - 0.5) - 0.5) * 2.0;
                         float major = smoothstep(0.0, 1.0, 1.0 - min(majorGrid.x, majorGrid.y) / uMajorWidth);
 
-                        // Elevation-based accent
-                        float accentGlow = smoothstep(-0.3, 0.3, vElevation) * uAccentAlpha;
+                        // Elevation-based accent - very subtle for background
+                        float accentGlow = smoothstep(-0.2, 0.2, vElevation) * uAccentAlpha;
 
-                        vec3 minorTint = mix(uMinorColor, uAccentColor, accentGlow * 0.5);
-                        vec3 majorTint = mix(uMajorColor, uAccentColor, accentGlow * 0.7);
+                        vec3 minorTint = mix(uMinorColor, uAccentColor, accentGlow * 0.3);
+                        vec3 majorTint = mix(uMajorColor, uAccentColor, accentGlow * 0.4);
 
                         vec3 color = minorTint * minor * uMinorAlpha + majorTint * major * uMajorAlpha;
-                        float alpha = (minor * uMinorAlpha + major * uMajorAlpha + accentGlow * 0.3);
+                        float alpha = (minor * uMinorAlpha + major * uMajorAlpha + accentGlow * 0.2);
 
-                        // New: bottom-only mask (fade out toward the top)
-                        float bottomMask = 1.0 - smoothstep(uMaskTop - uMaskFeather, uMaskTop + uMaskFeather, vUv.y);
-                        alpha *= bottomMask;
+                        // Bottom-only mask with smooth fade
+                        float verticalMask = 1.0 - smoothstep(uHeightFactor - 0.1, uHeightFactor + 0.1, vUv.y);
+                        alpha *= verticalMask;
 
-                        // Subtle depth enhancement
-                        alpha *= 0.95 + vElevation * 0.05;
+                        // Very subtle depth enhancement
+                        alpha *= 0.98 + vElevation * 0.02;
 
+                        // Ensure clean edges
                         if (alpha <= 0.001) discard;
                         gl_FragColor = vec4(color, alpha);
                     }
@@ -215,7 +241,7 @@ const Grid = ({ theme, breakpoint }) => {
 	);
 };
 
-// Enhanced radial glows with better color distribution
+// Subtle radial glows for background ambiance
 const RadialGlow = ({
 	position = [0, 0, -30],
 	size = [120, 120],
@@ -257,8 +283,8 @@ const RadialGlow = ({
                         vec2 p = vUv - 0.5;
                         float d = length(p) * 2.0;
                         
-                        // Smoother falloff with intensity control
-                        float a = pow(1.0 - smoothstep(0.0, 1.0, d), 1.8) * uIntensity;
+                        // Very smooth falloff for background
+                        float a = pow(1.0 - smoothstep(0.0, 1.0, d), 2.0) * uIntensity;
                         
                         gl_FragColor = vec4(uColor, a * uOpacity);
                     }
@@ -275,35 +301,35 @@ const Glows = ({ theme }) => {
 
 	return (
 		<>
-			{/* Primary glow - larger, more subtle */}
+			{/* Primary glow - very subtle for background */}
 			<RadialGlow
-				position={[0, 4, -25]}
-				size={[160, 160]}
+				position={[0, 8, -28]}
+				size={[180, 180]}
 				color={accent1}
-				opacity={isLight ? 0.1 : 0.14}
-				intensity={1.2}
-			/>
-			{/* Secondary glow - offset, complementary */}
-			<RadialGlow
-				position={[38, 10, -32]}
-				size={[200, 200]}
-				color={accent2}
 				opacity={isLight ? 0.06 : 0.09}
-				intensity={0.9}
+				intensity={1.0}
 			/>
-			{/* Tertiary glow - subtle depth */}
+			{/* Secondary glow - even more subtle */}
 			<RadialGlow
-				position={[-25, -8, -28]}
-				size={[140, 140]}
-				color={accent1}
-				opacity={isLight ? 0.04 : 0.06}
+				position={[35, 12, -35]}
+				size={[220, 220]}
+				color={accent2}
+				opacity={isLight ? 0.03 : 0.05}
 				intensity={0.7}
+			/>
+			{/* Bottom accent glow */}
+			<RadialGlow
+				position={[0, -15, -20]}
+				size={[160, 80]}
+				color={accent1}
+				opacity={isLight ? 0.02 : 0.04}
+				intensity={0.5}
 			/>
 		</>
 	);
 };
 
-// Enhanced logo with better lighting and effects
+// Enhanced logo with better positioning and clarity
 const EnhancedLogo = ({ breakpoint }) => {
 	const base = useRef();
 	const anim = useRef();
@@ -329,13 +355,23 @@ const EnhancedLogo = ({ breakpoint }) => {
 	}, [texture]);
 
 	const { camera } = useThree();
-	const targetZ = -14;
-	const frac = breakpoint === 'mobile' ? 0.38 : breakpoint === 'tablet' ? 0.34 : 0.3;
+	const targetZ = -12;
+
+	// Responsive logo sizing with more breakpoints
+	const logoScales = {
+		mobile: 0.22,
+		'tablet-sm': 0.26,
+		tablet: 0.3,
+		desktop: 0.34,
+		'desktop-lg': 0.38,
+	};
+
+	const frac = logoScales[breakpoint] || 0.3;
 	const clamp = (v, min, max) => Math.min(max, Math.max(min, v));
 	const scaleXY = useMemo(() => {
 		const dist = Math.abs(targetZ - (camera?.position?.z ?? 5));
 		const worldH = 2 * Math.tan(THREE.MathUtils.degToRad((camera?.fov ?? 60) / 2)) * dist;
-		const h = clamp(worldH * frac, 7, 22);
+		const h = clamp(worldH * frac, 6, 20);
 		return [h * aspect, h];
 	}, [camera?.fov, camera?.position?.z, aspect, frac]);
 
@@ -353,18 +389,28 @@ const EnhancedLogo = ({ breakpoint }) => {
 		const { pointer, clock } = state;
 		const t = clock.elapsedTime;
 
-		const px = prefersReduced ? 0 : (breakpoint === 'mobile' ? 0.15 : 0.25) * pointer.x;
-		const py = prefersReduced ? 0 : (breakpoint === 'mobile' ? 0.15 : 0.25) * pointer.y;
+		// Responsive parallax effects
+		const parallaxFactors = {
+			mobile: 0.1,
+			'tablet-sm': 0.15,
+			tablet: 0.2,
+			desktop: 0.25,
+			'desktop-lg': 0.3,
+		};
 
-		anim.current.position.x = THREE.MathUtils.damp(anim.current.position.x, px, 4.5, 0.016);
-		anim.current.position.y = THREE.MathUtils.damp(anim.current.position.y, py, 4.5, 0.016);
+		const factor = parallaxFactors[breakpoint] || 0.2;
+		const px = prefersReduced ? 0 : factor * pointer.x;
+		const py = prefersReduced ? 0 : factor * pointer.y;
 
-		const tiltX = prefersReduced ? 0 : THREE.MathUtils.degToRad(py * 2.0);
-		const tiltY = prefersReduced ? 0 : THREE.MathUtils.degToRad(px * -2.5);
-		anim.current.rotation.x = THREE.MathUtils.damp(anim.current.rotation.x, tiltX, 4.5, 0.016);
-		anim.current.rotation.y = THREE.MathUtils.damp(anim.current.rotation.y, tiltY, 4.5, 0.016);
+		anim.current.position.x = THREE.MathUtils.damp(anim.current.position.x, px, 5.0, 0.016);
+		anim.current.position.y = THREE.MathUtils.damp(anim.current.position.y, py, 5.0, 0.016);
 
-		const s = 1 + (prefersReduced ? 0 : Math.sin(t * 0.3) * 0.006);
+		const tiltX = prefersReduced ? 0 : THREE.MathUtils.degToRad(py * 1.5);
+		const tiltY = prefersReduced ? 0 : THREE.MathUtils.degToRad(px * -2.0);
+		anim.current.rotation.x = THREE.MathUtils.damp(anim.current.rotation.x, tiltX, 5.0, 0.016);
+		anim.current.rotation.y = THREE.MathUtils.damp(anim.current.rotation.y, tiltY, 5.0, 0.016);
+
+		const s = 1 + (prefersReduced ? 0 : Math.sin(t * 0.2) * 0.004);
 		anim.current.scale.set(s, s, 1);
 	});
 
@@ -375,8 +421,8 @@ const EnhancedLogo = ({ breakpoint }) => {
 			uMap: { value: texture ?? null },
 			uTime: { value: 0 },
 			uOpacity: { value: 1.0 },
-			uSheen: { value: prefersReduced ? 0.0 : 0.15 },
-			uVignette: { value: isLight ? 0.08 : 0.12 },
+			uSheen: { value: prefersReduced ? 0.0 : 0.1 },
+			uVignette: { value: isLight ? 0.06 : 0.09 },
 		}),
 		[texture, isLight, prefersReduced]
 	);
@@ -390,17 +436,17 @@ const EnhancedLogo = ({ breakpoint }) => {
 	return (
 		<group ref={base} position={[0, 0, 0]} renderOrder={-1}>
 			<group ref={anim}>
-				{/* Enhanced halo with better color */}
-				<mesh position={[0, 0, targetZ - 0.6]}>
-					<planeGeometry args={[1.3, 1.3]} />
+				{/* Subtle halo for background context */}
+				<mesh position={[0, 0, targetZ - 0.5]}>
+					<planeGeometry args={[1.2, 1.2]} />
 					<shaderMaterial
 						transparent
 						blending={THREE.AdditiveBlending}
 						depthWrite={false}
 						uniforms={{
 							uColor: { value: new THREE.Color(haloColor) },
-							uOpacity: { value: isLight ? 0.08 : 0.11 },
-							uIntensity: { value: 1.4 },
+							uOpacity: { value: isLight ? 0.05 : 0.08 },
+							uIntensity: { value: 1.2 },
 						}}
 						vertexShader={`
                             varying vec2 vUv;
@@ -418,14 +464,14 @@ const EnhancedLogo = ({ breakpoint }) => {
                             void main(){
                                 vec2 p = vUv - 0.5;
                                 float r = length(p) * 2.0;
-                                float a = pow(1.0 - smoothstep(0.0, 1.0, r), 2.2) * uIntensity;
+                                float a = pow(1.0 - smoothstep(0.0, 1.0, r), 2.0) * uIntensity;
                                 gl_FragColor = vec4(uColor, a * uOpacity);
                             }
                         `}
 					/>
 				</mesh>
 
-				{/* Logo with enhanced effects */}
+				{/* Clean logo with subtle effects */}
 				<mesh position={[0, 0, targetZ]}>
 					<planeGeometry args={[1, 1]} />
 					<shaderMaterial
@@ -459,18 +505,18 @@ const EnhancedLogo = ({ breakpoint }) => {
                                 vec2 p = vUv - 0.5;
                                 float r = length(p) * 2.0;
                                 
-                                // Smoother edge vignette
+                                // Subtle edge vignette
                                 float edge = 1.0 - smoothstep(0.6, 1.1, r) * uVignette;
 
-                                // Enhanced sheen effect
-                                float sweepCenter = fract(uTime * 0.04);
+                                // Minimal sheen effect for background
+                                float sweepCenter = fract(uTime * 0.03);
                                 float diag = (vUv.x * 0.6 + vUv.y * 0.4);
-                                float sweep = band(diag, sweepCenter, 0.08) * uSheen;
+                                float sweep = band(diag, sweepCenter, 0.06) * uSheen;
                                 
-                                vec3 color = tex.rgb + vec3(sweep) * 1.2;
+                                vec3 color = tex.rgb + vec3(sweep) * 0.8;
                                 
-                                // Subtle color enhancement
-                                color = mix(color, color * 1.05, edge * 0.3);
+                                // Clean color presentation
+                                color = mix(color, color * 1.02, edge * 0.2);
 
                                 gl_FragColor = vec4(color, tex.a * edge * uOpacity);
                             }
@@ -485,7 +531,7 @@ const EnhancedLogo = ({ breakpoint }) => {
 // Main component orchestrator
 const Background3D = () => {
 	const theme = useTheme();
-	const breakpoint = useResponsive();
+	const { breakpoint, dimensions } = useResponsive();
 
 	const [webglOk, setWebglOk] = useState(true);
 	const [ctxLost, setCtxLost] = useState(false);
@@ -493,28 +539,28 @@ const Background3D = () => {
 
 	useEffect(() => {
 		setWebglOk(isWebGLAvailable());
-		const t = setTimeout(() => setReady(true), 600);
+		const t = setTimeout(() => setReady(true), 500);
 		return () => clearTimeout(t);
 	}, []);
 
 	const cameraConfig = useMemo(() => {
-		switch (breakpoint) {
-			case 'mobile':
-				return { position: [0, 0, 5], fov: 72 };
-			case 'tablet':
-				return { position: [0, 0, 5], fov: 65 };
-			default:
-				return { position: [0, 0, 5], fov: 58 };
-		}
+		const configs = {
+			mobile: { position: [0, 0, 5], fov: 70 },
+			'tablet-sm': { position: [0, 0, 5], fov: 68 },
+			tablet: { position: [0, 0, 5], fov: 64 },
+			desktop: { position: [0, 0, 5], fov: 60 },
+			'desktop-lg': { position: [0, 0, 5], fov: 58 },
+		};
+		return configs[breakpoint] || { position: [0, 0, 5], fov: 60 };
 	}, [breakpoint]);
 
 	const baseGradient =
 		theme === 'light'
-			? 'radial-gradient(ellipse 110% 65% at 50% -12%, #f8fafc 0%, #ffffff 70%)'
-			: 'radial-gradient(ellipse 115% 68% at 50% -15%, #0f172a 0%, #0b1020 65%)';
+			? 'radial-gradient(ellipse 120% 70% at 50% -10%, #f8fafc 0%, #ffffff 75%)'
+			: 'radial-gradient(ellipse 125% 72% at 50% -12%, #0f172a 0%, #0b1020 70%)';
 
 	const showFallback = !webglOk || ctxLost;
-	const cssPreviewOpacity = showFallback ? 0.95 : ready ? 0.2 : 0.55;
+	const cssPreviewOpacity = showFallback ? 0.9 : ready ? 0.15 : 0.4;
 
 	return (
 		<div
@@ -522,19 +568,19 @@ const Background3D = () => {
 			aria-hidden="true"
 			style={{ background: baseGradient }}
 		>
-			{/* Enhanced CSS preview */}
+			{/* Enhanced CSS preview with bottom-focused grid */}
 			<div
 				className="absolute inset-0 pointer-events-none transition-opacity duration-500 ease-out"
 				style={{ opacity: cssPreviewOpacity }}
 			>
-				{/* Multi-layer glow system */}
+				{/* Subtle glow layers */}
 				<div
 					className="absolute inset-0"
 					style={{
 						background:
 							theme === 'light'
-								? 'radial-gradient(850px 550px at 50% 0%, rgba(6, 182, 212, 0.08), transparent 65%)'
-								: 'radial-gradient(950px 650px at 50% 0%, rgba(6, 182, 212, 0.12), transparent 70%)',
+								? 'radial-gradient(900px 500px at 50% 0%, rgba(6, 182, 212, 0.06), transparent 70%)'
+								: 'radial-gradient(1000px 600px at 50% 0%, rgba(6, 182, 212, 0.09), transparent 75%)',
 					}}
 				/>
 				<div
@@ -542,31 +588,34 @@ const Background3D = () => {
 					style={{
 						background:
 							theme === 'light'
-								? 'radial-gradient(1100px 700px at 70% -10%, rgba(99, 102, 241, 0.05), transparent 60%)'
-								: 'radial-gradient(1200px 800px at 65% -15%, rgba(99, 102, 241, 0.08), transparent 65%)',
+								? 'radial-gradient(1200px 800px at 65% -8%, rgba(99, 102, 241, 0.04), transparent 65%)'
+								: 'radial-gradient(1300px 900px at 60% -10%, rgba(99, 102, 241, 0.06), transparent 70%)',
 					}}
 				/>
 
-				{/* Enhanced grid pattern */}
+				{/* Bottom-focused grid pattern */}
 				<div
-					className="absolute inset-0 pointer-events-none animate-grid-flow"
+					className="absolute bottom-0 left-0 right-0 pointer-events-none animate-grid-flow"
 					style={{
+						height: '40%',
 						backgroundImage: `
                             linear-gradient(to right, ${
 								theme === 'light'
-									? 'rgba(148, 163, 184, 0.08)'
-									: 'rgba(71, 85, 105, 0.10)'
+									? 'rgba(148, 163, 184, 0.06)'
+									: 'rgba(71, 85, 105, 0.08)'
 							} 1px, transparent 1px),
                             linear-gradient(to bottom, ${
 								theme === 'light'
-									? 'rgba(148, 163, 184, 0.08)'
-									: 'rgba(71, 85, 105, 0.10)'
+									? 'rgba(148, 163, 184, 0.06)'
+									: 'rgba(71, 85, 105, 0.08)'
 							} 1px, transparent 1px)
                         `,
-						backgroundSize: '32px 32px',
-						// Bottom band mask
-						maskImage: 'linear-gradient(to top, black 38%, transparent 70%)',
-						WebkitMaskImage: 'linear-gradient(to top, black 38%, transparent 70%)',
+						backgroundSize: '28px 28px',
+						// Smooth fade at the top of the grid
+						maskImage:
+							'linear-gradient(to top, transparent 0%, black 25%, black 85%, transparent 100%)',
+						WebkitMaskImage:
+							'linear-gradient(to top, transparent 0%, black 25%, black 85%, transparent 100%)',
 					}}
 				/>
 			</div>
@@ -609,31 +658,31 @@ const Background3D = () => {
 					}}
 				>
 					<Glows theme={theme} />
-					<Grid theme={theme} breakpoint={breakpoint} />
+					<Grid theme={theme} breakpoint={breakpoint} dimensions={dimensions} />
 					<Suspense fallback={null}>
 						<EnhancedLogo breakpoint={breakpoint} />
 					</Suspense>
 				</Canvas>
 			)}
 
-			{/* Enhanced bottom fade */}
+			{/* Enhanced bottom fade for better grid integration */}
 			<div
-				className="absolute inset-x-0 bottom-0 h-64 pointer-events-none"
+				className="absolute inset-x-0 bottom-0 h-48 pointer-events-none"
 				style={{
 					background:
 						theme === 'light'
-							? 'linear-gradient(to top, #ffffff 25%, rgba(255, 255, 255, 0.8) 50%, transparent 100%)'
-							: 'linear-gradient(to top, #0b1020 30%, rgba(11, 16, 32, 0.7) 55%, transparent 100%)',
+							? 'linear-gradient(to top, #ffffff 20%, rgba(255, 255, 255, 0.85) 45%, transparent 100%)'
+							: 'linear-gradient(to top, #0b1020 25%, rgba(11, 16, 32, 0.8) 50%, transparent 100%)',
 				}}
 			/>
 
-			{/* Refined noise texture */}
+			{/* Minimal noise texture */}
 			<div
 				className="absolute inset-0 pointer-events-none mix-blend-overlay"
 				style={{
 					backgroundImage:
-						"url(\"data:image/svg+xml,%3Csvg viewBox='0 0 400 400' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E\")",
-					opacity: theme === 'light' ? 0.003 : 0.006,
+						"url(\"data:image/svg+xml,%3Csvg viewBox='0 0 400 400' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E\")",
+					opacity: theme === 'light' ? 0.002 : 0.004,
 				}}
 			/>
 		</div>
