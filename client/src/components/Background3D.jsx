@@ -68,7 +68,7 @@ const isWebGLAvailable = () => {
 
 // --- R3F Scene Components ---
 
-// Grid with 3D perspective view
+// Grid with 3D perspective view and water waves
 const Grid = ({ theme, breakpoint }) => {
 	const meshRef = useRef();
 	const materialRef = useRef();
@@ -109,12 +109,14 @@ const Grid = ({ theme, breakpoint }) => {
 			uMinorAlpha: { value: isLight ? 0.45 : 0.55 },
 			uMajorAlpha: { value: isLight ? 0.65 : 0.75 },
 			uAccentAlpha: { value: isLight ? 0.15 : 0.2 },
-			uSpeed: { value: prefersReduced ? 0.0 : 0.012 },
-			uClothFreq: { value: 1.8 },
-			uClothAmp: { value: 0.04 },
-			uWaveAmp: { value: breakpoint === 'mobile' ? 0.15 : 0.25 },
-			uWaveFreq: { value: 0.12 },
-			uWaveSpeed: { value: prefersReduced ? 0.0 : 0.25 },
+			uSpeed: { value: prefersReduced ? 0.0 : 0.3 },
+			// Water wave parameters
+			uWaveSpeed: { value: prefersReduced ? 0.0 : 0.4 },
+			uWaveAmplitude: { value: breakpoint === 'mobile' ? 0.35 : 0.55 },
+			uWaveFrequency: { value: 0.08 },
+			uRippleSpeed: { value: prefersReduced ? 0.0 : 0.6 },
+			uRippleAmplitude: { value: 0.18 },
+			uRippleFrequency: { value: 0.14 },
 		};
 	}, [theme, prefersReduced, breakpoint]);
 
@@ -126,8 +128,8 @@ const Grid = ({ theme, breakpoint }) => {
 		// Add subtle 3D rotation based on mouse movement
 		if (meshRef.current && !prefersReduced) {
 			const { pointer } = state;
-			const targetRotX = THREE.MathUtils.degToRad(-15 + pointer.y * 5); // Tilt based on Y
-			const targetRotY = THREE.MathUtils.degToRad(pointer.x * 8); // Rotate based on X
+			const targetRotX = THREE.MathUtils.degToRad(-15 + pointer.y * 5);
+			const targetRotY = THREE.MathUtils.degToRad(pointer.x * 8);
 
 			meshRef.current.rotation.x = THREE.MathUtils.damp(
 				meshRef.current.rotation.x,
@@ -145,11 +147,10 @@ const Grid = ({ theme, breakpoint }) => {
 	});
 
 	return (
-		// Position and rotate for 3D perspective effect
 		<mesh
 			ref={meshRef}
 			position={[0, -12, -15]}
-			rotation={[THREE.MathUtils.degToRad(-15), 0, 0]} // Initial tilt
+			rotation={[THREE.MathUtils.degToRad(-15), 0, 0]}
 			renderOrder={-2}
 		>
 			<planeGeometry args={[120, 80, 320, 240]} />
@@ -161,37 +162,73 @@ const Grid = ({ theme, breakpoint }) => {
 				vertexShader={`
           uniform float uTime;
           uniform float uSpeed;
-          uniform float uClothFreq;
-          uniform float uClothAmp;
-          uniform float uWaveAmp;
-          uniform float uWaveFreq;
           uniform float uWaveSpeed;
+          uniform float uWaveAmplitude;
+          uniform float uWaveFrequency;
+          uniform float uRippleSpeed;
+          uniform float uRippleAmplitude;
+          uniform float uRippleFrequency;
 
           varying vec2 vUv;
           varying vec3 vPosition;
           varying float vElevation;
           varying float vDepth;
 
+          // Improved noise function for natural waves
+          float hash(vec2 p) {
+            return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453);
+          }
+
+          float noise(vec2 p) {
+            vec2 i = floor(p);
+            vec2 f = fract(p);
+            f = f * f * (3.0 - 2.0 * f);
+            float a = hash(i);
+            float b = hash(i + vec2(1.0, 0.0));
+            float c = hash(i + vec2(0.0, 1.0));
+            float d = hash(i + vec2(1.0, 1.0));
+            return mix(mix(a, b, f.x), mix(c, d, f.x), f.y);
+          }
+
           void main() {
             vUv = uv;
             vec3 pos = position;
 
-            // Cloth-like texture displacement
-            float cloth = sin(pos.x * uClothFreq + uTime * uSpeed) *
-                          cos(pos.y * uClothFreq * 1.2 + uTime * uSpeed * 0.8) * uClothAmp;
+            // Primary wave - large rolling ocean swells
+            float wave1 = sin(pos.x * uWaveFrequency + uTime * uWaveSpeed) * 
+                         cos(pos.y * uWaveFrequency * 0.7 + uTime * uWaveSpeed * 0.8) * 
+                         uWaveAmplitude;
 
-            // Wavy motion
-            float wave1 = sin(pos.x * uWaveFreq + uTime * uWaveSpeed) * uWaveAmp;
-            float wave2 = cos(pos.y * uWaveFreq * 0.7 + uTime * uWaveSpeed * 1.1) * uWaveAmp * 0.4;
+            // Secondary wave - cross waves for realism
+            float wave2 = sin(pos.x * uWaveFrequency * 1.3 - uTime * uWaveSpeed * 1.2) * 
+                         sin(pos.y * uWaveFrequency * 0.9 + uTime * uWaveSpeed * 0.6) * 
+                         uWaveAmplitude * 0.5;
 
-            float elevation = cloth + wave1 + wave2;
+            // Ripples - small high-frequency surface detail
+            float ripple1 = sin(pos.x * uRippleFrequency + uTime * uRippleSpeed) * 
+                           cos(pos.y * uRippleFrequency * 1.1 - uTime * uRippleSpeed * 0.9) * 
+                           uRippleAmplitude;
+
+            float ripple2 = sin(pos.y * uRippleFrequency * 1.3 + uTime * uRippleSpeed * 1.1) * 
+                           cos(pos.x * uRippleFrequency * 0.8 - uTime * uRippleSpeed * 0.7) * 
+                           uRippleAmplitude * 0.6;
+
+            // Organic noise for natural variation
+            vec2 noiseCoord = vec2(pos.x * 0.05, pos.y * 0.05) + uTime * 0.05;
+            float organicNoise = (noise(noiseCoord) - 0.5) * 0.25;
+
+            // Combine all wave components
+            float elevation = wave1 + wave2 + ripple1 + ripple2 + organicNoise;
+
+            // Depth-based wave attenuation (calmer in distance)
+            float depthFactor = smoothstep(0.0, 0.6, (pos.y + 40.0) / 80.0);
+            elevation *= depthFactor;
+
             pos.z += elevation;
 
             vPosition = pos;
             vElevation = elevation;
-            
-            // Calculate depth for perspective fade
-            vDepth = (pos.y + 40.0) / 80.0; // Normalize depth
+            vDepth = (pos.y + 40.0) / 80.0;
 
             gl_Position = projectionMatrix * modelViewMatrix * vec4(pos, 1.0);
           }
@@ -218,32 +255,43 @@ const Grid = ({ theme, breakpoint }) => {
           void main() {
             vec2 coord = vPosition.xy;
 
-            // Perspective depth fade - fade out towards the back
+            // Perspective depth fade
             float depthFade = smoothstep(0.0, 0.4, vDepth);
             if (depthFade < 0.01) discard;
 
+            // Grid lines with anti-aliasing
             vec2 g = abs(fract(coord / uMinorSize - 0.5) - 0.5) / fwidth(coord / uMinorSize);
             float minor = 1.0 - min(min(g.x, g.y) * uMinorWidth, 1.0);
 
-            vec2 G = abs(fract((coord / (uMinorSize * uMajorEvery)) - 0.5) - 0.5) / fwidth(coord / (uMinorSize * uMajorEvery));
+            vec2 G = abs(fract((coord / (uMinorSize * uMajorEvery)) - 0.5) - 0.5) / 
+                     fwidth(coord / (uMinorSize * uMajorEvery));
             float major = 1.0 - min(min(G.x, G.y) * uMajorWidth, 1.0);
 
-            // Elevation-based accent glow
-            float accentGlow = smoothstep(-0.2, 0.2, vElevation) * uAccentAlpha;
+            // Water-like shimmer on wave peaks
+            float waveHighlight = smoothstep(0.15, 0.5, vElevation) * uAccentAlpha * 2.2;
+            
+            // Darker on wave troughs for depth perception
+            float waveShadow = smoothstep(-0.35, -0.1, vElevation) * 0.18;
 
-            vec3 minorTint = mix(uMinorColor, uAccentColor, accentGlow * 0.4);
-            vec3 majorTint = mix(uMajorColor, uAccentColor, accentGlow * 0.6);
+            vec3 minorTint = mix(uMinorColor, uAccentColor, waveHighlight);
+            vec3 majorTint = mix(uMajorColor, uAccentColor, waveHighlight);
+
+            // Apply shadow to colors for realistic depth
+            minorTint = mix(minorTint * 0.68, minorTint, 1.0 - waveShadow);
+            majorTint = mix(majorTint * 0.68, majorTint, 1.0 - waveShadow);
 
             vec3 color = minorTint * minor * uMinorAlpha + majorTint * major * uMajorAlpha;
-            float alpha = (minor * uMinorAlpha + major * uMajorAlpha + accentGlow * 0.3);
+            float alpha = (minor * uMinorAlpha + major * uMajorAlpha + waveHighlight);
 
             // Horizontal fade from center
             float distFromCenter = length(vec2(vUv.x - 0.5, 0.0)) * 2.0;
             float fade = 1.0 - smoothstep(uFadeNear, uFadeFar, distFromCenter);
-            
-            // Combine perspective depth with horizontal fade
+
+            // Combine all fades
             alpha *= fade * depthFade;
-            alpha *= 0.95 + vElevation * 0.05;
+            
+            // Dynamic brightness based on elevation (shimmer effect)
+            alpha *= 0.88 + abs(vElevation) * 0.24;
 
             if (alpha <= 0.01) discard;
             gl_FragColor = vec4(color, alpha);
