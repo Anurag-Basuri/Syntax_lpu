@@ -68,7 +68,7 @@ const isWebGLAvailable = () => {
 
 // --- R3F Scene Components ---
 
-// Clean grid with cloth texture
+// Grid positioned below logo only
 const Grid = ({ theme, breakpoint }) => {
 	const meshRef = useRef();
 	const materialRef = useRef();
@@ -125,8 +125,9 @@ const Grid = ({ theme, breakpoint }) => {
 	});
 
 	return (
-		<mesh ref={meshRef} position={[0, -4, -8]} renderOrder={-2}>
-			<planeGeometry args={[100, 80, 256, 128]} />
+		// Position grid lower so it only appears below the logo
+		<mesh ref={meshRef} position={[0, -8, -10]} renderOrder={-2}>
+			<planeGeometry args={[100, 60, 256, 128]} />
 			<shaderMaterial
 				ref={materialRef}
 				transparent
@@ -185,6 +186,9 @@ const Grid = ({ theme, breakpoint }) => {
           void main() {
             vec2 coord = vPosition.xy;
 
+            // Only render grid in bottom half (below logo)
+            if (vUv.y > 0.45) discard;
+
             vec2 g = abs(fract(coord / uMinorSize - 0.5) - 0.5) / fwidth(coord / uMinorSize);
             float minor = 1.0 - min(min(g.x, g.y) * uMinorWidth, 1.0);
 
@@ -199,10 +203,14 @@ const Grid = ({ theme, breakpoint }) => {
             vec3 color = minorTint * minor * uMinorAlpha + majorTint * major * uMajorAlpha;
             float alpha = (minor * uMinorAlpha + major * uMajorAlpha + accentGlow * 0.3);
 
-            float distFromCenter = length(vUv - 0.5) * 1.6;
+            // Fade at edges (horizontal)
+            float distFromCenter = length(vec2(vUv.x - 0.5, 0.0)) * 2.0;
             float fade = 1.0 - smoothstep(uFadeNear, uFadeFar, distFromCenter);
             
-            alpha *= fade;
+            // Smooth fade at top edge (where it meets logo area)
+            float topFade = smoothstep(0.35, 0.45, vUv.y);
+            
+            alpha *= fade * (1.0 - topFade);
             alpha *= 0.95 + vElevation * 0.05;
 
             if (alpha <= 0.01) discard;
@@ -336,7 +344,7 @@ const Background3D = () => {
 	const baseGradient = `var(--bg-base)`;
 
 	const showFallback = !webglOk || ctxLost;
-	const cssPreviewOpacity = showFallback ? 0.9 : ready ? 0.15 : 0.4;
+	const cssPreviewOpacity = showFallback ? 0.9 : ready ? 0.12 : 0.35;
 
 	return (
 		<div
@@ -344,14 +352,15 @@ const Background3D = () => {
 			aria-hidden="true"
 			style={{ background: baseGradient }}
 		>
-			{/* Simple CSS preview grid */}
+			{/* CSS preview grid - bottom only */}
 			<div
 				className="absolute inset-0 pointer-events-none transition-opacity duration-500 ease-out"
 				style={{ opacity: cssPreviewOpacity }}
 			>
 				<div
-					className="absolute inset-0 pointer-events-none animate-grid-flow"
+					className="absolute bottom-0 left-0 right-0 pointer-events-none animate-grid-flow"
 					style={{
+						height: '50%',
 						backgroundImage: `
                             linear-gradient(to right, ${
 								theme === 'light'
@@ -365,15 +374,13 @@ const Background3D = () => {
 							} 1.5px, transparent 1.5px)
                         `,
 						backgroundSize: '24px 24px',
-						maskImage:
-							'radial-gradient(ellipse 85% 70% at 50% 50%, black 25%, transparent 90%)',
-						WebkitMaskImage:
-							'radial-gradient(ellipse 85% 70% at 50% 50%, black 25%, transparent 90%)',
+						maskImage: 'linear-gradient(to top, black 60%, transparent 100%)',
+						WebkitMaskImage: 'linear-gradient(to top, black 60%, transparent 100%)',
 					}}
 				/>
 			</div>
 
-			{/* WebGL scene - just grid and logo */}
+			{/* WebGL scene */}
 			{!showFallback && (
 				<Canvas
 					camera={cameraConfig}
