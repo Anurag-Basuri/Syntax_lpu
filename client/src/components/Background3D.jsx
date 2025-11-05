@@ -118,8 +118,9 @@ const Grid = ({ theme, breakpoint, dimensions }) => {
 			uMajorWidth: { value: 0.02 },
 			uFadeNear: { value: 0.1 },
 			uFadeFar: { value: 0.9 },
-			uMinorAlpha: { value: isLight ? 0.12 : 0.22 },
-			uMajorAlpha: { value: isLight ? 0.25 : 0.38 },
+			// Slightly clearer lines while still subtle
+			uMinorAlpha: { value: isLight ? 0.16 : 0.24 },
+			uMajorAlpha: { value: isLight ? 0.3 : 0.4 },
 			uAccentAlpha: { value: isLight ? 0.06 : 0.09 },
 			uSpeed: { value: prefersReduced ? 0.0 : 0.012 },
 			uClothFreq: { value: 1.8 },
@@ -555,12 +556,12 @@ const Background3D = () => {
 	}, [breakpoint]);
 
 	const baseGradient =
-		theme === 'light'
-			? 'radial-gradient(ellipse 120% 70% at 50% -10%, #f8fafc 0%, #ffffff 75%)'
-			: 'radial-gradient(ellipse 125% 72% at 50% -12%, #0f172a 0%, #0b1020 70%)';
+		// Cleaner theme-driven background
+		`radial-gradient(ellipse 120% 70% at 50% -12%, var(--bg-soft) 0%, var(--bg-base) 72%)`;
 
 	const showFallback = !webglOk || ctxLost;
-	const cssPreviewOpacity = showFallback ? 0.9 : ready ? 0.15 : 0.4;
+	// Lighter CSS preview so WebGL graphics are fully visible
+	const cssPreviewOpacity = showFallback ? 0.9 : ready ? 0.08 : 0.35;
 
 	return (
 		<div
@@ -568,54 +569,32 @@ const Background3D = () => {
 			aria-hidden="true"
 			style={{ background: baseGradient }}
 		>
-			{/* Enhanced CSS preview with bottom-focused grid */}
+			{/* Clean CSS preview with bottom-only grid */}
 			<div
 				className="absolute inset-0 pointer-events-none transition-opacity duration-500 ease-out"
 				style={{ opacity: cssPreviewOpacity }}
 			>
-				{/* Subtle glow layers */}
-				<div
-					className="absolute inset-0"
-					style={{
-						background:
-							theme === 'light'
-								? 'radial-gradient(900px 500px at 50% 0%, rgba(6, 182, 212, 0.06), transparent 70%)'
-								: 'radial-gradient(1000px 600px at 50% 0%, rgba(6, 182, 212, 0.09), transparent 75%)',
-					}}
-				/>
-				<div
-					className="absolute inset-0"
-					style={{
-						background:
-							theme === 'light'
-								? 'radial-gradient(1200px 800px at 65% -8%, rgba(99, 102, 241, 0.04), transparent 65%)'
-								: 'radial-gradient(1300px 900px at 60% -10%, rgba(99, 102, 241, 0.06), transparent 70%)',
-					}}
-				/>
-
-				{/* Bottom-focused grid pattern */}
+				{/* Removed extra glow layers for a cleaner base */}
 				<div
 					className="absolute bottom-0 left-0 right-0 pointer-events-none animate-grid-flow"
 					style={{
-						height: '40%',
+						height: '42%',
 						backgroundImage: `
                             linear-gradient(to right, ${
 								theme === 'light'
-									? 'rgba(148, 163, 184, 0.06)'
-									: 'rgba(71, 85, 105, 0.08)'
+									? 'rgba(148,163,184,0.10)'
+									: 'rgba(71,85,105,0.12)'
 							} 1px, transparent 1px),
                             linear-gradient(to bottom, ${
 								theme === 'light'
-									? 'rgba(148, 163, 184, 0.06)'
-									: 'rgba(71, 85, 105, 0.08)'
+									? 'rgba(148,163,184,0.10)'
+									: 'rgba(71,85,105,0.12)'
 							} 1px, transparent 1px)
                         `,
 						backgroundSize: '28px 28px',
-						// Smooth fade at the top of the grid
-						maskImage:
-							'linear-gradient(to top, transparent 0%, black 25%, black 85%, transparent 100%)',
-						WebkitMaskImage:
-							'linear-gradient(to top, transparent 0%, black 25%, black 85%, transparent 100%)',
+						// Gentle fade at the top of the preview grid
+						maskImage: 'linear-gradient(to top, black 75%, transparent 100%)',
+						WebkitMaskImage: 'linear-gradient(to top, black 75%, transparent 100%)',
 					}}
 				/>
 			</div>
@@ -632,7 +611,7 @@ const Background3D = () => {
 						precision: 'highp',
 						stencil: false,
 					}}
-					dpr={[1, Math.min(2, window.devicePixelRatio || 1.5)]}
+					dpr={[1, Math.min(2, window.devicePixelRatio || 2)]}
 					eventSource={typeof window !== 'undefined' ? document.body : undefined}
 					eventPrefix="client"
 					onCreated={({ gl }) => {
@@ -657,6 +636,7 @@ const Background3D = () => {
 						};
 					}}
 				>
+					{/* Keep subtle ambient glows + bottom grid under the logo */}
 					<Glows theme={theme} />
 					<Grid theme={theme} breakpoint={breakpoint} dimensions={dimensions} />
 					<Suspense fallback={null}>
@@ -664,27 +644,6 @@ const Background3D = () => {
 					</Suspense>
 				</Canvas>
 			)}
-
-			{/* Enhanced bottom fade for better grid integration */}
-			<div
-				className="absolute inset-x-0 bottom-0 h-48 pointer-events-none"
-				style={{
-					background:
-						theme === 'light'
-							? 'linear-gradient(to top, #ffffff 20%, rgba(255, 255, 255, 0.85) 45%, transparent 100%)'
-							: 'linear-gradient(to top, #0b1020 25%, rgba(11, 16, 32, 0.8) 50%, transparent 100%)',
-				}}
-			/>
-
-			{/* Minimal noise texture */}
-			<div
-				className="absolute inset-0 pointer-events-none mix-blend-overlay"
-				style={{
-					backgroundImage:
-						"url(\"data:image/svg+xml,%3Csvg viewBox='0 0 400 400' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E\")",
-					opacity: theme === 'light' ? 0.002 : 0.004,
-				}}
-			/>
 		</div>
 	);
 };
