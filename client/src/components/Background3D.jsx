@@ -81,12 +81,10 @@ const Grid = ({ theme, breakpoint, dimensions }) => {
 	const uniforms = useMemo(() => {
 		const isLight = theme === 'light';
 
-		// Enhanced color scheme for better background visibility
-		const minorHex = isLight ? '#e2e8f0' : '#334155'; // slate-200 / slate-700
-		const majorHex = isLight ? '#cbd5e1' : '#475569'; // slate-300 / slate-600
+		const minorHex = isLight ? '#e2e8f0' : '#334155';
+		const majorHex = isLight ? '#cbd5e1' : '#475569';
 		const accentHex = readCssVar('--accent-1');
 
-		// Responsive grid sizing based on screen size
 		const gridSizes = {
 			mobile: 18.0,
 			'tablet-sm': 20.0,
@@ -95,17 +93,17 @@ const Grid = ({ theme, breakpoint, dimensions }) => {
 			'desktop-lg': 26.0,
 		};
 
-		// Grid positioning - always at bottom with adaptive height
+		// Widen the visible band so it enters the viewport
 		const gridHeight = {
-			mobile: 0.35,
-			'tablet-sm': 0.32,
-			tablet: 0.3,
-			desktop: 0.28,
-			'desktop-lg': 0.26,
+			mobile: 0.6,
+			'tablet-sm': 0.56,
+			tablet: 0.54,
+			desktop: 0.5,
+			'desktop-lg': 0.48,
 		};
 
 		const gridSize = gridSizes[breakpoint] || 24.0;
-		const heightFactor = gridHeight[breakpoint] || 0.3;
+		const heightFactor = gridHeight[breakpoint] || 0.5;
 
 		return {
 			uTime: { value: 0 },
@@ -114,13 +112,13 @@ const Grid = ({ theme, breakpoint, dimensions }) => {
 			uAccentColor: { value: new THREE.Color(accentHex) },
 			uMinorSize: { value: gridSize },
 			uMajorEvery: { value: 5.0 },
-			uMinorWidth: { value: 0.01 },
-			uMajorWidth: { value: 0.02 },
+			// Slightly wider lines for visibility
+			uMinorWidth: { value: 0.015 },
+			uMajorWidth: { value: 0.03 },
 			uFadeNear: { value: 0.1 },
 			uFadeFar: { value: 0.9 },
-			// Slightly clearer lines while still subtle
-			uMinorAlpha: { value: isLight ? 0.16 : 0.24 },
-			uMajorAlpha: { value: isLight ? 0.3 : 0.4 },
+			uMinorAlpha: { value: isLight ? 0.22 : 0.28 },
+			uMajorAlpha: { value: isLight ? 0.38 : 0.46 },
 			uAccentAlpha: { value: isLight ? 0.06 : 0.09 },
 			uSpeed: { value: prefersReduced ? 0.0 : 0.012 },
 			uClothFreq: { value: 1.8 },
@@ -140,7 +138,8 @@ const Grid = ({ theme, breakpoint, dimensions }) => {
 	});
 
 	return (
-		<mesh ref={meshRef} position={[0, -14, -15]} renderOrder={-2}>
+		// Raise the grid plane so the masked band is in view
+		<mesh ref={meshRef} position={[0, -8, -15]} renderOrder={-2}>
 			<planeGeometry args={[140, 60, 320, 160]} />
 			<shaderMaterial
 				ref={materialRef}
@@ -148,95 +147,90 @@ const Grid = ({ theme, breakpoint, dimensions }) => {
 				depthWrite={false}
 				uniforms={uniforms}
 				vertexShader={`
-                    uniform float uTime;
-                    uniform float uSpeed;
-                    uniform float uClothFreq;
-                    uniform float uClothAmp;
-                    uniform float uWaveAmp;
-                    uniform float uWaveFreq;
-                    uniform float uWaveSpeed;
-                    uniform float uHeightFactor;
-                    uniform float uAspectRatio;
-                    
-                    varying vec2 vUv;
-                    varying vec3 vPosition;
-                    varying float vElevation;
-                    
-                    void main() {
-                        vUv = uv;
-                        
-                        // Position grid at bottom
-                        vec3 pos = position;
-                        pos.y += 12.0; // Adjust vertical position
-                        
-                        // Cloth-like texture displacement
-                        float cloth = sin(pos.x * uClothFreq + uTime * uSpeed) * 
-                                     cos(pos.y * uClothFreq * 1.2 + uTime * uSpeed * 0.8) * uClothAmp;
-                        
-                        // Subtle wavy motion
-                        float wave1 = sin(pos.x * uWaveFreq + uTime * uWaveSpeed) * uWaveAmp;
-                        float wave2 = cos(pos.y * uWaveFreq * 0.7 + uTime * uWaveSpeed * 1.1) * uWaveAmp * 0.4;
-                        
-                        float elevation = cloth + wave1 + wave2;
-                        pos.z += elevation;
-                        
-                        vPosition = pos;
-                        vElevation = elevation;
-                        
-                        gl_Position = projectionMatrix * modelViewMatrix * vec4(pos, 1.0);
-                    }
-                `}
+          uniform float uTime;
+          uniform float uSpeed;
+          uniform float uClothFreq;
+          uniform float uClothAmp;
+          uniform float uWaveAmp;
+          uniform float uWaveFreq;
+          uniform float uWaveSpeed;
+
+          varying vec2 vUv;
+          varying vec3 vPosition;
+          varying float vElevation;
+
+          void main() {
+            vUv = uv;
+
+            // Keep geometry centered; no extra Y offset
+            vec3 pos = position;
+
+            // Cloth-like texture displacement
+            float cloth = sin(pos.x * uClothFreq + uTime * uSpeed) *
+                          cos(pos.y * uClothFreq * 1.2 + uTime * uSpeed * 0.8) * uClothAmp;
+
+            // Subtle wavy motion
+            float wave1 = sin(pos.x * uWaveFreq + uTime * uWaveSpeed) * uWaveAmp;
+            float wave2 = cos(pos.y * uWaveFreq * 0.7 + uTime * uWaveSpeed * 1.1) * uWaveAmp * 0.4;
+
+            float elevation = cloth + wave1 + wave2;
+            pos.z += elevation;
+
+            vPosition = pos;
+            vElevation = elevation;
+
+            gl_Position = projectionMatrix * modelViewMatrix * vec4(pos, 1.0);
+          }
+        `}
 				fragmentShader={`
-                    uniform vec3 uMinorColor;
-                    uniform vec3 uMajorColor;
-                    uniform vec3 uAccentColor;
-                    uniform float uMinorSize;
-                    uniform float uMajorEvery;
-                    uniform float uMinorWidth;
-                    uniform float uMajorWidth;
-                    uniform float uFadeNear;
-                    uniform float uFadeFar;
-                    uniform float uMinorAlpha;
-                    uniform float uMajorAlpha;
-                    uniform float uAccentAlpha;
-                    uniform float uHeightFactor;
+          uniform vec3 uMinorColor;
+          uniform vec3 uMajorColor;
+          uniform vec3 uAccentColor;
+          uniform float uMinorSize;
+          uniform float uMajorEvery;
+          uniform float uMinorWidth;
+          uniform float uMajorWidth;
+          uniform float uFadeNear;
+          uniform float uFadeFar;
+          uniform float uMinorAlpha;
+          uniform float uMajorAlpha;
+          uniform float uAccentAlpha;
+          uniform float uHeightFactor;
 
-                    varying vec2 vUv;
-                    varying vec3 vPosition;
-                    varying float vElevation;
+          varying vec2 vUv;
+          varying vec3 vPosition;
+          varying float vElevation;
 
-                    void main() {
-                        vec2 coord = vPosition.xy;
+          void main() {
+            vec2 coord = vPosition.xy;
 
-                        // Grid lines
-                        vec2 grid = abs(fract(coord / uMinorSize - 0.5) - 0.5) * 2.0;
-                        float minor = smoothstep(0.0, 1.0, 1.0 - min(grid.x, grid.y) / uMinorWidth);
+            // Grid lines
+            vec2 g = abs(fract(coord / uMinorSize - 0.5) - 0.5) * 2.0;
+            float minor = smoothstep(0.0, 1.0, 1.0 - min(g.x, g.y) / uMinorWidth);
 
-                        vec2 majorCoord = coord / (uMinorSize * uMajorEvery);
-                        vec2 majorGrid = abs(fract(majorCoord - 0.5) - 0.5) * 2.0;
-                        float major = smoothstep(0.0, 1.0, 1.0 - min(majorGrid.x, majorGrid.y) / uMajorWidth);
+            vec2 G = abs(fract((coord / (uMinorSize * uMajorEvery)) - 0.5) - 0.5) * 2.0;
+            float major = smoothstep(0.0, 1.0, 1.0 - min(G.x, G.y) / uMajorWidth);
 
-                        // Elevation-based accent - very subtle for background
-                        float accentGlow = smoothstep(-0.2, 0.2, vElevation) * uAccentAlpha;
+            // Elevation-based accent
+            float accentGlow = smoothstep(-0.2, 0.2, vElevation) * uAccentAlpha;
 
-                        vec3 minorTint = mix(uMinorColor, uAccentColor, accentGlow * 0.3);
-                        vec3 majorTint = mix(uMajorColor, uAccentColor, accentGlow * 0.4);
+            vec3 minorTint = mix(uMinorColor, uAccentColor, accentGlow * 0.3);
+            vec3 majorTint = mix(uMajorColor, uAccentColor, accentGlow * 0.4);
 
-                        vec3 color = minorTint * minor * uMinorAlpha + majorTint * major * uMajorAlpha;
-                        float alpha = (minor * uMinorAlpha + major * uMajorAlpha + accentGlow * 0.2);
+            vec3 color = minorTint * minor * uMinorAlpha + majorTint * major * uMajorAlpha;
+            float alpha = (minor * uMinorAlpha + major * uMajorAlpha + accentGlow * 0.2);
 
-                        // Bottom-only mask with smooth fade
-                        float verticalMask = 1.0 - smoothstep(uHeightFactor - 0.1, uHeightFactor + 0.1, vUv.y);
-                        alpha *= verticalMask;
+            // Bottom-only mask (wider band so it reaches viewport)
+            float verticalMask = 1.0 - smoothstep(uHeightFactor - 0.1, uHeightFactor + 0.1, vUv.y);
+            alpha *= verticalMask;
 
-                        // Very subtle depth enhancement
-                        alpha *= 0.98 + vElevation * 0.02;
+            // Subtle depth enhancement
+            alpha *= 0.98 + vElevation * 0.02;
 
-                        // Ensure clean edges
-                        if (alpha <= 0.001) discard;
-                        gl_FragColor = vec4(color, alpha);
-                    }
-                `}
+            if (alpha <= 0.0001) discard;
+            gl_FragColor = vec4(color, alpha);
+          }
+        `}
 			/>
 		</mesh>
 	);
