@@ -10,7 +10,7 @@ const adminSchema = new mongoose.Schema(
 			default: () => uuidv4(),
 			unique: true,
 		},
-		username: {
+		fullname: {
 			type: String,
 			required: true,
 			trim: true,
