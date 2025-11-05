@@ -68,8 +68,8 @@ const isWebGLAvailable = () => {
 
 // --- R3F Scene Components ---
 
-// Enhanced grid positioned at the bottom with better responsiveness
-const Grid = ({ theme, breakpoint, dimensions }) => {
+// Clean grid with cloth texture
+const Grid = ({ theme, breakpoint }) => {
 	const meshRef = useRef();
 	const materialRef = useRef();
 
@@ -81,9 +81,8 @@ const Grid = ({ theme, breakpoint, dimensions }) => {
 	const uniforms = useMemo(() => {
 		const isLight = theme === 'light';
 
-		// Much brighter colors for visibility
-		const minorHex = isLight ? '#94a3b8' : '#64748b'; // slate-400 / slate-500
-		const majorHex = isLight ? '#64748b' : '#94a3b8'; // slate-500 / slate-400
+		const minorHex = isLight ? '#94a3b8' : '#64748b';
+		const majorHex = isLight ? '#64748b' : '#94a3b8';
 		const accentHex = readCssVar('--accent-1');
 
 		const gridSizes = {
@@ -103,12 +102,10 @@ const Grid = ({ theme, breakpoint, dimensions }) => {
 			uAccentColor: { value: new THREE.Color(accentHex) },
 			uMinorSize: { value: gridSize },
 			uMajorEvery: { value: 5.0 },
-			// Wider lines for better visibility
 			uMinorWidth: { value: 0.025 },
 			uMajorWidth: { value: 0.045 },
 			uFadeNear: { value: 0.1 },
 			uFadeFar: { value: 0.95 },
-			// Higher alpha values for visibility
 			uMinorAlpha: { value: isLight ? 0.45 : 0.55 },
 			uMajorAlpha: { value: isLight ? 0.65 : 0.75 },
 			uAccentAlpha: { value: isLight ? 0.15 : 0.2 },
@@ -119,7 +116,7 @@ const Grid = ({ theme, breakpoint, dimensions }) => {
 			uWaveFreq: { value: 0.12 },
 			uWaveSpeed: { value: prefersReduced ? 0.0 : 0.25 },
 		};
-	}, [theme, prefersReduced, breakpoint, dimensions]);
+	}, [theme, prefersReduced, breakpoint]);
 
 	useFrame((state) => {
 		if (materialRef.current) {
@@ -128,7 +125,6 @@ const Grid = ({ theme, breakpoint, dimensions }) => {
 	});
 
 	return (
-		// FIXED: Moved closer to camera and positioned lower in viewport
 		<mesh ref={meshRef} position={[0, -4, -8]} renderOrder={-2}>
 			<planeGeometry args={[100, 80, 256, 128]} />
 			<shaderMaterial
@@ -153,11 +149,9 @@ const Grid = ({ theme, breakpoint, dimensions }) => {
             vUv = uv;
             vec3 pos = position;
 
-            // Cloth-like texture displacement
             float cloth = sin(pos.x * uClothFreq + uTime * uSpeed) *
                           cos(pos.y * uClothFreq * 1.2 + uTime * uSpeed * 0.8) * uClothAmp;
 
-            // Wavy motion
             float wave1 = sin(pos.x * uWaveFreq + uTime * uWaveSpeed) * uWaveAmp;
             float wave2 = cos(pos.y * uWaveFreq * 0.7 + uTime * uWaveSpeed * 1.1) * uWaveAmp * 0.4;
 
@@ -191,14 +185,12 @@ const Grid = ({ theme, breakpoint, dimensions }) => {
           void main() {
             vec2 coord = vPosition.xy;
 
-            // Grid lines with better anti-aliasing
             vec2 g = abs(fract(coord / uMinorSize - 0.5) - 0.5) / fwidth(coord / uMinorSize);
             float minor = 1.0 - min(min(g.x, g.y) * uMinorWidth, 1.0);
 
             vec2 G = abs(fract((coord / (uMinorSize * uMajorEvery)) - 0.5) - 0.5) / fwidth(coord / (uMinorSize * uMajorEvery));
             float major = 1.0 - min(min(G.x, G.y) * uMajorWidth, 1.0);
 
-            // Elevation-based accent glow
             float accentGlow = smoothstep(-0.2, 0.2, vElevation) * uAccentAlpha;
 
             vec3 minorTint = mix(uMinorColor, uAccentColor, accentGlow * 0.4);
@@ -207,8 +199,6 @@ const Grid = ({ theme, breakpoint, dimensions }) => {
             vec3 color = minorTint * minor * uMinorAlpha + majorTint * major * uMajorAlpha;
             float alpha = (minor * uMinorAlpha + major * uMajorAlpha + accentGlow * 0.3);
 
-            // REMOVED vertical mask - grid visible across entire plane
-            // Simple radial fade from center
             float distFromCenter = length(vUv - 0.5) * 1.6;
             float fade = 1.0 - smoothstep(uFadeNear, uFadeFar, distFromCenter);
             
@@ -224,101 +214,11 @@ const Grid = ({ theme, breakpoint, dimensions }) => {
 	);
 };
 
-// Subtle radial glows for background ambiance
-const RadialGlow = ({
-	position = [0, 0, -30],
-	size = [120, 120],
-	color = '#fff',
-	opacity = 0.1,
-	intensity = 1.0,
-}) => {
-	const uniforms = useMemo(
-		() => ({
-			uColor: { value: new THREE.Color(color) },
-			uOpacity: { value: opacity },
-			uIntensity: { value: intensity },
-		}),
-		[color, opacity, intensity]
-	);
-
-	return (
-		<mesh position={position} renderOrder={-3}>
-			<planeGeometry args={size} />
-			<shaderMaterial
-				transparent
-				blending={THREE.AdditiveBlending}
-				depthWrite={false}
-				uniforms={uniforms}
-				vertexShader={`
-                    varying vec2 vUv;
-                    void main(){
-                        vUv = uv;
-                        gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
-                    }
-                `}
-				fragmentShader={`
-                    uniform vec3 uColor;
-                    uniform float uOpacity;
-                    uniform float uIntensity;
-                    varying vec2 vUv;
-                    
-                    void main(){
-                        vec2 p = vUv - 0.5;
-                        float d = length(p) * 2.0;
-                        
-                        // Very smooth falloff for background
-                        float a = pow(1.0 - smoothstep(0.0, 1.0, d), 2.0) * uIntensity;
-                        
-                        gl_FragColor = vec4(uColor, a * uOpacity);
-                    }
-                `}
-			/>
-		</mesh>
-	);
-};
-
-const Glows = ({ theme }) => {
-	const accent1 = useMemo(() => readCssVar('--accent-1'), []);
-	const accent2 = useMemo(() => readCssVar('--accent-2'), []);
-	const isLight = theme === 'light';
-
-	return (
-		<>
-			{/* Primary glow - very subtle for background */}
-			<RadialGlow
-				position={[0, 8, -28]}
-				size={[180, 180]}
-				color={accent1}
-				opacity={isLight ? 0.06 : 0.09}
-				intensity={1.0}
-			/>
-			{/* Secondary glow - even more subtle */}
-			<RadialGlow
-				position={[35, 12, -35]}
-				size={[220, 220]}
-				color={accent2}
-				opacity={isLight ? 0.03 : 0.05}
-				intensity={0.7}
-			/>
-			{/* Bottom accent glow */}
-			<RadialGlow
-				position={[0, -15, -20]}
-				size={[160, 80]}
-				color={accent1}
-				opacity={isLight ? 0.02 : 0.04}
-				intensity={0.5}
-			/>
-		</>
-	);
-};
-
-// Enhanced logo with better positioning and clarity
+// Clean logo
 const EnhancedLogo = ({ breakpoint }) => {
 	const base = useRef();
 	const anim = useRef();
 	const texture = useTexture(logo);
-	const theme = useTheme();
-	const isLight = theme === 'light';
 
 	useEffect(() => {
 		if (!texture) return;
@@ -340,7 +240,6 @@ const EnhancedLogo = ({ breakpoint }) => {
 	const { camera } = useThree();
 	const targetZ = -12;
 
-	// Responsive logo sizing with more breakpoints
 	const logoScales = {
 		mobile: 0.22,
 		'tablet-sm': 0.26,
@@ -356,7 +255,7 @@ const EnhancedLogo = ({ breakpoint }) => {
 		const worldH = 2 * Math.tan(THREE.MathUtils.degToRad((camera?.fov ?? 60) / 2)) * dist;
 		const h = clamp(worldH * frac, 6, 20);
 		return [h * aspect, h];
-	}, [camera?.fov, camera?.position?.z, aspect, frac, targetZ]);
+	}, [camera?.fov, camera?.position?.z, aspect, frac]);
 
 	useEffect(() => {
 		if (base.current) base.current.scale.set(scaleXY[0], scaleXY[1], 1);
@@ -372,7 +271,6 @@ const EnhancedLogo = ({ breakpoint }) => {
 		const { pointer, clock } = state;
 		const t = clock.elapsedTime;
 
-		// Responsive parallax effects
 		const parallaxFactors = {
 			mobile: 0.1,
 			'tablet-sm': 0.15,
@@ -397,121 +295,19 @@ const EnhancedLogo = ({ breakpoint }) => {
 		anim.current.scale.set(s, s, 1);
 	});
 
-	const haloColor = readCssVar('--accent-1');
-
-	const uniforms = useMemo(
-		() => ({
-			uMap: { value: texture ?? null },
-			uTime: { value: 0 },
-			uOpacity: { value: 1.0 },
-			uSheen: { value: prefersReduced ? 0.0 : 0.1 },
-			uVignette: { value: isLight ? 0.06 : 0.09 },
-		}),
-		[texture, isLight, prefersReduced]
-	);
-
-	useFrame((state) => {
-		if (uniforms.uTime) {
-			uniforms.uTime.value = state.clock.elapsedTime;
-		}
-	});
-
 	return (
 		<group ref={base} position={[0, 0, 0]} renderOrder={-1}>
 			<group ref={anim}>
-				{/* Subtle halo for background context */}
-				<mesh position={[0, 0, targetZ - 0.5]}>
-					<planeGeometry args={[1.2, 1.2]} />
-					<shaderMaterial
-						transparent
-						blending={THREE.AdditiveBlending}
-						depthWrite={false}
-						uniforms={{
-							uColor: { value: new THREE.Color(haloColor) },
-							uOpacity: { value: isLight ? 0.05 : 0.08 },
-							uIntensity: { value: 1.2 },
-						}}
-						vertexShader={`
-                            varying vec2 vUv;
-                            void main(){
-                                vUv = uv;
-                                gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
-                            }
-                        `}
-						fragmentShader={`
-                            uniform vec3 uColor;
-                            uniform float uOpacity;
-                            uniform float uIntensity;
-                            varying vec2 vUv;
-                            
-                            void main(){
-                                vec2 p = vUv - 0.5;
-                                float r = length(p) * 2.0;
-                                float a = pow(1.0 - smoothstep(0.0, 1.0, r), 2.0) * uIntensity;
-                                gl_FragColor = vec4(uColor, a * uOpacity);
-                            }
-                        `}
-					/>
-				</mesh>
-
-				{/* Clean logo with subtle effects */}
 				<mesh position={[0, 0, targetZ]}>
 					<planeGeometry args={[1, 1]} />
-					<shaderMaterial
-						transparent
-						depthWrite={false}
-						uniforms={uniforms}
-						vertexShader={`
-                            varying vec2 vUv;
-                            void main(){
-                                vUv = uv;
-                                gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
-                            }
-                        `}
-						fragmentShader={`
-                            precision highp float;
-                            uniform sampler2D uMap;
-                            uniform float uTime;
-                            uniform float uOpacity;
-                            uniform float uSheen;
-                            uniform float uVignette;
-                            varying vec2 vUv;
-
-                            float band(float x, float c, float w){
-                                return smoothstep(c - w, c, x) * (1.0 - smoothstep(c, c + w, x));
-                            }
-
-                            void main(){
-                                vec4 tex = texture2D(uMap, vUv);
-                                if (tex.a < 0.01) discard;
-
-                                vec2 p = vUv - 0.5;
-                                float r = length(p) * 2.0;
-                                
-                                // Subtle edge vignette
-                                float edge = 1.0 - smoothstep(0.6, 1.1, r) * uVignette;
-
-                                // Minimal sheen effect for background
-                                float sweepCenter = fract(uTime * 0.03);
-                                float diag = (vUv.x * 0.6 + vUv.y * 0.4);
-                                float sweep = band(diag, sweepCenter, 0.06) * uSheen;
-                                
-                                vec3 color = tex.rgb + vec3(sweep) * 0.8;
-                                
-                                // Clean color presentation
-                                color = mix(color, color * 1.02, edge * 0.2);
-
-                                gl_FragColor = vec4(color, tex.a * edge * uOpacity);
-                            }
-                        `}
-					/>
+					<meshBasicMaterial map={texture} transparent depthWrite={false} />
 				</mesh>
 			</group>
 		</group>
 	);
 };
 
-// Main component orchestrator
+// Main component
 const Background3D = () => {
 	const theme = useTheme();
 	const { breakpoint, dimensions } = useResponsive();
@@ -537,10 +333,9 @@ const Background3D = () => {
 		return configs[breakpoint] || { position: [0, 0, 5], fov: 60 };
 	}, [breakpoint]);
 
-	const baseGradient = `radial-gradient(ellipse 120% 70% at 50% -12%, var(--bg-soft) 0%, var(--bg-base) 72%)`;
+	const baseGradient = `var(--bg-base)`;
 
 	const showFallback = !webglOk || ctxLost;
-	// Much lighter CSS preview
 	const cssPreviewOpacity = showFallback ? 0.9 : ready ? 0.15 : 0.4;
 
 	return (
@@ -549,7 +344,7 @@ const Background3D = () => {
 			aria-hidden="true"
 			style={{ background: baseGradient }}
 		>
-			{/* Enhanced CSS preview grid - visible across more of viewport */}
+			{/* Simple CSS preview grid */}
 			<div
 				className="absolute inset-0 pointer-events-none transition-opacity duration-500 ease-out"
 				style={{ opacity: cssPreviewOpacity }}
@@ -570,7 +365,6 @@ const Background3D = () => {
 							} 1.5px, transparent 1.5px)
                         `,
 						backgroundSize: '24px 24px',
-						// Radial fade instead of bottom-only
 						maskImage:
 							'radial-gradient(ellipse 85% 70% at 50% 50%, black 25%, transparent 90%)',
 						WebkitMaskImage:
@@ -579,7 +373,7 @@ const Background3D = () => {
 				/>
 			</div>
 
-			{/* WebGL scene */}
+			{/* WebGL scene - just grid and logo */}
 			{!showFallback && (
 				<Canvas
 					camera={cameraConfig}
@@ -588,18 +382,11 @@ const Background3D = () => {
 						antialias: true,
 						alpha: true,
 						powerPreference: 'high-performance',
-						precision: 'highp',
-						stencil: false,
 					}}
 					dpr={[1, Math.min(2, window.devicePixelRatio || 2)]}
-					eventSource={typeof window !== 'undefined' ? document.body : undefined}
-					eventPrefix="client"
 					onCreated={({ gl }) => {
 						gl.setClearColor(0x000000, 0);
 						gl.outputColorSpace = THREE.SRGBColorSpace;
-						gl.toneMapping = THREE.ACESFilmicToneMapping;
-						gl.toneMappingExposure = 1.0;
-
 						requestAnimationFrame(() => setReady(true));
 
 						const el = gl.domElement;
@@ -616,7 +403,6 @@ const Background3D = () => {
 						};
 					}}
 				>
-					<Glows theme={theme} />
 					<Grid theme={theme} breakpoint={breakpoint} dimensions={dimensions} />
 					<Suspense fallback={null}>
 						<EnhancedLogo breakpoint={breakpoint} />
