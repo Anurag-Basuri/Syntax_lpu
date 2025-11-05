@@ -236,8 +236,8 @@ export {
 	sendContact,
 	getAllContacts,
 	getContactById,
-	updateContactStatus, // Renamed from markContactAsResolved
+	updateContactStatus,
 	deleteContact,
-	bulkDeleteContacts, // New
-	getContactStats, // New
+	bulkDeleteContacts,
+	getContactStats,
 };

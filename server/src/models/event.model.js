@@ -1,4 +1,21 @@
-import mongoose, { Mongoose } from 'mongoose';
+import mongoose from 'mongoose';
+import mongoosePaginate from 'mongoose-paginate-v2';
+
+const posterSchema = new mongoose.Schema({
+	url: {
+		type: String,
+		required: [true, 'Poster URL is required'],
+		// A more robust URL validation regex
+		match: [
+			/^(https?:\/\/(?:www\.|(?!www))[a-zA-Z0-9][a-zA-Z0-9-]+[a-zA-Z0-9]\.[^\s]{2,}|www\.[a-zA-Z0-9][a-zA-Z0-9-]+[a-zA-Z0-9]\.[^\s]{2,}|https?:\/\/[a-zA-Z0-9]+\.[^\s]{2,}|[a-zA-Z0-9]+\.[^\s]{2,})$/,
+			'Please provide a valid URL for the poster.',
+		],
+	},
+	publicId: {
+		type: String,
+		required: [true, 'Cloudinary public_id is required for the poster'],
+	},
+});
 
 const EventSchema = new mongoose.Schema(
 	{
@@ -6,127 +23,126 @@ const EventSchema = new mongoose.Schema(
 			type: String,
 			required: [true, 'Title is required'],
 			trim: true,
-			minlength: [2, 'Title must be at least 2 characters'],
-			maxlength: [100, 'Title cannot exceed 100 characters'],
+			minlength: [3, 'Title must be at least 3 characters long'],
+			maxlength: [150, 'Title cannot exceed 150 characters'],
 		},
 		description: {
 			type: String,
 			required: [true, 'Description is required'],
 			trim: true,
-			minlength: [5, 'Description must be at least 5 characters'],
-			maxlength: [1000, 'Description cannot exceed 1000 characters'],
+			minlength: [10, 'Description must be at least 10 characters long'],
+			maxlength: [2000, 'Description cannot exceed 2000 characters'],
 		},
-		date: {
+		// Combined date and time for easier querying and time zone management
+		eventDate: {
 			type: Date,
-			required: [true, 'Date is required'],
+			required: [true, 'Event date and time are required'],
 			validate: {
 				validator: function (v) {
-					return v >= new Date(); // Event date must be in the future
+					// Ensure the event date is not in the past at the time of creation/update
+					return v.getTime() >= Date.now() - 60000; // Allow a 1-minute grace period
 				},
-				message: 'Event date must be in the future',
+				message: 'Event date cannot be in the past.',
 			},
-		},
-		time: {
-			type: String,
-			required: [true, 'Time is required'],
-			trim: true,
-			minlength: [2, 'Time must be at least 2 characters'],
-			maxlength: [20, 'Time cannot exceed 20 characters'],
 		},
 		venue: {
 			type: String,
 			required: [true, 'Venue is required'],
 			trim: true,
 			minlength: [2, 'Venue must be at least 2 characters'],
-			maxlength: [100, 'Venue cannot exceed 100 characters'],
+			maxlength: [150, 'Venue cannot exceed 150 characters'],
 		},
 		organizer: {
 			type: String,
+			required: [true, 'Organizer is required'],
 			trim: true,
 			minlength: [2, 'Organizer must be at least 2 characters'],
 			maxlength: [100, 'Organizer cannot exceed 100 characters'],
 		},
-		sponsor: {
+		category: {
 			type: String,
+			required: [true, 'Event category is required (e.g., Workshop, Competition)'],
 			trim: true,
-			minlength: [2, 'Sponsor must be at least 2 characters'],
-			maxlength: [100, 'Sponsor cannot exceed 100 characters'],
-			default: 'Not Applicable',
 		},
-		posters: [
-			{
-				url: {
-					type: String,
-					validate: {
-						validator: function (v) {
-							return /^https?:\/\/.*\.(png|jpg|jpeg)$/.test(v);
-						},
-						message: 'Poster URL must be a valid image URL',
-					},
-				},
-				publicId: {
-					type: String,
-					unique: true,
-				},
-			},
-		],
+		posters: {
+			type: [posterSchema],
+			validate: [(val) => val.length > 0, 'At least one event poster is required.'],
+		},
 		tags: {
 			type: [String],
-			trim: true,
-		},
-		moreDetails: {
-			type: String,
-			trim: true,
+			default: [],
 		},
 		totalSpots: {
 			type: Number,
 			min: [0, 'Total spots cannot be negative'],
+			default: 0, // Default to unlimited spots
 		},
 		ticketPrice: {
 			type: Number,
 			min: [0, 'Ticket price cannot be negative'],
+			default: 0, // Default to a free event
 		},
-		registrations: {
-			type: [mongoose.Schema.Types.ObjectId],
-			ref: 'Ticket',
-			validate: {
-				validator: function (v) {
-					if (!v || v.length === 0) return true;
-					return v.every((id) => mongoose.Types.ObjectId.isValid(id));
-				},
-				message: (props) => `One or more registration IDs are invalid!`,
+		// This array stores references to User documents, not Tickets.
+		// This is better for quickly checking who has registered.
+		registeredUsers: [
+			{
+				type: mongoose.Schema.Types.ObjectId,
+				ref: 'User',
 			},
-		},
+		],
 		status: {
 			type: String,
 			enum: {
-				values: ['upcoming', 'ongoing', 'completed', 'cancelled'],
-				message: 'Status must be either upcoming, ongoing, completed, or cancelled',
+				values: ['upcoming', 'ongoing', 'completed', 'cancelled', 'postponed'],
+				message:
+					'Status must be one of: upcoming, ongoing, completed, cancelled, postponed',
 			},
 			default: 'upcoming',
 		},
 	},
 	{
 		timestamps: true,
+		toJSON: { virtuals: true }, // Ensure virtuals are included in JSON output
+		toObject: { virtuals: true }, // Ensure virtuals are included in object output
 	}
 );
 
-EventSchema.index({ date: 1, title: 1 });
-// Automatically set status to 'ongoing' if the event date is today or in the future
+// Virtual property to check if the event is free
+EventSchema.virtual('isFree').get(function () {
+	return this.ticketPrice === 0;
+});
+
+// Virtual property to calculate remaining spots
+EventSchema.virtual('spotsLeft').get(function () {
+	if (this.totalSpots === 0) {
+		return Infinity; // Unlimited spots
+	}
+	return Math.max(0, this.totalSpots - this.registeredUsers.length);
+});
+
+// Virtual property to check if the event is full
+EventSchema.virtual('isFull').get(function () {
+	if (this.totalSpots === 0) {
+		return false; // Never full if spots are unlimited
+	}
+	return this.registeredUsers.length >= this.totalSpots;
+});
+
+// Text index for efficient searching on title, description, and tags
+EventSchema.index({ title: 'text', description: 'text', tags: 'text', category: 'text' });
+// Index for common filtering and sorting
+EventSchema.index({ eventDate: 1, status: 1 });
+
+// Pre-save hook to sanitize tags array
 EventSchema.pre('save', function (next) {
-	if (this.isModified('date') && this.date < new Date()) {
-		return next(new Error('Event date must be in the future'));
+	if (this.isModified('tags')) {
+		this.tags = this.tags.map((tag) => tag.trim()).filter((tag) => tag.length > 0);
 	}
 	next();
 });
 
-// Automatically set status to 'completed' if the event date is in the past
-EventSchema.pre('findOneAndUpdate', function (next) {
-	if (this._update.date && this._update.date < new Date()) {
-		this._update.status = 'completed';
-	}
-	next();
-});
+// Add pagination plugin
+EventSchema.plugin(mongoosePaginate);
 
 const Event = mongoose.model('Event', EventSchema);
 
