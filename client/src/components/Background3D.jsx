@@ -376,16 +376,11 @@ const FloatingLogo = ({ breakpoint }) => {
 // Main component
 const Background3D = () => {
 	const theme = useTheme();
-	const { breakpoint, dimensions } = useResponsive();
+	const { breakpoint } = useResponsive();
 
 	const [webglOk, setWebglOk] = useState(true);
-	const [ctxLost, setCtxLost] = useState(false);
-	const [ready, setReady] = useState(false);
-
 	useEffect(() => {
 		setWebglOk(isWebGLAvailable());
-		const t = setTimeout(() => setReady(true), 500);
-		return () => clearTimeout(t);
 	}, []);
 
 	const cameraConfig = useMemo(() => {
@@ -399,81 +394,31 @@ const Background3D = () => {
 		return configs[breakpoint] || { position: [0, 0, 5], fov: 60 };
 	}, [breakpoint]);
 
-	const baseGradient = `var(--bg-base)`;
-
-	const showFallback = !webglOk || ctxLost;
-	const cssPreviewOpacity = showFallback ? 0.9 : ready ? 0.12 : 0.35;
+	if (!webglOk) {
+		return null; // Render nothing if WebGL is not supported
+	}
 
 	return (
-		<div
-			className="fixed inset-0 -z-10 overflow-hidden"
-			aria-hidden="true"
-			style={{ background: baseGradient }}
-		>
-			{/* Enhanced CSS preview grid with better visibility */}
-			<div
-				className="absolute inset-0 pointer-events-none transition-opacity duration-500 ease-out"
-				style={{ opacity: cssPreviewOpacity }}
-			>
-				<div
-					className="absolute bottom-0 left-0 right-0 pointer-events-none animate-grid-flow"
-					style={{
-						height: '55%',
-						backgroundImage: `
-                            linear-gradient(to right, ${
-								theme === 'light'
-									? 'rgba(203,213,225,0.35)' // Increased from 0.18
-									: 'rgba(71,85,105,0.4)' // Increased from 0.20
-							} 1.8px, transparent 1.8px),
-                            linear-gradient(to bottom, ${
-								theme === 'light' ? 'rgba(203,213,225,0.35)' : 'rgba(71,85,105,0.4)'
-							} 1.8px, transparent 1.8px)
-                        `,
-						backgroundSize: '24px 24px',
-						transform: 'perspective(600px) rotateX(45deg)',
-						transformOrigin: 'bottom center',
-						maskImage: 'linear-gradient(to top, black 45%, transparent 100%)',
-						WebkitMaskImage: 'linear-gradient(to top, black 45%, transparent 100%)',
-					}}
-				/>
-			</div>
-
+		<div className="fixed inset-0 -z-10 overflow-hidden" aria-hidden="true">
 			{/* WebGL scene with 3D perspective */}
-			{!showFallback && (
-				<Canvas
-					camera={cameraConfig}
-					style={{ position: 'absolute', inset: 0 }}
-					gl={{
-						antialias: true,
-						alpha: true,
-						powerPreference: 'high-performance',
-					}}
-					dpr={[1, Math.min(2, window.devicePixelRatio || 2)]}
-					onCreated={({ gl }) => {
-						gl.setClearColor(0x000000, 0);
-						gl.outputColorSpace = THREE.SRGBColorSpace;
-						requestAnimationFrame(() => setReady(true));
-
-						const el = gl.domElement;
-						const onLost = (e) => {
-							e.preventDefault();
-							setCtxLost(true);
-						};
-						const onRestored = () => setCtxLost(false);
-						el.addEventListener('webglcontextlost', onLost, { passive: false });
-						el.addEventListener('webglcontextrestored', onRestored, { passive: true });
-						return () => {
-							el.removeEventListener('webglcontextlost', onLost);
-							el.removeEventListener('webglcontextrestored', onRestored);
-						};
-					}}
-				>
-					<Grid theme={theme} breakpoint={breakpoint} dimensions={dimensions} />
-					<Suspense fallback={null}>
-						<FloatingLogo breakpoint={breakpoint} />
-					</Suspense>
-				</Canvas>
-			)}
+			<Canvas
+				camera={cameraConfig}
+				gl={{
+					antialias: true,
+					alpha: true,
+					powerPreference: 'high-performance',
+				}}
+				dpr={[1, Math.min(2, window.devicePixelRatio || 2)]}
+				onCreated={({ gl }) => {
+					gl.setClearColor(0x000000, 0);
+					gl.outputColorSpace = THREE.SRGBColorSpace;
+				}}
+			>
+				<Grid theme={theme} breakpoint={breakpoint} />
+				<Suspense fallback={null}>
+					<FloatingLogo breakpoint={breakpoint} />
+				</Suspense>
+			</Canvas>
 		</div>
 	);
 };
