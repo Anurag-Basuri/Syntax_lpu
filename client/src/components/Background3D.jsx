@@ -81,8 +81,9 @@ const Grid = ({ theme, breakpoint, dimensions }) => {
 	const uniforms = useMemo(() => {
 		const isLight = theme === 'light';
 
-		const minorHex = isLight ? '#e2e8f0' : '#334155';
-		const majorHex = isLight ? '#cbd5e1' : '#475569';
+		// Much brighter colors for visibility
+		const minorHex = isLight ? '#94a3b8' : '#64748b'; // slate-400 / slate-500
+		const majorHex = isLight ? '#64748b' : '#94a3b8'; // slate-500 / slate-400
 		const accentHex = readCssVar('--accent-1');
 
 		const gridSizes = {
@@ -93,17 +94,7 @@ const Grid = ({ theme, breakpoint, dimensions }) => {
 			'desktop-lg': 26.0,
 		};
 
-		// Widen the visible band so it enters the viewport
-		const gridHeight = {
-			mobile: 0.6,
-			'tablet-sm': 0.56,
-			tablet: 0.54,
-			desktop: 0.5,
-			'desktop-lg': 0.48,
-		};
-
 		const gridSize = gridSizes[breakpoint] || 24.0;
-		const heightFactor = gridHeight[breakpoint] || 0.5;
 
 		return {
 			uTime: { value: 0 },
@@ -112,22 +103,21 @@ const Grid = ({ theme, breakpoint, dimensions }) => {
 			uAccentColor: { value: new THREE.Color(accentHex) },
 			uMinorSize: { value: gridSize },
 			uMajorEvery: { value: 5.0 },
-			// Slightly wider lines for visibility
-			uMinorWidth: { value: 0.015 },
-			uMajorWidth: { value: 0.03 },
+			// Wider lines for better visibility
+			uMinorWidth: { value: 0.025 },
+			uMajorWidth: { value: 0.045 },
 			uFadeNear: { value: 0.1 },
-			uFadeFar: { value: 0.9 },
-			uMinorAlpha: { value: isLight ? 0.22 : 0.28 },
-			uMajorAlpha: { value: isLight ? 0.38 : 0.46 },
-			uAccentAlpha: { value: isLight ? 0.06 : 0.09 },
+			uFadeFar: { value: 0.95 },
+			// Higher alpha values for visibility
+			uMinorAlpha: { value: isLight ? 0.45 : 0.55 },
+			uMajorAlpha: { value: isLight ? 0.65 : 0.75 },
+			uAccentAlpha: { value: isLight ? 0.15 : 0.2 },
 			uSpeed: { value: prefersReduced ? 0.0 : 0.012 },
 			uClothFreq: { value: 1.8 },
 			uClothAmp: { value: 0.04 },
 			uWaveAmp: { value: breakpoint === 'mobile' ? 0.15 : 0.25 },
 			uWaveFreq: { value: 0.12 },
 			uWaveSpeed: { value: prefersReduced ? 0.0 : 0.25 },
-			uHeightFactor: { value: heightFactor },
-			uAspectRatio: { value: dimensions.width / dimensions.height },
 		};
 	}, [theme, prefersReduced, breakpoint, dimensions]);
 
@@ -138,9 +128,9 @@ const Grid = ({ theme, breakpoint, dimensions }) => {
 	});
 
 	return (
-		// Raise the grid plane so the masked band is in view
-		<mesh ref={meshRef} position={[0, -8, -15]} renderOrder={-2}>
-			<planeGeometry args={[140, 60, 320, 160]} />
+		// FIXED: Moved closer to camera and positioned lower in viewport
+		<mesh ref={meshRef} position={[0, -4, -8]} renderOrder={-2}>
+			<planeGeometry args={[100, 80, 256, 128]} />
 			<shaderMaterial
 				ref={materialRef}
 				transparent
@@ -161,15 +151,13 @@ const Grid = ({ theme, breakpoint, dimensions }) => {
 
           void main() {
             vUv = uv;
-
-            // Keep geometry centered; no extra Y offset
             vec3 pos = position;
 
             // Cloth-like texture displacement
             float cloth = sin(pos.x * uClothFreq + uTime * uSpeed) *
                           cos(pos.y * uClothFreq * 1.2 + uTime * uSpeed * 0.8) * uClothAmp;
 
-            // Subtle wavy motion
+            // Wavy motion
             float wave1 = sin(pos.x * uWaveFreq + uTime * uWaveSpeed) * uWaveAmp;
             float wave2 = cos(pos.y * uWaveFreq * 0.7 + uTime * uWaveSpeed * 1.1) * uWaveAmp * 0.4;
 
@@ -195,7 +183,6 @@ const Grid = ({ theme, breakpoint, dimensions }) => {
           uniform float uMinorAlpha;
           uniform float uMajorAlpha;
           uniform float uAccentAlpha;
-          uniform float uHeightFactor;
 
           varying vec2 vUv;
           varying vec3 vPosition;
@@ -204,30 +191,31 @@ const Grid = ({ theme, breakpoint, dimensions }) => {
           void main() {
             vec2 coord = vPosition.xy;
 
-            // Grid lines
-            vec2 g = abs(fract(coord / uMinorSize - 0.5) - 0.5) * 2.0;
-            float minor = smoothstep(0.0, 1.0, 1.0 - min(g.x, g.y) / uMinorWidth);
+            // Grid lines with better anti-aliasing
+            vec2 g = abs(fract(coord / uMinorSize - 0.5) - 0.5) / fwidth(coord / uMinorSize);
+            float minor = 1.0 - min(min(g.x, g.y) * uMinorWidth, 1.0);
 
-            vec2 G = abs(fract((coord / (uMinorSize * uMajorEvery)) - 0.5) - 0.5) * 2.0;
-            float major = smoothstep(0.0, 1.0, 1.0 - min(G.x, G.y) / uMajorWidth);
+            vec2 G = abs(fract((coord / (uMinorSize * uMajorEvery)) - 0.5) - 0.5) / fwidth(coord / (uMinorSize * uMajorEvery));
+            float major = 1.0 - min(min(G.x, G.y) * uMajorWidth, 1.0);
 
-            // Elevation-based accent
+            // Elevation-based accent glow
             float accentGlow = smoothstep(-0.2, 0.2, vElevation) * uAccentAlpha;
 
-            vec3 minorTint = mix(uMinorColor, uAccentColor, accentGlow * 0.3);
-            vec3 majorTint = mix(uMajorColor, uAccentColor, accentGlow * 0.4);
+            vec3 minorTint = mix(uMinorColor, uAccentColor, accentGlow * 0.4);
+            vec3 majorTint = mix(uMajorColor, uAccentColor, accentGlow * 0.6);
 
             vec3 color = minorTint * minor * uMinorAlpha + majorTint * major * uMajorAlpha;
-            float alpha = (minor * uMinorAlpha + major * uMajorAlpha + accentGlow * 0.2);
+            float alpha = (minor * uMinorAlpha + major * uMajorAlpha + accentGlow * 0.3);
 
-            // Bottom-only mask (wider band so it reaches viewport)
-            float verticalMask = 1.0 - smoothstep(uHeightFactor - 0.1, uHeightFactor + 0.1, vUv.y);
-            alpha *= verticalMask;
+            // REMOVED vertical mask - grid visible across entire plane
+            // Simple radial fade from center
+            float distFromCenter = length(vUv - 0.5) * 1.6;
+            float fade = 1.0 - smoothstep(uFadeNear, uFadeFar, distFromCenter);
+            
+            alpha *= fade;
+            alpha *= 0.95 + vElevation * 0.05;
 
-            // Subtle depth enhancement
-            alpha *= 0.98 + vElevation * 0.02;
-
-            if (alpha <= 0.0001) discard;
+            if (alpha <= 0.01) discard;
             gl_FragColor = vec4(color, alpha);
           }
         `}
@@ -549,13 +537,11 @@ const Background3D = () => {
 		return configs[breakpoint] || { position: [0, 0, 5], fov: 60 };
 	}, [breakpoint]);
 
-	const baseGradient =
-		// Cleaner theme-driven background
-		`radial-gradient(ellipse 120% 70% at 50% -12%, var(--bg-soft) 0%, var(--bg-base) 72%)`;
+	const baseGradient = `radial-gradient(ellipse 120% 70% at 50% -12%, var(--bg-soft) 0%, var(--bg-base) 72%)`;
 
 	const showFallback = !webglOk || ctxLost;
-	// Lighter CSS preview so WebGL graphics are fully visible
-	const cssPreviewOpacity = showFallback ? 0.9 : ready ? 0.08 : 0.35;
+	// Much lighter CSS preview
+	const cssPreviewOpacity = showFallback ? 0.9 : ready ? 0.15 : 0.4;
 
 	return (
 		<div
@@ -563,32 +549,32 @@ const Background3D = () => {
 			aria-hidden="true"
 			style={{ background: baseGradient }}
 		>
-			{/* Clean CSS preview with bottom-only grid */}
+			{/* Enhanced CSS preview grid - visible across more of viewport */}
 			<div
 				className="absolute inset-0 pointer-events-none transition-opacity duration-500 ease-out"
 				style={{ opacity: cssPreviewOpacity }}
 			>
-				{/* Removed extra glow layers for a cleaner base */}
 				<div
-					className="absolute bottom-0 left-0 right-0 pointer-events-none animate-grid-flow"
+					className="absolute inset-0 pointer-events-none animate-grid-flow"
 					style={{
-						height: '42%',
 						backgroundImage: `
                             linear-gradient(to right, ${
 								theme === 'light'
-									? 'rgba(148,163,184,0.10)'
-									: 'rgba(71,85,105,0.12)'
-							} 1px, transparent 1px),
+									? 'rgba(148,163,184,0.18)'
+									: 'rgba(100,116,139,0.20)'
+							} 1.5px, transparent 1.5px),
                             linear-gradient(to bottom, ${
 								theme === 'light'
-									? 'rgba(148,163,184,0.10)'
-									: 'rgba(71,85,105,0.12)'
-							} 1px, transparent 1px)
+									? 'rgba(148,163,184,0.18)'
+									: 'rgba(100,116,139,0.20)'
+							} 1.5px, transparent 1.5px)
                         `,
-						backgroundSize: '28px 28px',
-						// Gentle fade at the top of the preview grid
-						maskImage: 'linear-gradient(to top, black 75%, transparent 100%)',
-						WebkitMaskImage: 'linear-gradient(to top, black 75%, transparent 100%)',
+						backgroundSize: '24px 24px',
+						// Radial fade instead of bottom-only
+						maskImage:
+							'radial-gradient(ellipse 85% 70% at 50% 50%, black 25%, transparent 90%)',
+						WebkitMaskImage:
+							'radial-gradient(ellipse 85% 70% at 50% 50%, black 25%, transparent 90%)',
 					}}
 				/>
 			</div>
@@ -630,7 +616,6 @@ const Background3D = () => {
 						};
 					}}
 				>
-					{/* Keep subtle ambient glows + bottom grid under the logo */}
 					<Glows theme={theme} />
 					<Grid theme={theme} breakpoint={breakpoint} dimensions={dimensions} />
 					<Suspense fallback={null}>
