@@ -68,18 +68,16 @@ const isWebGLAvailable = () => {
 
 // --- R3F Scene Components ---
 
-// Grid with 3D perspective view and water waves
+// Grid with 3D perspective view and new wavy effect
 const Grid = ({ theme, breakpoint }) => {
 	const meshRef = useRef();
-	const fillMatRef = useRef();
-	const wireMatRef = useRef();
+	const wireMatRef = useRef(); // Only wireframe material now
 
 	const prefersReduced = useMemo(() => {
 		if (typeof window === 'undefined' || !window.matchMedia) return false;
 		return window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 	}, []);
 
-	// grid / geometry density driven by a single "uniform size" concept
 	const gridSize = useMemo(() => {
 		const map = {
 			mobile: 12.0,
@@ -91,82 +89,75 @@ const Grid = ({ theme, breakpoint }) => {
 		return map[breakpoint] || 20.0;
 	}, [breakpoint]);
 
-	// segments must be integers; use gridSize to derive a uniform mesh density
 	const segs = Math.max(8, Math.floor(gridSize * 1.5));
 	const segsY = Math.max(6, Math.floor(gridSize));
 
-	// cloth / wave uniforms
 	const uniforms = useMemo(
 		() => ({
 			uTime: { value: 0 },
-			uWaveAmplitude: { value: breakpoint === 'mobile' ? 0.35 : 0.55 },
+			uWaveAmplitude: { value: breakpoint === 'mobile' ? 0.45 : 0.65 },
 			uWaveFrequency: { value: 0.09 },
 			uWaveSpeed: { value: prefersReduced ? 0.0 : 0.45 },
-			uClothColor: { value: new THREE.Color(theme === 'light' ? '#f1f5f9' : '#0f1724') },
-			uAccent: { value: new THREE.Color(readCssVar('--accent-1')) },
 			uDepthFade: { value: 0.95 },
-			uWireOpacity: { value: theme === 'light' ? 0.12 : 0.18 },
+			// **CHANGE:** Increased wire opacity significantly
+			uWireOpacity: { value: theme === 'light' ? 0.4 : 0.6 },
 			uWireColor: { value: new THREE.Color(theme === 'light' ? '#cbd5e1' : '#334155') },
+			// **NEW:** Accent color for the glow effect
+			uAccent: { value: new THREE.Color(readCssVar('--accent-1')) },
 		}),
 		[theme, prefersReduced, breakpoint]
 	);
 
-	// animate time
 	useFrame((state) => {
 		const t = state.clock.elapsedTime;
-		if (fillMatRef.current) fillMatRef.current.uniforms.uTime.value = t;
 		if (wireMatRef.current) wireMatRef.current.uniforms.uTime.value = t;
 	});
 
-	// Shared vertex shader for both fill and wireframe to ensure they match
 	const vertexShader = `
-		uniform float uTime;
-		uniform float uWaveAmplitude;
-		uniform float uWaveFrequency;
-		uniform float uWaveSpeed;
+        uniform float uTime;
+        uniform float uWaveAmplitude;
+        uniform float uWaveFrequency;
+        uniform float uWaveSpeed;
 
-		varying vec2 vUv;
-		varying float vElevation;
-		varying float vDepth;
+        varying vec2 vUv;
+        varying float vElevation;
+        varying float vDepth;
 
-		// small analytic noise (cheap)
-		float hash(vec2 p) {
-			return fract(sin(dot(p, vec2(127.1,311.7))) * 43758.5453123);
-		}
-		float noise(vec2 p){
-			vec2 i = floor(p);
-			vec2 f = fract(p);
-			f = f*f*(3.0-2.0*f);
-			float a = hash(i);
-			float b = hash(i+vec2(1.0,0.0));
-			float c = hash(i+vec2(0.0,1.0));
-			float d = hash(i+vec2(1.0,1.0));
-			return mix(mix(a,b,f.x), mix(c,d,f.x), f.y);
-		}
+        float hash(vec2 p) {
+            return fract(sin(dot(p, vec2(127.1,311.7))) * 43758.5453123);
+        }
+        float noise(vec2 p){
+            vec2 i = floor(p);
+            vec2 f = fract(p);
+            f = f*f*(3.0-2.0*f);
+            float a = hash(i);
+            float b = hash(i+vec2(1.0,0.0));
+            float c = hash(i+vec2(0.0,1.0));
+            float d = hash(i+vec2(1.0,1.0));
+            return mix(mix(a,b,f.x), mix(c,d,f.x), f.y);
+        }
 
-		void main(){
-			vUv = uv;
-			vec3 pos = position;
+        void main(){
+            vUv = uv;
+            vec3 pos = position;
 
-			// rolling waves + small high-frequency cloth ripples
-			float wave = sin(pos.x * uWaveFrequency + uTime * uWaveSpeed) *
-						 cos(pos.y * uWaveFrequency * 0.75 + uTime * uWaveSpeed * 0.9) * uWaveAmplitude;
-			float small = sin(pos.x * uWaveFrequency * 3.2 + uTime * uWaveSpeed * 1.8) * 0.12;
-			float n = (noise((pos.xy) * 0.08 + uTime * 0.03) - 0.5) * 0.18;
+            float wave = sin(pos.x * uWaveFrequency + uTime * uWaveSpeed) *
+                         cos(pos.y * uWaveFrequency * 0.75 + uTime * uWaveSpeed * 0.9) * uWaveAmplitude;
+            float small = sin(pos.x * uWaveFrequency * 3.2 + uTime * uWaveSpeed * 1.8) * 0.12;
+            float n = (noise((pos.xy) * 0.08 + uTime * 0.03) - 0.5) * 0.18;
 
-			float elevation = wave + small + n;
+            float elevation = wave + small + n;
 
-			// gentle distance attenuation so far cloth lies flatter
-			vDepth = (pos.y + 40.0) / 80.0;
-			elevation *= smoothstep(0.0, 0.9, 1.0 - vDepth);
+            vDepth = (pos.y + 40.0) / 80.0;
+            elevation *= smoothstep(0.0, 0.9, 1.0 - vDepth);
 
-			pos.z += elevation;
+            pos.z += elevation;
 
-			vElevation = elevation;
+            vElevation = elevation;
 
-			gl_Position = projectionMatrix * modelViewMatrix * vec4(pos, 1.0);
-		}
-	`;
+            gl_Position = projectionMatrix * modelViewMatrix * vec4(pos, 1.0);
+        }
+    `;
 
 	return (
 		<group
@@ -174,50 +165,6 @@ const Grid = ({ theme, breakpoint }) => {
 			position={[0, -10, -12]}
 			rotation={[THREE.MathUtils.degToRad(-12), 0, 0]}
 		>
-			{/* fill mesh: displaced vertices produce cloth look */}
-			<mesh renderOrder={-1}>
-				<planeGeometry args={[120, 80, segs, segsY]} />
-				<shaderMaterial
-					ref={fillMatRef}
-					uniforms={uniforms}
-					transparent={true}
-					depthWrite={false}
-					side={THREE.DoubleSide}
-					vertexShader={vertexShader}
-					fragmentShader={`
-                        uniform vec3 uClothColor;
-                        uniform vec3 uAccent;
-                        uniform float uDepthFade;
-
-                        varying vec2 vUv;
-                        varying float vElevation; 
-                        varying float vDepth;
-
-                        void main(){
-                            // base cloth tint
-                            vec3 base = uClothColor;
-
-                            // subtle highlight based on elevation
-                            float h = smoothstep(0.06, 0.35, vElevation);
-                            vec3 color = mix(base, uAccent, h * 0.25);
-
-                            // simulate soft shadow in troughs
-                            float shadow = smoothstep(-0.25, -0.04, vElevation) * 0.18;
-                            color *= 1.0 - shadow;
-
-                            // vignette/fade by depth
-                            float depthFade = smoothstep(0.0, uDepthFade, 1.0 - vDepth);
-                            
-                            float alpha = 0.9 * depthFade; // Only using depthFade
-
-                            if (alpha <= 0.01) discard;
-                            gl_FragColor = vec4(color, alpha);
-                        }
-                    `}
-				/>
-			</mesh>
-
-			{/* wire overlay: uses the same vertex shader to match the displacement */}
 			<mesh renderOrder={0}>
 				<planeGeometry args={[120, 80, segs, segsY]} />
 				<shaderMaterial
@@ -232,17 +179,27 @@ const Grid = ({ theme, breakpoint }) => {
                         uniform vec3 uWireColor;
                         uniform float uWireOpacity;
                         uniform float uDepthFade;
+                        uniform vec3 uAccent; // **NEW** Accent color for glow
+                        uniform float uTime; // **NEW** For pulsing glow
                         
                         varying vec2 vUv;
                         varying float vDepth;
+                        varying float vElevation; // **NEW** To base glow on elevation
                         
                         void main(){
                             float depthFade = smoothstep(0.0, uDepthFade, 1.0 - vDepth);
                             
-                            float alpha = uWireOpacity * depthFade; // Only using depthFade
+                            // **CHANGE:** New dynamic glow effect based on elevation and time
+                            float glowFactor = smoothstep(0.0, 0.4, abs(vElevation)) * 0.5; // Glows more on higher elevation
+                            glowFactor += sin(uTime * 3.0 + vUv.x * 5.0) * 0.2 + 0.3; // Pulsing effect
+                            glowFactor = clamp(glowFactor, 0.0, 1.0);
+
+                            vec3 finalColor = mix(uWireColor, uAccent, glowFactor);
+                            
+                            float alpha = uWireOpacity * depthFade * (0.8 + glowFactor * 0.2); // Opacity also affected by glow
                             
                             if (alpha <= 0.01) discard;
-                            gl_FragColor = vec4(uWireColor, alpha);
+                            gl_FragColor = vec4(finalColor, alpha);
                         }
                     `}
 				/>
@@ -251,10 +208,10 @@ const Grid = ({ theme, breakpoint }) => {
 	);
 };
 
-// Clean logo
+// Clean logo (no 3D animation)
 const FloatingLogo = ({ breakpoint }) => {
 	const base = useRef();
-	const anim = useRef();
+	// const anim = useRef(); // Removed anim ref as no 3D effect
 	const texture = useTexture(logo);
 
 	useEffect(() => {
@@ -298,14 +255,23 @@ const FloatingLogo = ({ breakpoint }) => {
 		if (base.current) base.current.scale.set(scaleXY[0], scaleXY[1], 1);
 	}, [scaleXY]);
 
+	// **CHANGE:** Removed 3D animation from the logo
+	// useFrame((state) => {
+	//     const t = state.clock.elapsedTime;
+	//     if (anim.current) {
+	//         anim.current.position.y = Math.sin(t * 0.8) * 0.15;
+	//         anim.current.rotation.y = Math.cos(t * 0.5) * 0.05;
+	//         anim.current.rotation.x = Math.sin(t * 0.4) * 0.02;
+	//     }
+	// });
+
 	return (
 		<group ref={base} position={[0, 0, 0]} renderOrder={-1}>
-			<group ref={anim}>
-				<mesh position={[0, 0, targetZ]}>
-					<planeGeometry args={[1, 1]} />
-					<meshBasicMaterial map={texture} transparent depthWrite={false} />
-				</mesh>
-			</group>
+			{/* **CHANGE:** Direct mesh, no extra animation group */}
+			<mesh position={[0, 0, targetZ]}>
+				<planeGeometry args={[1, 1]} />
+				<meshBasicMaterial map={texture} transparent depthWrite={false} />
+			</mesh>
 		</group>
 	);
 };
