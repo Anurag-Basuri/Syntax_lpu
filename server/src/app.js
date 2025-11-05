@@ -8,7 +8,6 @@ import mongoSanitize from 'express-mongo-sanitize';
 // --- Custom Middlewares & Utils ---
 import { initRateLimiter, rateLimiter } from './middlewares/rateLimit.middleware.js';
 import { applyCors } from './middlewares/cors.middleware.js';
-import { InitializeCloudinary } from './utils/cloudinary.js';
 import { ApiError } from './utils/ApiError.js';
 
 // --- Route Imports ---
@@ -29,9 +28,6 @@ const app = express();
 colors.enable();
 
 // --- Service Initializations ---
-InitializeCloudinary();
-console.log('☁️  Cloudinary Initialized'.cyan);
-
 if (process.env.REDIS_URL) {
 	try {
 		await initRateLimiter();

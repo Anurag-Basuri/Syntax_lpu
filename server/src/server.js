@@ -1,6 +1,7 @@
 import dotenv from 'dotenv';
 import colors from 'colors';
 import connectDB, { gracefulShutdown as closeDB } from './database/index.js';
+import { checkCloudinaryConnection } from './utils/cloudinary.js';
 import app from './app.js';
 
 // --- Initialization ---
@@ -8,7 +9,15 @@ dotenv.config();
 colors.enable();
 
 // --- Environment Variable Validation ---
-const requiredEnvVars = ['PORT', 'MONGODB_URI', 'NODE_ENV', 'ACCESS_TOKEN_SECRET'];
+const requiredEnvVars = [
+	'PORT',
+	'MONGODB_URI',
+	'NODE_ENV',
+	'ACCESS_TOKEN_SECRET',
+	'CLOUDINARY_CLOUD_NAME',
+	'CLOUDINARY_API_KEY',
+	'CLOUDINARY_API_SECRET',
+];
 for (const key of requiredEnvVars) {
 	if (!process.env[key]) {
 		console.error(`❌ Missing required environment variable: ${key}`.red.bold);
@@ -53,10 +62,25 @@ const gracefulShutdown = async (signal, error) => {
 // --- Server Startup ---
 const startServer = async () => {
 	try {
-		// 1. Connect to the database
+		// 1. Connect to the database (critical)
 		await connectDB();
 
-		// 2. Start the Express server
+		// 2. Check Cloudinary connection (non-critical)
+		try {
+			await checkCloudinaryConnection();
+			console.log('☁️  Cloudinary connection verified.'.cyan.bold);
+		} catch (cloudinaryErr) {
+			console.warn('\n----------------------------------------------------'.yellow);
+			console.warn('⚠️  Cloudinary Connection Failed!'.yellow.bold);
+			console.warn(`   Reason: ${cloudinaryErr.message}`.grey);
+			console.warn(
+				"\n   The server will run, but it's flying without its cloud. \n   All file upload and delete operations will be grounded."
+					.yellow
+			);
+			console.warn('----------------------------------------------------\n'.yellow);
+		}
+
+		// 3. Start the Express server
 		server = app.listen(PORT, () => {
 			console.log(
 				`🚀 Server is running in ${process.env.NODE_ENV.cyan} mode at http://localhost:${PORT}`
