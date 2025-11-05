@@ -71,242 +71,204 @@ const isWebGLAvailable = () => {
 // Grid with 3D perspective view and water waves
 const Grid = ({ theme, breakpoint }) => {
 	const meshRef = useRef();
-	const materialRef = useRef();
+	const fillMatRef = useRef();
+	const wireMatRef = useRef();
 
 	const prefersReduced = useMemo(() => {
 		if (typeof window === 'undefined' || !window.matchMedia) return false;
 		return window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 	}, []);
 
-	const uniforms = useMemo(() => {
-		const isLight = theme === 'light';
-
-		// Enhanced colors with better contrast
-		const minorHex = isLight ? '#cbd5e1' : '#475569'; // Slate-300 / Slate-600
-		const majorHex = isLight ? '#94a3b8' : '#64748b'; // Slate-400 / Slate-500
-		const accentHex = readCssVar('--accent-1');
-
-		const gridSizes = {
-			mobile: 18.0,
-			'tablet-sm': 20.0,
-			tablet: 22.0,
+	// grid / geometry density driven by a single "uniform size" concept
+	const gridSize = useMemo(() => {
+		const map = {
+			mobile: 12.0,
+			'tablet-sm': 16.0,
+			tablet: 20.0,
 			desktop: 24.0,
-			'desktop-lg': 26.0,
+			'desktop-lg': 28.0,
 		};
+		return map[breakpoint] || 20.0;
+	}, [breakpoint]);
 
-		const gridSize = gridSizes[breakpoint] || 24.0;
+	// segments must be integers; use gridSize to derive a uniform mesh density
+	const segs = Math.max(8, Math.floor(gridSize * 1.5));
+	const segsY = Math.max(6, Math.floor(gridSize));
 
-		return {
+	// cloth / wave uniforms
+	const uniforms = useMemo(
+		() => ({
 			uTime: { value: 0 },
-			uMinorColor: { value: new THREE.Color(minorHex) },
-			uMajorColor: { value: new THREE.Color(majorHex) },
-			uAccentColor: { value: new THREE.Color(accentHex) },
-			uMinorSize: { value: gridSize },
-			uMajorEvery: { value: 5.0 },
-			// Increased line width for better visibility
-			uMinorWidth: { value: 0.03 },
-			uMajorWidth: { value: 0.055 },
-			uFadeNear: { value: 0.1 },
-			uFadeFar: { value: 0.95 },
-			// Increased alpha for better visibility
-			uMinorAlpha: { value: isLight ? 0.55 : 0.65 },
-			uMajorAlpha: { value: isLight ? 0.75 : 0.85 },
-			uAccentAlpha: { value: isLight ? 0.2 : 0.25 },
-			uSpeed: { value: prefersReduced ? 0.0 : 0.3 },
-			// Water wave parameters
-			uWaveSpeed: { value: prefersReduced ? 0.0 : 0.4 },
 			uWaveAmplitude: { value: breakpoint === 'mobile' ? 0.35 : 0.55 },
-			uWaveFrequency: { value: 0.08 },
-			uRippleSpeed: { value: prefersReduced ? 0.0 : 0.6 },
-			uRippleAmplitude: { value: 0.18 },
-			uRippleFrequency: { value: 0.14 },
-		};
-	}, [theme, prefersReduced, breakpoint]);
+			uWaveFrequency: { value: 0.09 },
+			uWaveSpeed: { value: prefersReduced ? 0.0 : 0.45 },
+			uClothColor: { value: new THREE.Color(theme === 'light' ? '#f1f5f9' : '#0f1724') },
+			uAccent: { value: new THREE.Color(readCssVar('--accent-1')) },
+			uDepthFade: { value: 0.95 },
+			uWireOpacity: { value: theme === 'light' ? 0.12 : 0.18 },
+			uWireColor: { value: new THREE.Color(theme === 'light' ? '#cbd5e1' : '#334155') },
+		}),
+		[theme, prefersReduced, breakpoint]
+	);
 
+	// animate time and subtle rotation
 	useFrame((state) => {
-		if (materialRef.current) {
-			materialRef.current.uniforms.uTime.value = state.clock.elapsedTime;
-		}
+		const t = state.clock.elapsedTime;
+		if (fillMatRef.current) fillMatRef.current.uniforms.uTime.value = t;
+		if (wireMatRef.current) wireMatRef.current.uniforms.uTime.value = t;
 
-		// Add subtle 3D rotation based on mouse movement
+		// subtle 3D tilt based on pointer unless reduced motion requested
 		if (meshRef.current && !prefersReduced) {
 			const { pointer } = state;
-			const targetRotX = THREE.MathUtils.degToRad(-15 + pointer.y * 5);
-			const targetRotY = THREE.MathUtils.degToRad(pointer.x * 8);
-
+			const targetX = THREE.MathUtils.degToRad(-10 + pointer.y * 4);
+			const targetY = THREE.MathUtils.degToRad(pointer.x * 6);
 			meshRef.current.rotation.x = THREE.MathUtils.damp(
 				meshRef.current.rotation.x,
-				targetRotX,
-				4,
+				targetX,
+				3,
 				0.016
 			);
 			meshRef.current.rotation.y = THREE.MathUtils.damp(
 				meshRef.current.rotation.y,
-				targetRotY,
-				4,
+				targetY,
+				3,
 				0.016
 			);
 		}
 	});
 
-	return (
-		<mesh
-			ref={meshRef}
-			position={[0, -12, -15]}
-			rotation={[THREE.MathUtils.degToRad(-15), 0, 0]}
-			renderOrder={-2}
-		>
-			<planeGeometry args={[120, 80, 320, 240]} />
-			<shaderMaterial
-				ref={materialRef}
-				transparent
-				depthWrite={false}
-				uniforms={uniforms}
-				vertexShader={`
-          uniform float uTime;
-          uniform float uSpeed;
-          uniform float uWaveSpeed;
-          uniform float uWaveAmplitude;
-          uniform float uWaveFrequency;
-          uniform float uRippleSpeed;
-          uniform float uRippleAmplitude;
-          uniform float uRippleFrequency;
+	// Shared vertex shader for both fill and wireframe to ensure they match
+	const vertexShader = `
+        uniform float uTime;
+        uniform float uWaveAmplitude;
+        uniform float uWaveFrequency;
+        uniform float uWaveSpeed;
 
-          varying vec2 vUv;
-          varying vec3 vPosition;
-          varying float vElevation;
-          varying float vDepth;
+        varying vec2 vUv;
+        varying float vElevation;
+        varying float vDepth;
 
-          // Improved noise function for natural waves
-          float hash(vec2 p) {
-            return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453);
-          }
-
-          float noise(vec2 p) {
+        // small analytic noise (cheap)
+        float hash(vec2 p) {
+            return fract(sin(dot(p, vec2(127.1,311.7))) * 43758.5453123);
+        }
+        float noise(vec2 p){
             vec2 i = floor(p);
             vec2 f = fract(p);
-            f = f * f * (3.0 - 2.0 * f);
+            f = f*f*(3.0-2.0*f);
             float a = hash(i);
-            float b = hash(i + vec2(1.0, 0.0));
-            float c = hash(i + vec2(0.0, 1.0));
-            float d = hash(i + vec2(1.0, 1.0));
-            return mix(mix(a, b, f.x), mix(c, d, f.x), f.y);
-          }
+            float b = hash(i+vec2(1.0,0.0));
+            float c = hash(i+vec2(0.0,1.0));
+            float d = hash(i+vec2(1.0,1.0));
+            return mix(mix(a,b,f.x), mix(c,d,f.x), f.y);
+        }
 
-          void main() {
+        void main(){
             vUv = uv;
             vec3 pos = position;
 
-            // Primary wave - large rolling ocean swells
-            float wave1 = sin(pos.x * uWaveFrequency + uTime * uWaveSpeed) * 
-                         cos(pos.y * uWaveFrequency * 0.7 + uTime * uWaveSpeed * 0.8) * 
-                         uWaveAmplitude;
+            // rolling waves + small high-frequency cloth ripples
+            float wave = sin(pos.x * uWaveFrequency + uTime * uWaveSpeed) * 
+                         cos(pos.y * uWaveFrequency * 0.75 + uTime * uWaveSpeed * 0.9) * uWaveAmplitude;
+            float small = sin(pos.x * uWaveFrequency * 3.2 + uTime * uWaveSpeed * 1.8) * 0.12;
+            float n = (noise((pos.xy) * 0.08 + uTime * 0.03) - 0.5) * 0.18;
 
-            // Secondary wave - cross waves for realism
-            float wave2 = sin(pos.x * uWaveFrequency * 1.3 - uTime * uWaveSpeed * 1.2) * 
-                         sin(pos.y * uWaveFrequency * 0.9 + uTime * uWaveSpeed * 0.6) * 
-                         uWaveAmplitude * 0.5;
+            float elevation = wave + small + n;
 
-            // Ripples - small high-frequency surface detail
-            float ripple1 = sin(pos.x * uRippleFrequency + uTime * uRippleSpeed) * 
-                           cos(pos.y * uRippleFrequency * 1.1 - uTime * uRippleSpeed * 0.9) * 
-                           uRippleAmplitude;
-
-            float ripple2 = sin(pos.y * uRippleFrequency * 1.3 + uTime * uRippleSpeed * 1.1) * 
-                           cos(pos.x * uRippleFrequency * 0.8 - uTime * uRippleSpeed * 0.7) * 
-                           uRippleAmplitude * 0.6;
-
-            // Organic noise for natural variation
-            vec2 noiseCoord = vec2(pos.x * 0.05, pos.y * 0.05) + uTime * 0.05;
-            float organicNoise = (noise(noiseCoord) - 0.5) * 0.25;
-
-            // Combine all wave components
-            float elevation = wave1 + wave2 + ripple1 + ripple2 + organicNoise;
-
-            // Depth-based wave attenuation (calmer in distance)
-            float depthFactor = smoothstep(0.0, 0.6, (pos.y + 40.0) / 80.0);
-            elevation *= depthFactor;
+            // gentle distance attenuation so far cloth lies flatter
+            vDepth = (pos.y + 40.0) / 80.0;
+            elevation *= smoothstep(0.0, 0.9, 1.0 - vDepth);
 
             pos.z += elevation;
 
-            vPosition = pos;
             vElevation = elevation;
-            vDepth = (pos.y + 40.0) / 80.0;
 
             gl_Position = projectionMatrix * modelViewMatrix * vec4(pos, 1.0);
-          }
-        `}
-				fragmentShader={`
-          uniform vec3 uMinorColor;
-          uniform vec3 uMajorColor;
-          uniform vec3 uAccentColor;
-          uniform float uMinorSize;
-          uniform float uMajorEvery;
-          uniform float uMinorWidth;
-          uniform float uMajorWidth;
-          uniform float uFadeNear;
-          uniform float uFadeFar;
-          uniform float uMinorAlpha;
-          uniform float uMajorAlpha;
-          uniform float uAccentAlpha;
+        }
+    `;
 
-          varying vec2 vUv;
-          varying vec3 vPosition;
-          varying float vElevation;
-          varying float vDepth;
+	return (
+		<group
+			ref={meshRef}
+			position={[0, -10, -12]}
+			rotation={[THREE.MathUtils.degToRad(-12), 0, 0]}
+		>
+			{/* fill mesh: displaced vertices produce cloth look */}
+			<mesh renderOrder={-1}>
+				<planeGeometry args={[120, 80, segs, segsY]} />
+				<shaderMaterial
+					ref={fillMatRef}
+					uniforms={uniforms}
+					transparent={true}
+					depthWrite={false}
+					side={THREE.DoubleSide}
+					vertexShader={vertexShader}
+					fragmentShader={`
+                        uniform vec3 uClothColor;
+                        uniform vec3 uAccent;
+                        uniform float uDepthFade;
 
-          void main() {
-            vec2 coord = vPosition.xy;
+                        varying vec2 vUv;
+                        varying float vElevation;
+                        varying float vDepth;
 
-            // Perspective depth fade
-            float depthFade = smoothstep(0.0, 0.4, vDepth);
-            if (depthFade < 0.01) discard;
+                        void main(){
+                            // base cloth tint
+                            vec3 base = uClothColor;
 
-            // Grid lines with anti-aliasing
-            vec2 g = abs(fract(coord / uMinorSize - 0.5) - 0.5) / fwidth(coord / uMinorSize);
-            float minor = 1.0 - min(min(g.x, g.y) * uMinorWidth, 1.0);
+                            // subtle highlight based on elevation
+                            float h = smoothstep(0.06, 0.35, vElevation);
+                            vec3 color = mix(base, uAccent, h * 0.25);
 
-            vec2 G = abs(fract((coord / (uMinorSize * uMajorEvery)) - 0.5) - 0.5) / 
-                     fwidth(coord / (uMinorSize * uMajorEvery));
-            float major = 1.0 - min(min(G.x, G.y) * uMajorWidth, 1.0);
+                            // simulate soft shadow in troughs
+                            float shadow = smoothstep(-0.25, -0.04, vElevation) * 0.18;
+                            color *= 1.0 - shadow;
 
-            // Water-like shimmer on wave peaks
-            float waveHighlight = smoothstep(0.15, 0.5, vElevation) * uAccentAlpha * 2.2;
-            
-            // Darker on wave troughs for depth perception
-            float waveShadow = smoothstep(-0.35, -0.1, vElevation) * 0.18;
+                            // vignette/fade by depth
+                            float fade = smoothstep(0.0, uDepthFade, 1.0 - vDepth);
+                            float alpha = 0.9 * fade;
 
-            vec3 minorTint = mix(uMinorColor, uAccentColor, waveHighlight);
-            vec3 majorTint = mix(uMajorColor, uAccentColor, waveHighlight);
+                            if (alpha <= 0.01) discard;
+                            gl_FragColor = vec4(color, alpha);
+                        }
+                    `}
+				/>
+			</mesh>
 
-            // Apply shadow to colors for realistic depth
-            minorTint = mix(minorTint * 0.68, minorTint, 1.0 - waveShadow);
-            majorTint = mix(majorTint * 0.68, majorTint, 1.0 - waveShadow);
+			{/* wire overlay: uses the same vertex shader to match the displacement */}
+			<mesh renderOrder={0}>
+				<planeGeometry args={[120, 80, segs, segsY]} />
+				<shaderMaterial
+					ref={wireMatRef}
+					uniforms={uniforms}
+					transparent={true}
+					depthWrite={false}
+					wireframe={true}
+					side={THREE.DoubleSide}
+					vertexShader={vertexShader}
+					fragmentShader={`
+                        uniform vec3 uWireColor;
+                        uniform float uWireOpacity;
+                        uniform float uDepthFade;
 
-            vec3 color = minorTint * minor * uMinorAlpha + majorTint * major * uMajorAlpha;
-            float alpha = (minor * uMinorAlpha + major * uMajorAlpha + waveHighlight);
+                        varying float vDepth;
 
-            // Horizontal fade from center
-            float distFromCenter = length(vec2(vUv.x - 0.5, 0.0)) * 2.0;
-            float fade = 1.0 - smoothstep(uFadeNear, uFadeFar, distFromCenter);
+                        void main(){
+                            float fade = smoothstep(0.0, uDepthFade, 1.0 - vDepth);
+                            float alpha = uWireOpacity * fade * fade;
 
-            // Combine all fades
-            alpha *= fade * depthFade;
-            
-            // Dynamic brightness based on elevation (shimmer effect)
-            alpha *= 0.88 + abs(vElevation) * 0.24;
-
-            if (alpha <= 0.01) discard;
-            gl_FragColor = vec4(color, alpha);
-          }
-        `}
-			/>
-		</mesh>
+                            if (alpha <= 0.01) discard;
+                            gl_FragColor = vec4(uWireColor, alpha);
+                        }
+                    `}
+				/>
+			</mesh>
+		</group>
 	);
 };
 
 // Clean logo
-const EnhancedLogo = ({ breakpoint }) => {
+const FloatingLogo = ({ breakpoint }) => {
 	const base = useRef();
 	const anim = useRef();
 	const texture = useTexture(logo);
@@ -495,7 +457,7 @@ const Background3D = () => {
 				>
 					<Grid theme={theme} breakpoint={breakpoint} dimensions={dimensions} />
 					<Suspense fallback={null}>
-						<EnhancedLogo breakpoint={breakpoint} />
+						<FloatingLogo breakpoint={breakpoint} />
 					</Suspense>
 				</Canvas>
 			)}
