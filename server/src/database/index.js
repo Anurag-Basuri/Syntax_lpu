@@ -4,6 +4,9 @@ import colors from 'colors';
 import path from 'path';
 import { fileURLToPath } from 'url';
 
+// Enable colors for console output
+colors.enable();
+
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
@@ -14,7 +17,7 @@ let cachedConnection = null;
 
 const connectDB = async () => {
 	if (cachedConnection) {
-		console.log('✅ Using existing MongoDB connection');
+		console.log('✅ Using existing MongoDB connection'.green);
 		return cachedConnection;
 	}
 
@@ -22,48 +25,58 @@ const connectDB = async () => {
 		const uri = process.env.MONGODB_URI;
 
 		if (!uri) {
-			throw new Error('❌ MongoDB URI is not defined. Check your .env file.');
+			throw new Error('MongoDB URI is not defined. Check your .env file.');
 		}
 
-		console.log('🔌 Connecting to MongoDB...');
+		console.log('🔌 Connecting to MongoDB...'.cyan);
 
 		const options = {
-			bufferCommands: false,
-			maxPoolSize: 10,
-			serverSelectionTimeoutMS: 5000,
-			socketTimeoutMS: 45000,
-			family: 4,
+			bufferCommands: false, // Disable buffering for immediate error feedback
+			maxPoolSize: 10, // Default is 100, adjust as needed
+			serverSelectionTimeoutMS: 5000, // Fail fast if no server is available
+			socketTimeoutMS: 45000, // Close sockets after 45 seconds of inactivity
+			family: 4, // Use IPv4, skip trying IPv6
 		};
 
 		const conn = await mongoose.connect(uri, options);
 
 		cachedConnection = conn;
 
-		console.log(`✅ MongoDB Connected: ${conn.connection.host}`);
+		console.log(`✅ MongoDB Connected: ${conn.connection.host}`.green.bold);
 
-		mongoose.connection.on('error', err => {
-			console.error('❌ MongoDB connection error:', err);
+		mongoose.connection.on('error', (err) => {
+			console.error('❌ MongoDB connection error:'.red, err);
+			cachedConnection = null; // Reset cache on connection error
+		});
+
+		mongoose.connection.on('disconnected', () => {
+			console.log(' MongoDB disconnected.'.yellow);
 			cachedConnection = null;
 		});
 
 		return conn;
 	} catch (error) {
-		console.error(`❌ MongoDB connection failed: ${error.message}`);
-		throw error;
+		console.error(`❌ MongoDB connection failed: ${error.message}`.red.bold);
+		// Exit process with failure code if initial connection fails
+		process.exit(1);
 	}
 };
 
 // Gracefully close the MongoDB connection on termination
-process.on('SIGINT', async () => {
+const gracefulShutdown = async (signal) => {
+	console.log(`Received ${signal}. Closing MongoDB connection...`.yellow);
 	try {
 		await mongoose.connection.close();
-		console.log('🔒 MongoDB connection closed due to app termination');
+		console.log('🔒 MongoDB connection closed successfully.'.yellow.bold);
 		process.exit(0);
 	} catch (err) {
-		console.error('❌ Error during MongoDB disconnection:', err);
+		console.error('❌ Error during MongoDB disconnection:'.red, err);
 		process.exit(1);
 	}
-});
+};
+
+process.on('SIGINT', () => gracefulShutdown('SIGINT'));
+process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
 
 // Helper to check current DB connection status
 export const getConnectionStatus = () => mongoose.connection.readyState;
