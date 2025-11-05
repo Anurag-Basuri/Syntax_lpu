@@ -61,78 +61,195 @@ const isWebGLAvailable = () => {
 
 // Faint, anti-aliased animated grid (Next.js vibe)
 const Grid = ({ theme }) => {
+	const meshRef = useRef();
+
 	const prefersReduced = useMemo(() => {
 		if (typeof window === 'undefined' || !window.matchMedia) return false;
 		return window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 	}, []);
+
 	const uniforms = useMemo(() => {
 		const isLight = theme === 'light';
-		const gridHex = isLight ? '#0f172a' : '#cbd5e1';
+		// Cloth-like colors with higher contrast
+		const minorHex = isLight ? '#64748b' : '#cbd5e1';
+		const majorHex = isLight ? '#334155' : '#e2e8f0';
+
 		return {
 			uTime: { value: 0 },
-			uGridColor: { value: new THREE.Color(gridHex) },
-			uGridSize: { value: 36.0 },
-			uFadeDistance: { value: 0.65 },
-			uFadeSharpness: { value: 0.8 },
-			uAlpha: { value: isLight ? 0.22 : 0.2 },
-			uSpeed: { value: prefersReduced ? 0.0 : 0.01 },
+			uMinorColor: { value: new THREE.Color(minorHex) },
+			uMajorColor: { value: new THREE.Color(majorHex) },
+			uMinorSize: { value: 28.0 },
+			uMajorEvery: { value: 6.0 },
+			uMinorWidth: { value: 0.018 },
+			uMajorWidth: { value: 0.032 },
+			uFadeNear: { value: 0.28 },
+			uFadeFar: { value: 0.9 },
+			uMinorAlpha: { value: isLight ? 0.38 : 0.42 },
+			uMajorAlpha: { value: isLight ? 0.72 : 0.78 },
+			uSpeed: { value: prefersReduced ? 0.0 : 0.018 },
+			// Cloth texture parameters
+			uClothFreq: { value: 0.8 },
+			uClothAmp: { value: 0.15 },
+			// Wave parameters
+			uWaveAmp: { value: 0.35 },
+			uWaveFreq: { value: 0.25 },
+			uWaveSpeed: { value: prefersReduced ? 0.0 : 0.5 },
 		};
 	}, [theme, prefersReduced]);
 
 	useFrame((state) => {
-		uniforms.uTime.value = state.clock.elapsedTime;
+		const { clock, pointer } = state;
+		uniforms.uTime.value = clock.elapsedTime;
+
+		// Smooth 3D parallax tilt with cloth-like sway
+		if (meshRef.current && !prefersReduced) {
+			const targetRotY = THREE.MathUtils.degToRad(5 * (pointer.x || 0));
+			const targetRotZ = THREE.MathUtils.degToRad(3.5 * (pointer.y || 0));
+
+			// Add subtle wave motion for cloth effect
+			const wave = Math.sin(clock.elapsedTime * 0.3) * 0.008;
+
+			meshRef.current.rotation.y = THREE.MathUtils.damp(
+				meshRef.current.rotation.y,
+				targetRotY + wave,
+				3.2,
+				0.016
+			);
+			meshRef.current.rotation.z = THREE.MathUtils.damp(
+				meshRef.current.rotation.z,
+				targetRotZ,
+				3.2,
+				0.016
+			);
+		}
 	});
 
 	return (
-		<mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -10, 0]} renderOrder={-2}>
-			<planeGeometry args={[500, 500, 1, 1]} />
+		<mesh ref={meshRef} rotation={[-Math.PI / 2, 0, 0]} position={[0, -10, 0]} renderOrder={-2}>
+			<planeGeometry args={[1000, 1000, 64, 64]} />
 			<shaderMaterial
 				transparent
-				// Enable OES_standard_derivatives for AA lines (safe in WebGL2; extension in WebGL1)
+				depthWrite={false}
 				extensions={{ derivatives: true }}
 				uniforms={uniforms}
 				vertexShader={`
-          varying vec3 vWorldPosition;
-          void main() {
-            vWorldPosition = (modelMatrix * vec4(position, 1.0)).xyz;
-            gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
-          }
-        `}
+                    uniform float uTime;
+                    uniform float uWaveAmp;
+                    uniform float uWaveFreq;
+                    uniform float uWaveSpeed;
+                    varying vec3 vWorldPosition;
+                    varying vec3 vNormal;
+                    
+                    void main() {
+                        vec3 pos = position;
+                        
+                        // Cloth wave deformation
+                        float wave1 = sin(pos.x * uWaveFreq + uTime * uWaveSpeed) * uWaveAmp;
+                        float wave2 = cos(pos.y * uWaveFreq * 0.8 + uTime * uWaveSpeed * 0.7) * uWaveAmp * 0.6;
+                        pos.z += wave1 + wave2;
+                        
+                        // Calculate normal for lighting
+                        vec3 tangent = vec3(1.0, 0.0, cos(pos.x * uWaveFreq + uTime * uWaveSpeed) * uWaveAmp * uWaveFreq);
+                        vec3 bitangent = vec3(0.0, 1.0, -sin(pos.y * uWaveFreq * 0.8 + uTime * uWaveSpeed * 0.7) * uWaveAmp * 0.6 * uWaveFreq * 0.8);
+                        vNormal = normalize(cross(tangent, bitangent));
+                        
+                        vWorldPosition = (modelMatrix * vec4(pos, 1.0)).xyz;
+                        gl_Position = projectionMatrix * modelViewMatrix * vec4(pos, 1.0);
+                    }
+                `}
 				fragmentShader={`
-          #ifdef GL_OES_standard_derivatives
-          #extension GL_OES_standard_derivatives : enable
-          #endif
-          uniform float uTime;
-          uniform vec3  uGridColor;
-          uniform float uGridSize;
-          uniform float uFadeDistance;
-          uniform float uFadeSharpness;
-          uniform float uAlpha;
-          uniform float uSpeed;
-          varying vec3 vWorldPosition;
+                    #ifdef GL_OES_standard_derivatives
+                    #extension GL_OES_standard_derivatives : enable
+                    #endif
+                    precision mediump float;
+                    
+                    varying vec3 vWorldPosition;
+                    varying vec3 vNormal;
+                    uniform float uTime;
+                    uniform vec3  uMinorColor;
+                    uniform vec3  uMajorColor;
+                    uniform float uMinorSize;
+                    uniform float uMajorEvery;
+                    uniform float uMinorWidth;
+                    uniform float uMajorWidth;
+                    uniform float uFadeNear;
+                    uniform float uFadeFar;
+                    uniform float uMinorAlpha;
+                    uniform float uMajorAlpha;
+                    uniform float uSpeed;
+                    uniform float uClothFreq;
+                    uniform float uClothAmp;
 
-          float aafLine(float v, float width){
-            float dv = fwidth(v);
-            return 1.0 - smoothstep(0.5 - width - dv, 0.5 + width + dv, abs(fract(v) - 0.5));
-          }
+                    // Simple noise for cloth texture
+                    float hash(vec2 p) {
+                        return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453);
+                    }
 
-          void main() {
-            vec2 uv = vWorldPosition.xz / uGridSize;
-            uv.y += uTime * uSpeed;
+                    float noise(vec2 p) {
+                        vec2 i = floor(p);
+                        vec2 f = fract(p);
+                        f = f * f * (3.0 - 2.0 * f);
+                        float a = hash(i);
+                        float b = hash(i + vec2(1.0, 0.0));
+                        float c = hash(i + vec2(0.0, 1.0));
+                        float d = hash(i + vec2(1.0, 1.0));
+                        return mix(mix(a, b, f.x), mix(c, d, f.x), f.y);
+                    }
 
-            float gx = aafLine(uv.x, 0.015);
-            float gy = aafLine(uv.y, 0.015);
-            float grid = max(gx, gy);
+                    // Anti-aliased line function
+                    float aafLine(float v, float width) {
+                        float dv = fwidth(v);
+                        float d = abs(fract(v) - 0.5);
+                        return 1.0 - smoothstep(0.5 - width - dv, 0.5 + width + dv, d);
+                    }
 
-            float dist = length(vWorldPosition.xz);
-            float fade = 1.0 - smoothstep(uFadeDistance, uFadeDistance + uFadeSharpness, dist / 100.0);
+                    void main() {
+                        // Minor grid UV with animation
+                        vec2 uvMinor = vWorldPosition.xz / uMinorSize;
+                        uvMinor.y += uTime * uSpeed;
 
-            vec3 color = uGridColor;
-            float alpha = grid * fade * uAlpha;
-            if (alpha <= 0.001) discard;
-            gl_FragColor = vec4(color, alpha);
-          }
-        `}
+                        // Add cloth texture variation
+                        float clothNoise = noise(uvMinor * uClothFreq + uTime * 0.05);
+                        float clothVariation = clothNoise * uClothAmp;
+
+                        // Minor grid lines with cloth texture
+                        float gxMinor = aafLine(uvMinor.x, uMinorWidth + clothVariation * 0.003);
+                        float gyMinor = aafLine(uvMinor.y, uMinorWidth + clothVariation * 0.003);
+                        float minorGrid = max(gxMinor, gyMinor);
+
+                        // Major grid UV (weave pattern)
+                        vec2 uvMajor = vWorldPosition.xz / (uMinorSize * uMajorEvery);
+                        uvMajor.y += uTime * uSpeed;
+
+                        // Major grid lines (cloth weave)
+                        float gxMajor = aafLine(uvMajor.x, uMajorWidth + clothVariation * 0.005);
+                        float gyMajor = aafLine(uvMajor.y, uMajorWidth + clothVariation * 0.005);
+                        float majorGrid = max(gxMajor, gyMajor);
+
+                        // Cloth texture overlay with wave-based variation
+                        float clothPattern = noise(vWorldPosition.xz * 0.15 + uTime * 0.02) * 0.12;
+                        
+                        // Simple lighting from wave normal
+                        vec3 lightDir = normalize(vec3(0.5, 1.0, 0.3));
+                        float lighting = max(0.0, dot(vNormal, lightDir)) * 0.3 + 0.7;
+
+                        // Distance-based fade (keep center clear for logo)
+                        float dist = length(vWorldPosition.xz) / 140.0;
+                        float fade = 1.0 - smoothstep(uFadeNear, uFadeFar, dist);
+
+                        // Compose colors with cloth texture and lighting
+                        vec3 color = (uMinorColor * (minorGrid * uMinorAlpha + clothPattern * 0.3) + 
+                                      uMajorColor * (majorGrid * uMajorAlpha + clothPattern * 0.2)) * lighting;
+                        
+                        float alpha = max(
+                            minorGrid * uMinorAlpha + clothPattern * 0.15,
+                            majorGrid * uMajorAlpha + clothPattern * 0.12
+                        ) * fade * lighting;
+
+                        if (alpha <= 0.003) discard;
+                        gl_FragColor = vec4(color, alpha);
+                    }
+                `}
 			/>
 		</mesh>
 	);
