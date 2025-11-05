@@ -9,7 +9,6 @@ import ErrorBoundary from '../components/team/ErrorBoundary';
 import UnifiedTeamCard from '../components/team/UnifiedTeamCard';
 import DepartmentSection from '../components/team/DepartmentSection';
 import TeamMemberModal from '../components/team/TeamMemberModal';
-import FloatingParticles from '../components/team/FloatingParticles';
 import TeamSkeleton from '../components/team/TeamSkeleton';
 
 const TeamsPage = () => {
@@ -152,10 +151,7 @@ const TeamsPage = () => {
 	].filter((dept) => dept.count > 0);
 
 	return (
-		<div className="min-h-screen bg-gradient-to-br from-[#080b17] via-[#0f1228] to-[#0a0c20] text-white overflow-x-hidden">
-			{/* Background particles */}
-			<FloatingParticles />
-
+		<div className="min-h-screen text-white overflow-x-hidden">
 			{/* Enhanced Mobile Navigation Menu */}
 			<AnimatePresence>
 				{mobileMenuOpen && (
