@@ -1,8 +1,8 @@
 import mongoose from 'mongoose';
 import mongooseAggregatePaginate from 'mongoose-aggregate-paginate-v2';
 
-// --- POST SCHEMA ---
-const postSchema = new mongoose.Schema(
+// --- SCHEMA DEFINITION ---
+const socialSchema = new mongoose.Schema(
 	{
 		author: {
 			type: mongoose.Schema.Types.ObjectId,
@@ -54,4 +54,4 @@ postSchema.plugin(mongooseAggregatePaginate);
 
 const Post = mongoose.model('Post', postSchema);
 
-export default Post;
+export default socialSchema;

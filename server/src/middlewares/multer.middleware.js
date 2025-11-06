@@ -14,12 +14,19 @@ const ALLOWED_FILE_TYPES = {
 	'image/jpeg': 'jpg',
 	'image/jpg': 'jpg',
 	'image/png': 'png',
+	'image/webp': 'webp',
+	'image/gif': 'gif',
+	'video/mp4': 'mp4',
+	'video/webm': 'webm',
+	'video/ogg': 'ogg',
 	'application/pdf': 'pdf',
 	'application/msword': 'doc',
+	'application/vnd.openxmlformats-officedocument.wordprocessingml.document': 'docx',
+	'application/vnd.ms-excel': 'xls',
 };
 
-// 5MB max file size
-const MAX_FILE_SIZE = 5 * 1024 * 1024;
+// 5MB max file size for images, let's increase for videos
+const MAX_FILE_SIZE = 25 * 1024 * 1024; // 25MB
 const MAX_FILE_COUNT = 5; // Set a max count for array uploads
 
 // Ensure upload directory exists
