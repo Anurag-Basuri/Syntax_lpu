@@ -11,12 +11,12 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 // Load environment variables
-dotenv.config({ path: path.resolve(__dirname, '../.env') });
+dotenv.config({ path: path.resolve(__dirname, '../../.env') });
 
 let cachedConnection = null;
 
 const connectDB = async () => {
-	if (cachedConnection) {
+	if (cachedConnection && mongoose.connection.readyState === 1) {
 		console.log('✅ Using existing MongoDB connection'.green);
 		return cachedConnection;
 	}
@@ -62,21 +62,17 @@ const connectDB = async () => {
 	}
 };
 
-// Gracefully close the MongoDB connection on termination
-const gracefulShutdown = async (signal) => {
-	console.log(`Received ${signal}. Closing MongoDB connection...`.yellow);
-	try {
-		await mongoose.connection.close();
-		console.log('🔒 MongoDB connection closed successfully.'.yellow.bold);
-		process.exit(0);
-	} catch (err) {
-		console.error('❌ Error during MongoDB disconnection:'.red, err);
-		process.exit(1);
+// Gracefully close the MongoDB connection
+export const closeDB = async () => {
+	if (mongoose.connection.readyState === 1) {
+		try {
+			await mongoose.connection.close();
+			console.log('🔒 MongoDB connection closed successfully.'.green);
+		} catch (err) {
+			console.error('❌ Error during MongoDB disconnection:'.red, err);
+		}
 	}
 };
-
-process.on('SIGINT', () => gracefulShutdown('SIGINT'));
-process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
 
 // Helper to check current DB connection status
 export const getConnectionStatus = () => mongoose.connection.readyState;
