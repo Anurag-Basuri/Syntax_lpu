@@ -5,321 +5,183 @@ import { ApiResponse } from '../utils/ApiResponse.js';
 import { asyncHandler } from '../utils/asyncHandler.js';
 import { generateTicketQR } from '../services/qrcode.service.js';
 import { sendRegistrationEmail } from '../services/email.service.js';
-import { v4 as uuidv4 } from 'uuid';
 import { deleteFile } from '../utils/cloudinary.js';
+import mongoose from 'mongoose';
 
-// Create a new ticket
+// Create a new ticket (event registration)
 const createTicket = asyncHandler(async (req, res) => {
-    const {
-        fullName,
-        email,
-        phone,
-        lpuId,
-        eventId,
-        eventName,
-        gender,
-        hosteler,
-        hostel,
-        course,
-        club,
-    } = req.body;
+	const { eventId, fullName, email, phone, lpuId, gender, course, hosteler, hostel } = req.body;
 
-    if (
-        !fullName ||
-        !email ||
-        !phone ||
-        !lpuId ||
-        !eventId ||
-        !eventName ||
-        !gender ||
-        typeof hosteler !== 'boolean' ||
-        !course
-    ) {
-        throw new ApiError(400, 'All fields are required');
-    }
-
-    // Check if ticket already exists
-	let ticket = await Ticket.findOne({ email, eventId });
-    if (ticket) {
-        throw new ApiError(409, 'A ticket with this email already exists for this event');
-    }
-
-    // Create ticket and QR
-    ticket = new Ticket({
-        ticketId: uuidv4(),
-        fullName,
-        email,
-        lpuId,
-        phone,
-        gender,
-        hosteler,
-        hostel,
-        course,
-        eventId,
-        eventName,
-        isUsed: false,
-        isCancelled: false,
-        club,
-    });
-    await ticket.save();
-
-    // Add ticket to event registrations
-    try {
-        await Event.findByIdAndUpdate(
-            eventId,
-            { $addToSet: { registrations: ticket._id } },
-            { new: true }
-        );
-    } catch (eventUpdateErr) {
-        console.error('Failed to add ticket to event registrations:', eventUpdateErr);
-    }
-
-    let qrCode;
-    try {
-        qrCode = await generateTicketQR(ticket.ticketId);
-        if (!qrCode || !qrCode.url || !qrCode.public_id) {
-            throw new Error('Invalid QR code generated');
-        }
-        ticket.qrCode = {
-            url: qrCode.url,
-            publicId: qrCode.public_id,
-        };
-        await ticket.save();
-    } catch (qrErr) {
-        console.error('QR code generation failed:', qrErr);
-        await Ticket.findByIdAndDelete(ticket._id).catch((delErr) =>
-            console.error('Failed to delete ticket after QR error:', delErr)
-        );
-        if (qrCode?.public_id && qrCode.url) {
-            await deleteFile({ public_id: qrCode.public_id, resource_type: 'image' }).catch((delErr) =>
-                console.error('Failed to delete QR image after QR error:', delErr)
-            );
-        }
-        throw new ApiError(500, 'Failed to generate QR code for the ticket');
-    }
-
-    try {
-        await sendRegistrationEmail({
-            to: email,
-            name: fullName,
-            eventName,
-            eventDate: '22nd August 2025',
-            eventTime: '5:00 PM',
-            qrUrl: qrCode.url,
-        });
-    } catch (emailErr) {
-        console.error('Failed to send registration email:', emailErr);
-        // Instead of deleting the ticket, mark it as emailFailed for admin review
-        ticket.emailFailed = true;
-        await ticket.save().catch((saveErr) =>
-            console.error('Failed to mark ticket as emailFailed:', saveErr)
-        );
-        if (qrCode?.public_id && qrCode.url) {
-            await deleteFile({ public_id: qrCode.public_id, resource_type: 'image' }).catch((delErr) =>
-                console.error('Failed to delete QR image after email error:', delErr)
-            );
-        }
-        throw new ApiError(
-            500,
-            'Ticket created but failed to send registration email. Please contact support.',
-            ticket
-        );
-    }
-
-    return res
-        .status(201)
-        .json(
-            new ApiResponse(
-                201,
-                ticket,
-                'Ticket created successfully'
-            )
-        );
-});
-
-// Get ticket by ID
-const getTicketById = asyncHandler(async (req, res) => {
-	const ticketId = req.params.ticketId || req.body.ticketId;
-
-	const ticket = await Ticket.findById(ticketId);
-	if (!ticket) {
-		throw new ApiError(404, 'Ticket not found');
+	// 1. Find the event and validate its status
+	const event = await Event.findById(eventId);
+	if (!event) {
+		throw ApiError.NotFound('The specified event does not exist.');
 	}
 
-	return res.status(200).json(new ApiResponse(200, ticket, 'Ticket retrieved successfully'));
+	// Use the powerful registrationStatus virtual property from the Event model
+	if (event.registrationStatus !== 'OPEN') {
+		throw ApiError.BadRequest(
+			`Registration is currently not open. Status: ${event.registrationStatus}`
+		);
+	}
+
+	// 2. Create the ticket instance
+	const ticket = new Ticket({
+		eventId,
+		eventName: event.title, // Denormalize event name for convenience
+		fullName,
+		email,
+		phone,
+		lpuId,
+		gender,
+		course,
+		hosteler,
+		hostel: hosteler ? hostel : undefined,
+	});
+
+	// 3. Save the ticket and handle potential conflicts
+	try {
+		await ticket.save();
+	} catch (error) {
+		if (error.code === 11000) {
+			throw ApiError.Conflict(
+				'You have already registered for this event with this Email or LPU ID.'
+			);
+		}
+		throw error; // Re-throw other validation errors
+	}
+
+	// 4. Perform side effects (QR generation, email) after successful creation
+	try {
+		// Generate and save QR code
+		const qrCode = await generateTicketQR(ticket.ticketId);
+		ticket.qrCode = { url: qrCode.url, publicId: qrCode.public_id };
+		await ticket.save();
+
+		// Send registration email
+		await sendRegistrationEmail({
+			to: email,
+			name: fullName,
+			eventName: event.title,
+			eventDate: event.eventDate, // Use dynamic event date
+			qrUrl: qrCode.url,
+		});
+		ticket.emailStatus = 'sent';
+	} catch (sideEffectError) {
+		console.error('Post-creation error (QR/Email):', sideEffectError.message);
+		// The ticket is created, but a side-effect failed. Mark for admin review.
+		ticket.emailStatus = 'failed';
+		// Don't throw an error to the user, as their registration is successful.
+		// The frontend can show a message based on the response.
+	} finally {
+		await ticket.save();
+	}
+
+	// 5. Update the event's registered users list
+	await Event.findByIdAndUpdate(eventId, { $addToSet: { registeredUsers: ticket._id } });
+
+	return ApiResponse.success(
+		res,
+		{ ticket },
+		'Registration successful! Your ticket will be sent to your email.',
+		201
+	);
 });
 
-// Update ticket status (used/cancelled)
+// Get a ticket by its ticketId
+const getTicketById = asyncHandler(async (req, res) => {
+	const { ticketId } = req.params;
+	const ticket = await Ticket.findOne({ ticketId }).populate('eventId', 'title eventDate venue');
+
+	if (!ticket) {
+		throw ApiError.NotFound('Ticket not found.');
+	}
+
+	return ApiResponse.success(res, { ticket }, 'Ticket retrieved successfully.');
+});
+
+// Get tickets with filtering, sorting, and pagination
+const getTicketsByEvent = asyncHandler(async (req, res) => {
+	const { page = 1, limit = 10, eventId, status } = req.query;
+
+	const filter = {};
+	if (eventId) filter.eventId = eventId;
+	if (status) filter.status = status;
+
+	const options = {
+		page: parseInt(page, 10),
+		limit: parseInt(limit, 10),
+		sort: { createdAt: -1 },
+		populate: { path: 'eventId', select: 'title' },
+	};
+
+	const tickets = await Ticket.paginate(filter, options);
+
+	// Return empty array if no tickets found, not an error
+	return ApiResponse.paginated(res, tickets.docs, tickets, 'Tickets retrieved successfully.');
+});
+
+// Update ticket status
 const updateTicketStatus = asyncHandler(async (req, res) => {
 	const { ticketId } = req.params;
-	const { isUsed } = req.body;
+	const { status } = req.body; // Expecting 'active', 'used', or 'cancelled'
 
-	if (isUsed === undefined) {
-		throw new ApiError(400, 'At least one status field must be provided');
-	}
+	const ticket = await Ticket.findOneAndUpdate(
+		{ ticketId },
+		{ status },
+		{ new: true, runValidators: true }
+	);
 
-	const ticket = await Ticket.findById(ticketId);
 	if (!ticket) {
-		throw new ApiError(404, 'Ticket not found');
+		throw ApiError.NotFound('Ticket not found.');
 	}
 
-	if (isUsed !== undefined) ticket.isUsed = isUsed;
-
-	await ticket.save();
-
-	return res.status(200).json(new ApiResponse(200, ticket, 'Ticket status updated successfully'));
-});
-
-// Get all tickets for an event
-const getTicketsByEvent = asyncHandler(async (req, res) => {
-	const { eventId } = req.params;
-
-	if (!eventId) {
-		throw new ApiError(400, 'Event ID is required');
-	}
-
-	const tickets = await Ticket.find({ eventId }).sort({ createdAt: -1 });
-
-	if (!tickets.length) {
-		throw new ApiError(404, 'No tickets found for this event');
-	}
-
-	return res.status(200).json(new ApiResponse(200, tickets, 'Tickets retrieved successfully'));
+	return ApiResponse.success(res, { ticket }, 'Ticket status updated successfully.');
 });
 
 // Delete a ticket
 const deleteTicket = asyncHandler(async (req, res) => {
 	const { ticketId } = req.params;
+	const ticket = await Ticket.findOneAndDelete({ ticketId });
 
-	const ticket = await Ticket.findByIdAndDelete(ticketId);
 	if (!ticket) {
-		throw new ApiError(404, 'Ticket not found or already deleted');
+		throw ApiError.NotFound('Ticket not found.');
 	}
 
-	return res.status(200).json(new ApiResponse(200, null, 'Ticket deleted successfully'));
-});
+	// Remove ticket from the event's registration list
+	await Event.findByIdAndUpdate(ticket.eventId, { $pull: { registeredUsers: ticket._id } });
 
-// Check email and LPU ID availability for an event
-const checkEmailAvailability = asyncHandler(async (req, res) => {
-	const { email, eventId = '68859a199ec482166f0e8523', lpuId } = req.body;
-
-	const trimmedEmail = email.toLowerCase().trim();
-
-	// Check if email already exists for this event
-	const existingTicketByEmail = await Ticket.findOne({
-		email: trimmedEmail,
-		eventId: eventId,
-	});
-
-	if (existingTicketByEmail) {
-		throw new ApiError(
-			409,
-			'A ticket has already been purchased with this email address for this event'
-		);
+	// Delete QR code from Cloudinary if it exists
+	if (ticket.qrCode?.publicId) {
+		await deleteFile({ public_id: ticket.qrCode.publicId, resource_type: 'image' });
 	}
 
-	// Also check LPU ID if provided
-	if (lpuId) {
-		const existingTicketByLpu = await Ticket.findOne({
-			lpuId: typeof lpuId === 'string' ? lpuId.trim() : lpuId,
-			eventId: eventId,
-		});
+	return ApiResponse.success(res, null, 'Ticket deleted successfully.');
+});
 
-		if (existingTicketByLpu) {
-			throw new ApiError(
-				409,
-				'A ticket has already been purchased with this LPU ID for this event'
-			);
-		}
+// Check availability of email or LPU ID for an event
+const checkAvailability = asyncHandler(async (req, res) => {
+	const { email, lpuId, eventId } = req.body;
+
+	if (!eventId) {
+		throw ApiError.BadRequest('Event ID is required.');
 	}
 
-	return res
-		.status(200)
-		.json(
-			new ApiResponse(
-				200,
-				{ available: true, email: trimmedEmail, eventId: eventId },
-				'Email and LPU ID are available for registration'
-			)
-		);
-});
+	const orConditions = [];
+	if (email) orConditions.push({ email: email.toLowerCase().trim() });
+	if (lpuId) orConditions.push({ lpuId });
 
-const ticketForQR = asyncHandler(async (req, res) => {
-    const ticketId = req.params.ticketId || req.body.ticketId;
+	if (orConditions.length === 0) {
+		throw ApiError.BadRequest('Either email or LPU ID is required.');
+	}
 
-    if (!ticketId) {
-        throw new ApiError(400, "Ticket ID is required");
-    }
+	const existingTicket = await Ticket.findOne({ eventId, $or: orConditions });
 
-    // Try to find by ticketId first, then by _id if not found
-    let ticket = await Ticket.findOne({ ticketId });
+	if (existingTicket) {
+		throw ApiError.Conflict('This Email or LPU ID is already registered for this event.');
+	}
 
-    if (!ticket) {
-        console.log('Ticket not found by ticketId, trying _id:', ticketId);
-        // If not found by ticketId, try finding by MongoDB _id
-        try {
-            ticket = await Ticket.findById(ticketId);
-        } catch (error) {
-            console.log('Invalid ObjectId format:', error.message);
-        }
-    }
-
-    if (!ticket) {
-        throw new ApiError(404, "Ticket not found");
-    }
-
-    // Remove sensitive fields
-    const ticketData = ticket.toObject();
-    delete ticketData.__v;
-
-    return res
-        .status(200)
-        .json(new ApiResponse(200, ticketData, "Ticket retrieved successfully"));
-});
-
-const updateStatusForQR = asyncHandler(async (req, res) => {
-    const ticketId = req.params.ticketId || req.body.ticketId;
-    const { isUsed } = req.body;
-
-    if (!ticketId) {
-        throw new ApiError(400, "Ticket ID is required");
-    }
-    if (typeof isUsed !== "boolean") {
-        throw new ApiError(400, "isUsed field must be a boolean");
-    }
-
-    // Try to find by ticketId first, then by _id if not found
-    let ticket = await Ticket.findOne({ ticketId });
-    
-    if (!ticket) {
-        try {
-            ticket = await Ticket.findById(ticketId);
-        } catch (error) {
-            console.log('Invalid ObjectId format:', error.message);
-        }
-    }
-
-    if (!ticket) {
-        console.log('Ticket not found by any method for ID:', ticketId);
-        throw new ApiError(404, "Ticket not found");
-    }
-
-    // Only update if status is actually changing
-    if (ticket.isUsed !== isUsed) {
-        ticket.isUsed = isUsed;
-        await ticket.save();
-        console.log('Ticket status updated successfully');
-    } else {
-        console.log('Ticket status unchanged, no update needed');
-    }
-
-    // Remove sensitive fields
-    const ticketData = ticket.toObject();
-    delete ticketData.__v;
-
-    return res
-        .status(200)
-        .json(new ApiResponse(200, ticketData, "Ticket status updated successfully"));
+	return ApiResponse.success(res, { available: true }, 'Available for registration.');
 });
 
 export {
@@ -328,7 +190,5 @@ export {
 	updateTicketStatus,
 	getTicketsByEvent,
 	deleteTicket,
-	checkEmailAvailability,
-    ticketForQR,
-    updateStatusForQR
+	checkAvailability,
 };
