@@ -47,9 +47,7 @@ router.post(
 // Login Member
 router.post(
 	'/login',
-	validate([
-		body('password').notEmpty().withMessage('Password is required'),
-	]),
+	validate([body('password').notEmpty().withMessage('Password is required')]),
 	loginMember
 );
 
@@ -121,7 +119,7 @@ router.post(
 	'/:id/profile-picture',
 	protect,
 	authorize('member'),
-	upload.single('profilePicture'), // Use upload.single for one file
+	uploadFile('profilePicture'), // FIX: Use the imported uploadFile middleware
 	validate([param('id').isMongoId().withMessage('Invalid member ID')]),
 	uploadProfilePicture
 );
@@ -131,7 +129,7 @@ router.post(
 	'/:id/resume',
 	protect,
 	authorize('member'),
-	upload.single('resume'), // Use upload.single for one file
+	uploadFile('resume'), // FIX: Use the imported uploadFile middleware
 	validate([param('id').isMongoId().withMessage('Invalid member ID')]),
 	uploadResume
 );

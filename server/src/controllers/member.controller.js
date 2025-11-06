@@ -139,7 +139,7 @@ const unbanMember = asyncHandler(async (req, res) => {
 
 // Logout member
 const logoutMember = asyncHandler(async (req, res) => {
-	const member = req.member;
+	const member = req.user; // FIX: Changed from req.member to req.user
 
 	if (!member) {
 		throw ApiError.Unauthorized('Unauthorized access');
@@ -306,7 +306,7 @@ const uploadResume = asyncHandler(async (req, res) => {
 
 // Get current member
 const getCurrentMember = asyncHandler(async (req, res) => {
-	const member = req.member;
+	const member = req.user;
 
 	if (!member) {
 		throw ApiError.Unauthorized('Unauthorized access');
