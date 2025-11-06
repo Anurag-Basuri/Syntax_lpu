@@ -1,138 +1,130 @@
-import mongoose from "mongoose"
-import validator from "validator";
-import { v4 as uuidv4 } from "uuid";
-import { type } from "os";
+import mongoose from 'mongoose';
+import validator from 'validator';
+import { v4 as uuidv4 } from 'uuid';
+import mongoosePaginate from 'mongoose-paginate-v2';
 
-const ticketSchema = new mongoose.Schema({
-    ticketId: {
-        type: String,
-        default: uuidv4,
-        unique: true
-    },
+const ticketSchema = new mongoose.Schema(
+	{
+		ticketId: {
+			type: String,
+			default: () => `TICKET-${uuidv4().slice(0, 8).toUpperCase()}`,
+			unique: true,
+			required: true,
+		},
 
-    fullName: {
-        type: String,
-        required: [true, 'Full name is required'],
-        trim: true,
-        minlength: [2, 'Full name must be at least 2 characters'],
-        maxlength: [50, 'Full name cannot exceed 50 characters']
-    },
-    email: {
-        type: String,
-        required: [true, 'Email is required'],
-        trim: true,
-        unique: true,
-        validate: {
-            validator: validator.isEmail,
-            message: 'Invalid email format'
-        }
-    },
-    phone: {
-        type: String,
-        required: [true, 'Phone number is required'],
-        trim: true,
-        validate: {
-            validator: function(v) {
-                // Remove leading 0 or +91 if present
-                const normalized = v.replace(/^(\+91|0)/, '');
-                return /^\d{10}$/.test(normalized);
-            },
-            message: 'Phone number must be 10 digits (ignore leading 0 or +91)'
-        }
-    },
-    lpuId: {
-        type: Number,
-        required: [true, 'LPU ID is required'],
-        unique: true,
-        validate: {
-            validator: function(v) {
-                return /^\d{8}$/.test(v);
-            },
-            message: 'LPU ID must be 8 digits'
-        }
-    },
-    gender:{
-        type: String,
-        required: [true, 'Gender is required'],
-        enum: ['Male', 'Female']
-    },
-    hosteler: {
-        type: Boolean,
-        required: [true, 'Hosteler status is required'],
-        default: false
-    },
-    hostel: {
-        type: String,
-        required: function() {
-            return this.hosteler; // Only required if hosteler is true
-        }
-    },
-    course: {
-        type: String,
-        required: [true, 'Course is required'],
-    },
-    club: {
-        type:String,
-    },
+		// --- Event Information ---
+		eventId: {
+			type: mongoose.Schema.Types.ObjectId,
+			ref: 'Event',
+			required: [true, 'Event ID is required'],
+		},
+		eventName: {
+			type: String,
+			trim: true,
+		},
 
-    eventId: {
-        type: mongoose.Schema.Types.ObjectId,
-        required: true,
-        ref: 'Event'
-    },
-    eventName: {
-        type: mongoose.Schema.Types.String,
-        required: true,
-        trim: true,
-        ref: 'Event'
-    },
-    isUsed: {
-        type: Boolean,
-        default: false,
-        required: true
-    },
+		// --- Attendee Information ---
+		fullName: {
+			type: String,
+			required: [true, 'Full name is required'],
+			trim: true,
+			minlength: [2, 'Full name must be at least 2 characters'],
+			maxlength: [50, 'Full name cannot exceed 50 characters'],
+		},
+		email: {
+			type: String,
+			required: [true, 'Email is required'],
+			trim: true,
+			lowercase: true,
+			validate: [validator.isEmail, 'Invalid email format'],
+		},
+		phone: {
+			type: String,
+			required: [true, 'Phone number is required'],
+			trim: true,
+			validate: {
+				validator: function (v) {
+					return /^\d{10}$/.test(v.replace(/^(\+91|0)/, ''));
+				},
+				message: 'Phone number must be 10 digits.',
+			},
+		},
+		lpuId: {
+			type: String, // Changed to String for reliable validation
+			required: [true, 'LPU ID is required'],
+			trim: true,
+			validate: {
+				validator: function (v) {
+					return /^\d{7,8}$/.test(v); // Allow 7 or 8 digits
+				},
+				message: 'LPU ID must be 7 or 8 digits',
+			},
+		},
+		gender: {
+			type: String,
+			required: [true, 'Gender is required'],
+			enum: ['Male', 'Female', 'Other', 'Prefer not to say'],
+		},
+		course: {
+			type: String,
+			required: [true, 'Course is required'],
+			trim: true,
+		},
+		hosteler: {
+			type: Boolean,
+			default: false,
+		},
+		hostel: {
+			type: String,
+			trim: true,
+			// Only required if hosteler is true
+			required: function () {
+				return this.hosteler === true;
+			},
+		},
 
-    qrCode: {
-        url: {
-            type: String,
-            validate: {
-                validator: function(v) {
-                    return /^https?:\/\/.*\.(png|jpg|jpeg)$/.test(v);
-                },
-                message: 'QR Code must be a valid image URL'
-            },
-            publicId: {
-                type: String,
-                unique: true
-            }
-        }
-    },
+		// --- Ticket Status & Metadata ---
+		status: {
+			type: String,
+			enum: ['active', 'used', 'cancelled'],
+			default: 'active',
+			required: true,
+		},
+		qrCode: {
+			url: String,
+			publicId: String,
+		},
+		emailStatus: {
+			type: String,
+			enum: ['sent', 'failed', 'pending'],
+			default: 'pending',
+		},
+		paymentDetails: {
+			paymentId: String,
+			amount: Number,
+			currency: String,
+			method: String,
+		},
+	},
+	{
+		timestamps: true, // Automatically adds createdAt and updatedAt
+	}
+);
 
-    isCancelled: {
-        type: Boolean,
-        default: false,
-        required: true
-    },
-    createdAt: {
-        type: Date,
-        default: Date.now
-    },
+// --- INDEXES ---
 
-    emailFailed: {
-        type: Boolean,
-        default: false
-    },
-}, {
-    timestamps: true
-})
+// Create a compound index to ensure a user can only register once per event.
+// This is the most critical fix.
+ticketSchema.index({ eventId: 1, email: 1 }, { unique: true });
+ticketSchema.index({ eventId: 1, lpuId: 1 }, { unique: true });
 
-ticketSchema.index({ eventId: 1, createdAt: -1 });
-ticketSchema.pre('save', function(next) {
-    if (this.isModified('email') && !validator.isEmail(this.email)) {
-        return next(new Error('Invalid email format'));
-    }
-    next();
-});
+// Index for querying tickets by status for a specific event
+ticketSchema.index({ eventId: 1, status: 1 });
+
+// --- PLUGIN ---
+
+// Add pagination plugin for easier listing of tickets
+ticketSchema.plugin(mongoosePaginate);
 
 const Ticket = mongoose.model('Ticket', ticketSchema);
 
