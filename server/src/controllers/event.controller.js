@@ -32,6 +32,8 @@ const createEvent = asyncHandler(async (req, res) => {
 		tags,
 		totalSpots,
 		ticketPrice,
+		registrationOpenDate,
+		registrationCloseDate,
 	} = req.body;
 
 	// --- Validation ---
@@ -68,6 +70,9 @@ const createEvent = asyncHandler(async (req, res) => {
 		tags: tagsArray,
 		totalSpots: totalSpots ? parseInt(totalSpots, 10) : 0,
 		ticketPrice: ticketPrice ? parseFloat(ticketPrice) : 0,
+		// --- NEW: Set registration dates ---
+		registrationOpenDate: registrationOpenDate ? new Date(registrationOpenDate) : null,
+		registrationCloseDate: registrationCloseDate ? new Date(registrationCloseDate) : null,
 	});
 
 	return ApiResponse.success(res, { event: newEvent }, 'Event created successfully', 201);
@@ -172,6 +177,8 @@ const updateEvent = asyncHandler(async (req, res) => {
 		totalSpots,
 		ticketPrice,
 		status,
+		registrationOpenDate,
+		registrationCloseDate,
 	} = req.body;
 
 	const event = await Event.findById(id);
@@ -203,6 +210,8 @@ const updateEvent = asyncHandler(async (req, res) => {
 	if (totalSpots) event.totalSpots = parseInt(totalSpots, 10);
 	if (ticketPrice) event.ticketPrice = parseFloat(ticketPrice);
 	if (date && time) event.eventDate = parseEventDate(date, time);
+	if (registrationOpenDate) event.registrationOpenDate = new Date(registrationOpenDate);
+	if (registrationCloseDate) event.registrationCloseDate = new Date(registrationCloseDate);
 
 	const updatedEvent = await event.save();
 
@@ -234,4 +243,78 @@ const deleteEvent = asyncHandler(async (req, res) => {
 	return ApiResponse.success(res, null, 'Event deleted successfully');
 });
 
-export { createEvent, getAllEvents, getEventById, updateEvent, deleteEvent };
+// Get statistics about all events
+const getEventStats = asyncHandler(async (req, res) => {
+	const stats = await Event.aggregate([
+		{
+			$facet: {
+				byStatus: [{ $group: { _id: '$status', count: { $sum: 1 } } }],
+				totalRegistrations: [
+					{ $group: { _id: null, total: { $sum: { $size: '$registeredUsers' } } } },
+				],
+				totalEvents: [{ $count: 'count' }],
+			},
+		},
+		{
+			$project: {
+				totalEvents: { $arrayElemAt: ['$totalEvents.count', 0] },
+				totalRegistrations: { $arrayElemAt: ['$totalRegistrations.total', 0] },
+				statusCounts: {
+					$arrayToObject: {
+						$map: {
+							input: '$byStatus',
+							as: 'status',
+							in: { k: '$$status._id', v: '$$status.count' },
+						},
+					},
+				},
+			},
+		},
+	]);
+
+	const formattedStats = {
+		totalEvents: stats[0]?.totalEvents || 0,
+		totalRegistrations: stats[0]?.totalRegistrations || 0,
+		...stats[0]?.statusCounts,
+	};
+
+	return ApiResponse.success(
+		res,
+		{ stats: formattedStats },
+		'Event statistics retrieved successfully.'
+	);
+});
+
+// Get a list of all users registered for a specific event
+const getEventRegistrations = asyncHandler(async (req, res) => {
+	const { id: eventId } = req.params;
+
+	if (!mongoose.Types.ObjectId.isValid(eventId)) {
+		throw ApiError.BadRequest('Invalid event ID format');
+	}
+
+	const event = await Event.findById(eventId).populate({
+		path: 'registeredUsers',
+		select: 'fullname email LpuId department', // Select fields you want to show
+	});
+
+	if (!event) {
+		throw ApiError.NotFound('Event not found');
+	}
+
+	return ApiResponse.success(
+		res,
+		{ registrations: event.registeredUsers },
+		'Successfully retrieved event registrations.'
+	);
+});
+
+export {
+	createEvent,
+	getAllEvents,
+	getEventById,
+	updateEvent,
+	deleteEvent,
+	getEventStats,
+	getEventRegistrations,
+};
