@@ -1,6 +1,6 @@
 import dotenv from 'dotenv';
 import colors from 'colors';
-import connectDB, { gracefulShutdown as closeDB } from './database/index.js';
+import connectDB, { closeDB } from './database/index.js';
 import { checkCloudinaryConnection } from './utils/cloudinary.js';
 import { createRateLimiter } from './middlewares/rateLimit.middleware.js';
 import app from './app.js';
@@ -35,29 +35,39 @@ const gracefulShutdown = async (signal, error) => {
 	if (isShuttingDown) return;
 	isShuttingDown = true;
 
+	const exitCode = error ? 1 : 0;
+	const signalType = error ? 'Critical Error' : 'Signal';
+
+	console.log(`\n🔄 Received ${signal}. Starting graceful shutdown due to: ${signalType}`.yellow);
+
 	if (error) {
-		console.error(`\n❌ Critical Error: ${error.name}`.red.bold, error.message);
-		console.error(error.stack.grey);
+		console.error(`❌ ${error.name || 'Error'}:`.red.bold, error.message);
+		console.error(error.stack?.grey);
 	}
 
-	console.log(`\n🔄 Received ${signal}. Starting graceful shutdown...`.yellow);
+	// 1. Close the HTTP server to stop accepting new connections
+	if (server) {
+		server.close(async () => {
+			console.log('✅ HTTP server closed.'.green);
 
-	// 1. Close the HTTP server
-	server.close(async () => {
-		console.log('✅ HTTP server closed.'.green);
+			// 2. Close the database connection
+			await closeDB();
 
-		// 2. Close the database connection
+			console.log('👋 Shutdown complete.'.green.bold);
+			process.exit(exitCode);
+		});
+	} else {
+		// If server isn't running, just close DB and exit
 		await closeDB();
-
 		console.log('👋 Shutdown complete.'.green.bold);
-		process.exit(error ? 1 : 0);
-	});
+		process.exit(exitCode);
+	}
 
-	// Force shutdown after a timeout
+	// Force shutdown after a timeout if graceful shutdown fails
 	setTimeout(() => {
 		console.error('⚠️ Could not close connections in time, forcing shutdown.'.red);
 		process.exit(1);
-	}, 10000).unref(); // .unref() allows the process to exit if the server closes sooner
+	}, 10000).unref();
 };
 
 // --- Server Startup ---
@@ -111,6 +121,7 @@ const startServer = async () => {
 
 		process.on('unhandledRejection', (reason, promise) => {
 			console.error('❌ Unhandled Rejection at:'.red, promise);
+			// For unhandled rejections, we treat the 'reason' as the error
 			gracefulShutdown('unhandledRejection', reason);
 		});
 
