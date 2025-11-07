@@ -1,32 +1,32 @@
 import React from 'react';
 import { motion } from 'framer-motion';
-import { FaGithub, FaLinkedin, FaInstagram } from 'react-icons/fa';
-import { useNavigate } from 'react-router-dom';
+import { Github, Linkedin, Instagram, Mail, MapPin } from 'lucide-react';
+import { Link } from 'react-router-dom';
 
 const Footer = () => {
-	const navigate = useNavigate();
-
 	const socialLinks = [
 		{
-			name: 'GitHub',
-			icon: <FaGithub className="w-5 h-5" />,
-			url: 'https://github.com/your-org',
-		},
-		{
 			name: 'LinkedIn',
-			icon: <FaLinkedin className="w-5 h-5" />,
-			url: 'https://www.linkedin.com/company/syntax-club/',
+			icon: <Linkedin className="w-5 h-5" />,
+			url: 'https://www.linkedin.com/company/syntax-lpu/',
 		},
 		{
 			name: 'Instagram',
-			icon: <FaInstagram className="w-5 h-5" />,
-			url: 'https://www.instagram.com/syntax.club/',
+			icon: <Instagram className="w-5 h-5" />,
+			url: 'https://www.instagram.com/syntax.lpu/',
 		},
 	];
 
-	const footerLinks = [
+	const quickLinks = [
+		{ name: 'Events', to: '/event' },
+		{ name: 'Team', to: '/team' },
+		{ name: 'Contact', to: '/contact' },
+		{ name: 'Socials', to: '/socials' },
+	];
+
+	const policyLinks = [
 		{ name: 'Terms and Conditions', to: '/policy/terms' },
-		{ name: 'Cancellation and Refund', to: '/policy/refund-policy' },
+		{ name: 'Cancellation and Refund', to: '/policy/refund' },
 		{ name: 'Privacy Policy', to: '/policy/privacy' },
 		{ name: 'Cookie Policy', to: '/policy/cookie' },
 	];
@@ -73,38 +73,16 @@ const Footer = () => {
 							></div>
 						</h4>
 						<ul className="space-y-4 text-secondary">
-							<li>
-								<button
-									onClick={() => navigate('/event')}
-									className="hover:text-accent transition-colors"
-								>
-									Events
-								</button>
-							</li>
-							<li>
-								<button
-									onClick={() => navigate('/team')}
-									className="hover:text-accent transition-colors"
-								>
-									Team
-								</button>
-							</li>
-							<li>
-								<button
-									onClick={() => navigate('/contact')}
-									className="hover:text-accent transition-colors"
-								>
-									Contact
-								</button>
-							</li>
-							<li>
-								<button
-									onClick={() => navigate('/socials')}
-									className="hover:text-accent transition-colors"
-								>
-									Socials
-								</button>
-							</li>
+							{quickLinks.map((link) => (
+								<li key={link.name}>
+									<Link
+										to={link.to}
+										className="hover:text-accent transition-colors"
+									>
+										{link.name}
+									</Link>
+								</li>
+							))}
 						</ul>
 					</div>
 
@@ -122,58 +100,28 @@ const Footer = () => {
 						<ul className="space-y-4 text-secondary">
 							<li className="flex items-start gap-3">
 								<a
-									href="mailto:syntax.helpdesk@gmail.com"
+									href="mailto:syntax.studorg@gmail.com"
 									className="flex items-start gap-3 hover:text-accent transition-colors"
 								>
 									<div className="w-8 h-8 rounded-full bg-white/10 backdrop-blur-sm border border-white/10 flex items-center justify-center flex-shrink-0">
-										<svg
-											xmlns="http://www.w3.org/2000/svg"
-											className="h-4 w-4 text-accent"
-											fill="none"
-											viewBox="0 0 24 24"
-											stroke="currentColor"
-										>
-											<path
-												strokeLinecap="round"
-												strokeLinejoin="round"
-												strokeWidth={2}
-												d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"
-											/>
-										</svg>
+										<Mail className="h-4 w-4 text-accent" />
 									</div>
-									<span className="text-sm">syntax.helpdesk@gmail.com</span>
+									<span className="text-sm">syntax.studorg@gmail.com</span>
 								</a>
 							</li>
 							<li className="flex items-start gap-3">
 								<a
-									href="https://maps.google.com/?q=Your+Institution+Address"
+									href="https://maps.google.com/?q=Lovely+Professional+University"
 									target="_blank"
 									rel="noopener noreferrer"
 									className="flex items-start gap-3 hover:text-accent transition-colors"
 								>
 									<div className="w-8 h-8 rounded-full bg-white/10 backdrop-blur-sm border border-white/10 flex items-center justify-center flex-shrink-0">
-										<svg
-											xmlns="http://www.w3.org/2000/svg"
-											className="h-4 w-4 text-accent"
-											fill="none"
-											viewBox="0 0 24 24"
-											stroke="currentColor"
-										>
-											<path
-												strokeLinecap="round"
-												strokeLinejoin="round"
-												strokeWidth={2}
-												d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"
-											/>
-											<path
-												strokeLinecap="round"
-												strokeLinejoin="round"
-												strokeWidth={2}
-												d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"
-											/>
-										</svg>
+										<MapPin className="h-4 w-4 text-accent" />
 									</div>
-									<span className="text-sm">Your Institution Address</span>
+									<span className="text-sm">
+										Lovely Professional University, Punjab
+									</span>
 								</a>
 							</li>
 						</ul>
@@ -185,15 +133,14 @@ const Footer = () => {
 						© {new Date().getFullYear()} Syntax Club. All rights reserved.
 					</p>
 					<div className="flex flex-wrap gap-x-6 gap-y-2 justify-center md:justify-end">
-						{footerLinks.map((item, idx) => (
-							<button
+						{policyLinks.map((item, idx) => (
+							<Link
 								key={idx}
-								type="button"
-								onClick={() => navigate(item.to)}
+								to={item.to}
 								className="text-sm text-secondary hover:text-accent transition-colors"
 							>
 								{item.name}
-							</button>
+							</Link>
 						))}
 					</div>
 				</div>
