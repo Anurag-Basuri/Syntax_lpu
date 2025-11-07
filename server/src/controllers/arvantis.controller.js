@@ -104,15 +104,27 @@ const updateFestDetails = asyncHandler(async (req, res) => {
 const deleteFest = asyncHandler(async (req, res) => {
 	const fest = await findFestBySlugOrYear(req.params.identifier);
 
-    // Collect all media publicIds for deletion
+	// Collect all media publicIds for deletion
 	const mediaToDelete = [];
-	if (fest.poster?.publicId) mediaToDelete.push(fest.poster.publicId);
-	fest.gallery.forEach((item) => mediaToDelete.push(item.publicId));
+	if (fest.poster?.publicId) {
+		mediaToDelete.push({
+			public_id: fest.poster.publicId,
+			resource_type: fest.poster.resource_type || 'image',
+		});
+	}
+	fest.gallery.forEach((item) => {
+		mediaToDelete.push({ public_id: item.publicId, resource_type: item.resource_type });
+	});
 	fest.partners.forEach((p) => {
-		if (p.logo?.publicId) mediaToDelete.push(p.logo.publicId);
+		if (p.logo?.publicId) {
+			mediaToDelete.push({
+				public_id: p.logo.publicId,
+				resource_type: p.logo.resource_type || 'image',
+			});
+		}
 	});
 
-    // Delete all associated media from Cloudinary
+	// Delete all associated media from Cloudinary
 	if (mediaToDelete.length > 0) {
 		await deleteFiles(mediaToDelete);
 	}
@@ -141,7 +153,11 @@ const addPartner = asyncHandler(async (req, res) => {
 		website,
 		type,
 		tier,
-		logo: { url: logoFile.secure_url, publicId: logoFile.public_id },
+		logo: {
+			url: logoFile.url,
+			publicId: logoFile.publicId,
+			resource_type: logoFile.resource_type,
+		},
 	};
 
 	fest.partners.push(newPartner);
@@ -161,7 +177,10 @@ const removePartner = asyncHandler(async (req, res) => {
 
 	const [removedPartner] = fest.partners.splice(partnerIndex, 1);
 	if (removedPartner.logo?.publicId) {
-		await deleteFile(removedPartner.logo.publicId);
+		await deleteFile({
+			public_id: removedPartner.logo.publicId,
+			resource_type: removedPartner.logo.resource_type || 'image',
+		});
 	}
 	await fest.save();
 
@@ -203,10 +222,19 @@ const updateFestPoster = asyncHandler(async (req, res) => {
 	const fest = await findFestBySlugOrYear(req.params.identifier);
 	if (!req.file) throw new ApiError(400, 'Poster file is required.');
 
-	if (fest.poster?.publicId) await deleteFile(fest.poster.publicId);
+	if (fest.poster?.publicId) {
+		await deleteFile({
+			public_id: fest.poster.publicId,
+			resource_type: fest.poster.resource_type || 'image',
+		});
+	}
 
 	const posterFile = await uploadFile(req.file, { folder: `arvantis/${fest.year}` });
-	fest.poster = { url: posterFile.secure_url, publicId: posterFile.public_id };
+	fest.poster = {
+		url: posterFile.url,
+		publicId: posterFile.publicId,
+		resource_type: posterFile.resource_type,
+	};
 	await fest.save();
 
 	return ApiResponse.success(res, fest.poster, 'Fest poster updated successfully');
@@ -241,8 +269,8 @@ const removeGalleryMedia = asyncHandler(async (req, res) => {
 	const mediaIndex = fest.gallery.findIndex((item) => item.publicId === publicId);
 	if (mediaIndex === -1) throw new ApiError(404, 'Media item not found in the gallery.');
 
-	await deleteFile(publicId);
-	fest.gallery.splice(mediaIndex, 1);
+	const [mediaItem] = fest.gallery.splice(mediaIndex, 1);
+	await deleteFile({ public_id: mediaItem.publicId, resource_type: mediaItem.resource_type });
 	await fest.save();
 
 	return ApiResponse.success(res, null, 'Gallery media removed successfully');
