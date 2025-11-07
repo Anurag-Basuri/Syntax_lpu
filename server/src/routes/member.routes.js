@@ -32,18 +32,6 @@ router.get('/getall', getAllMembers);
 // Get Leaders (public)
 router.get('/getleaders', getLeaders);
 
-// Register Member
-router.post(
-	'/register',
-	validate([
-		body('fullname').notEmpty().withMessage('Full name is required'),
-		body('LpuId').notEmpty().withMessage('LPU ID is required'),
-		body('department').notEmpty().withMessage('Department is required'),
-		body('password').isLength({ min: 6 }).withMessage('Password must be at least 6 characters'),
-	]),
-	registerMember
-);
-
 // Login Member
 router.post(
 	'/login',
@@ -135,6 +123,20 @@ router.post(
 );
 
 // --- Protected Admin Routes ---
+
+// Register Member
+router.post(
+	'/register',
+	protect,
+	authorize('admin'),
+	validate([
+		body('fullname').notEmpty().withMessage('Full name is required'),
+		body('LpuId').notEmpty().withMessage('LPU ID is required'),
+		body('department').notEmpty().withMessage('Department is required'),
+		body('password').isLength({ min: 6 }).withMessage('Password must be at least 6 characters'),
+	]),
+	registerMember
+);
 
 // Update any member's profile by Admin
 router.put(
