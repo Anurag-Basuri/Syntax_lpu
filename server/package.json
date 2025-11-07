@@ -17,6 +17,7 @@
     "html5-qrcode": "^2.3.8",
     "instamojo-nodejs": "^0.0.5",
     "ioredis": "^5.7.0",
+    "json2csv": "^6.0.0-alpha.2",
     "jsonwebtoken": "^9.0.2",
     "mongoose": "^8.16.4",
     "mongoose-aggregate-paginate-v2": "^1.1.4",
