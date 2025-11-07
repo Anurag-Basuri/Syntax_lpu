@@ -6,6 +6,7 @@ import {
 	deleteEvent,
 	updateEventDetails,
 } from '../services/eventServices.js';
+import { toast } from 'react-hot-toast';
 
 // Hook to fetch a paginated list of all events
 export const useEvents = (params) => {
@@ -32,22 +33,37 @@ export const useManageEvent = () => {
 	const { mutate: addEvent, isPending: isCreating } = useMutation({
 		mutationFn: createEvent,
 		onSuccess: () => {
+			toast.success('Event created successfully!');
 			queryClient.invalidateQueries({ queryKey: ['events'] });
+		},
+		onError: (error) => {
+			toast.error(error.message);
+			console.error('Failed to create event:', error);
 		},
 	});
 
 	const { mutate: updateEvent, isPending: isUpdating } = useMutation({
 		mutationFn: ({ id, data }) => updateEventDetails(id, data),
-		onSuccess: (data, variables) => {
+		onSuccess: (data, { id }) => {
+			toast.success('Event updated successfully!');
 			queryClient.invalidateQueries({ queryKey: ['events'] });
-			queryClient.invalidateQueries({ queryKey: ['event', variables.id] });
+			queryClient.invalidateQueries({ queryKey: ['event', id] });
+		},
+		onError: (error) => {
+			toast.error(error.message);
+			console.error('Failed to update event:', error);
 		},
 	});
 
 	const { mutate: removeEvent, isPending: isDeleting } = useMutation({
 		mutationFn: deleteEvent,
 		onSuccess: () => {
+			toast.success('Event deleted.');
 			queryClient.invalidateQueries({ queryKey: ['events'] });
+		},
+		onError: (error) => {
+			toast.error(error.message);
+			console.error('Failed to delete event:', error);
 		},
 	});
 
