@@ -5,6 +5,8 @@ import {
 	adminLogin,
 	adminLogout,
 	adminRegister,
+	getCurrentAdmin,
+	getCurrentMember,
 } from '../services/authServices.js';
 import { getToken, decodeToken, removeToken, isTokenValid } from '../utils/handleTokens.js';
 
@@ -15,123 +17,110 @@ export const AuthProvider = ({ children }) => {
 	const [isAuthenticated, setIsAuthenticated] = useState(false);
 	const [loading, setLoading] = useState(true);
 
-	// Function to clear authentication state
+	// Function to clear all authentication state
 	const clearAuth = useCallback(() => {
 		setUser(null);
 		setIsAuthenticated(false);
 		removeToken();
+		setLoading(false);
 	}, []);
 
-	// Function to validate and load user from token
-	const validateAndLoadUser = useCallback(() => {
+	// Unified function to check token and fetch fresh user data from the backend
+	const checkAuthStatus = useCallback(async () => {
+		setLoading(true);
 		const { accessToken } = getToken();
 
-		if (!accessToken) {
+		if (!accessToken || !isTokenValid()) {
 			clearAuth();
-			setLoading(false);
-			return false;
+			return;
 		}
 
-		if (!isTokenValid()) {
-			console.log('Token expired, clearing authentication');
-			clearAuth();
-			setLoading(false);
-			return false;
-		}
+		try {
+			const decoded = decodeToken(accessToken);
+			let currentUser;
 
-		const decoded = decodeToken(accessToken);
-		if (decoded) {
-			setUser(decoded);
+			// Fetch user data based on role stored in the token
+			if (decoded.role === 'admin') {
+				currentUser = await getCurrentAdmin();
+			} else if (decoded.role === 'member') {
+				currentUser = await getCurrentMember();
+			} else {
+				throw new Error('Invalid user role in token');
+			}
+
+			setUser(currentUser);
 			setIsAuthenticated(true);
-			setLoading(false);
-			return true;
-		} else {
+		} catch (error) {
+			console.error('Authentication check failed:', error);
 			clearAuth();
+		} finally {
 			setLoading(false);
-			return false;
 		}
 	}, [clearAuth]);
 
-	// Load user from token on mount and set up interval checking
+	// Initial authentication check on component mount
 	useEffect(() => {
-		validateAndLoadUser();
-
-		// Check token validity every minute
-		const interval = setInterval(() => {
-			if (!isTokenValid()) {
-				console.log('Token expired during session, logging out');
-				clearAuth();
-				// Optionally show a notification here
-				if (
-					window.location.pathname.includes('/admin') ||
-					window.location.pathname.includes('/member')
-				) {
-					window.location.href = '/auth';
-				}
-			}
-		}, 60000); // Check every minute
-
-		return () => clearInterval(interval);
-	}, [validateAndLoadUser, clearAuth]);
+		checkAuthStatus();
+	}, [checkAuthStatus]);
 
 	// Member Login
-	const loginMember = useCallback(async (credentials) => {
-		if (credentials.identifier) {
-			if (credentials.identifier.includes('@')) {
-				credentials.email = credentials.identifier;
-			} else {
-				credentials.LpuId = credentials.identifier;
+	const loginMember = useCallback(
+		async (credentials) => {
+			// Handle identifier being either email or LpuId
+			const loginData = { ...credentials };
+			if (loginData.identifier) {
+				if (loginData.identifier.includes('@')) {
+					loginData.email = loginData.identifier;
+				} else {
+					loginData.LpuId = loginData.identifier;
+				}
+				delete loginData.identifier;
 			}
-			delete credentials.identifier;
-		}
-		const data = await memberLogin(credentials);
-		const decoded = decodeToken(data.accessToken);
-		setUser(decoded);
-		setIsAuthenticated(true);
-	}, []);
+			await memberLogin(loginData);
+			await checkAuthStatus(); // Fetch fresh user data after login
+		},
+		[checkAuthStatus]
+	);
 
 	// Member Logout
 	const logoutMember = useCallback(async () => {
 		try {
 			await memberLogout();
 		} catch (error) {
-			console.error('Logout error:', error);
+			console.error('Member logout API call failed:', error);
 		} finally {
-			clearAuth();
+			clearAuth(); // Always clear local state
 		}
 	}, [clearAuth]);
 
 	// Admin Login
-	const loginAdmin = useCallback(async (credentials) => {
-		const data = await adminLogin(credentials);
-		const decoded = decodeToken(data.accessToken);
-		setUser(decoded);
-		setIsAuthenticated(true);
-	}, []);
+	const loginAdmin = useCallback(
+		async (credentials) => {
+			await adminLogin(credentials);
+			await checkAuthStatus(); // Fetch fresh user data after login
+		},
+		[checkAuthStatus]
+	);
 
 	// Admin Register
-	const registerAdmin = useCallback(async (details) => {
-		const data = await adminRegister(details);
-		const decoded = decodeToken(data.accessToken);
-		setUser(decoded);
-		setIsAuthenticated(true);
-	}, []);
+	const registerAdmin = useCallback(
+		async (details) => {
+			await adminRegister(details);
+			await checkAuthStatus(); // Fetch fresh user data after registration
+		},
+		[checkAuthStatus]
+	);
 
 	// Admin Logout
 	const logoutAdmin = useCallback(async () => {
 		try {
 			await adminLogout();
 		} catch (error) {
-			console.error('Admin logout error:', error);
+			console.error('Admin logout API call failed:', error);
 		} finally {
-			clearAuth();
+			clearAuth(); // Always clear local state
 		}
 	}, [clearAuth]);
-
-	// Function to manually revalidate authentication
-	const revalidateAuth = useCallback(() => {
-		return validateAndLoadUser();
-	}, [validateAndLoadUser]);
 
 	return (
 		<AuthContext.Provider
@@ -144,7 +133,7 @@ export const AuthProvider = ({ children }) => {
 				loginAdmin,
 				registerAdmin,
 				logoutAdmin,
-				revalidateAuth,
+				revalidateAuth: checkAuthStatus, // Expose the unified check function
 			}}
 		>
 			{children}
