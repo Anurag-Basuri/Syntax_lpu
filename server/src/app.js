@@ -10,6 +10,7 @@ import { ApiResponse } from './utils/ApiResponse.js';
 // --- Route Imports ---
 import adminRouter from './routes/admin.routes.js';
 import applyRouter from './routes/apply.routes.js';
+import arvantisRouter from './routes/arvantis.routes.js';
 import contactRouter from './routes/contact.routes.js';
 import eventRoutes from './routes/event.routes.js';
 import memberRoutes from './routes/member.routes.js';
@@ -30,6 +31,7 @@ app.use(hpp()); // Protect against HTTP Parameter Pollution
 // --- API Routes ---
 app.use('/api/v1/admin', adminRouter);
 app.use('/api/v1/apply', applyRouter);
+app.use('/api/v1/arvantis', arvantisRouter);
 app.use('/api/v1/contact', contactRouter);
 app.use('/api/v1/events', eventRoutes);
 app.use('/api/v1/members', memberRoutes);
