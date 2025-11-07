@@ -7,6 +7,7 @@ import {
 	updateApplicationStatus,
 	deleteApplication,
 } from '../services/applyServices.js';
+import { toast } from 'react-hot-toast'; // Example: Import a toast library
 
 // Hook to fetch a paginated list of all applications
 export const useApplications = (params) => {
@@ -41,11 +42,13 @@ export const useManageApplication = () => {
 	const { mutate: updateStatus, isPending: isUpdating } = useMutation({
 		mutationFn: ({ id, status }) => updateApplicationStatus(id, status),
 		onSuccess: (data, { id }) => {
+			toast.success('Application status updated!');
 			queryClient.invalidateQueries({ queryKey: ['applications'] });
 			queryClient.invalidateQueries({ queryKey: ['application', id] });
 			queryClient.invalidateQueries({ queryKey: ['applicationStats'] });
 		},
 		onError: (error) => {
+			toast.error(error.message);
 			console.error('Failed to update status:', error);
 		},
 	});
@@ -53,10 +56,12 @@ export const useManageApplication = () => {
 	const { mutate: removeApplication, isPending: isDeleting } = useMutation({
 		mutationFn: deleteApplication,
 		onSuccess: () => {
+			toast.success('Application deleted.');
 			queryClient.invalidateQueries({ queryKey: ['applications'] });
 			queryClient.invalidateQueries({ queryKey: ['applicationStats'] });
 		},
 		onError: (error) => {
+			toast.error(error.message);
 			console.error('Failed to delete application:', error);
 		},
 	});
