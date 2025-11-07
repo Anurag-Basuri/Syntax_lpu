@@ -2,21 +2,19 @@ import Event from '../models/event.model.js';
 import { ApiError } from '../utils/ApiError.js';
 import { ApiResponse } from '../utils/ApiResponse.js';
 import { asyncHandler } from '../utils/asyncHandler.js';
-import { uploadFile, deleteFile } from '../utils/cloudinary.js';
+import { uploadFile, deleteFile, deleteFiles } from '../utils/cloudinary.js';
 import mongoose from 'mongoose';
 
-// Helper to parse and combine date and time into a single Date object
-const parseEventDate = (date, time) => {
-	if (!date || !time) {
-		throw ApiError.BadRequest('Both date and time are required to set the event date.');
+// Helper to find an event by its ID
+const findEventById = async (id) => {
+	if (!mongoose.Types.ObjectId.isValid(id)) {
+		throw new ApiError(400, 'Invalid event ID format.');
 	}
-	const eventDateTime = new Date(`${date}T${time}`);
-	if (isNaN(eventDateTime.getTime())) {
-		throw ApiError.BadRequest(
-			'Invalid date or time format. Use YYYY-MM-DD for date and HH:MM for time.'
-		);
+	const event = await Event.findById(id);
+	if (!event) {
+		throw new ApiError(404, 'Event not found.');
 	}
-	return eventDateTime;
+	return event;
 };
 
 // Create a new event
@@ -24,8 +22,7 @@ const createEvent = asyncHandler(async (req, res) => {
 	const {
 		title,
 		description,
-		date, // YYYY-MM-DD
-		time, // HH:MM (24-hour format)
+		eventDate,
 		venue,
 		organizer,
 		category,
@@ -36,46 +33,31 @@ const createEvent = asyncHandler(async (req, res) => {
 		registrationCloseDate,
 	} = req.body;
 
-	// --- Validation ---
-	const requiredFields = { title, description, date, time, venue, organizer, category };
-	const missingFields = Object.entries(requiredFields)
-		.filter(([_, value]) => !value)
-		.map(([key]) => key);
-
-	if (missingFields.length > 0) {
-		throw ApiError.BadRequest(`Missing required fields: ${missingFields.join(', ')}`);
-	}
-
 	if (!req.files || req.files.length === 0) {
-		throw ApiError.BadRequest('At least one event poster is required.');
+		throw new ApiError(400, 'At least one event poster is required.');
 	}
 
-	// The uploadFile utility now handles local file deletion, so no need for manual fs.unlinkSync
-	const posterUploadPromises = req.files.map((file) => uploadFile(file));
+	const posterUploadPromises = req.files.map((file) =>
+		uploadFile(file, { folder: 'events/posters' })
+	);
 	const uploadedPosters = await Promise.all(posterUploadPromises);
 
-	// --- Data Preparation ---
-	const eventDate = parseEventDate(date, time);
-	const tagsArray = tags ? tags.split(',').map((tag) => tag.trim()) : [];
-
-	// --- Database Creation ---
 	const newEvent = await Event.create({
 		title,
 		description,
-		eventDate,
+		eventDate: new Date(eventDate),
 		venue,
 		organizer,
 		category,
-		posters: uploadedPosters, // Already in { url, publicId } format
-		tags: tagsArray,
-		totalSpots: totalSpots ? parseInt(totalSpots, 10) : 0,
-		ticketPrice: ticketPrice ? parseFloat(ticketPrice) : 0,
-		// --- NEW: Set registration dates ---
+		posters: uploadedPosters,
+		tags: tags ? tags.split(',').map((tag) => tag.trim()) : [],
+		totalSpots,
+		ticketPrice,
 		registrationOpenDate: registrationOpenDate ? new Date(registrationOpenDate) : null,
 		registrationCloseDate: registrationCloseDate ? new Date(registrationCloseDate) : null,
 	});
 
-	return ApiResponse.success(res, { event: newEvent }, 'Event created successfully', 201);
+	return ApiResponse.success(res, newEvent, 'Event created successfully', 201);
 });
 
 // Get all events with filtering, sorting, and pagination
@@ -90,158 +72,116 @@ const getAllEvents = asyncHandler(async (req, res) => {
 		sortOrder = 'asc',
 	} = req.query;
 
-	const filter = {};
+	const pipeline = [];
+	const matchStage = {};
 	const now = new Date();
 
-	// Text search using the index on the model
-	if (search) {
-		filter.$text = { $search: search.trim() };
+	if (search) matchStage.$text = { $search: search.trim() };
+	if (status) matchStage.status = status;
+	if (period === 'upcoming') matchStage.eventDate = { $gte: now };
+	if (period === 'past') matchStage.eventDate = { $lt: now };
+
+	if (Object.keys(matchStage).length > 0) {
+		pipeline.push({ $match: matchStage });
 	}
 
-	// Filter by status
-	if (status && ['upcoming', 'ongoing', 'completed', 'cancelled', 'postponed'].includes(status)) {
-		filter.status = status;
-	}
+	// Add a field for the count of registered users instead of populating
+	pipeline.push({
+		$addFields: {
+			registeredUsersCount: { $size: '$registeredUsers' },
+		},
+	});
 
-	// Filter by period (upcoming/past)
-	if (period === 'upcoming') {
-		filter.eventDate = { $gte: now };
-	} else if (period === 'past') {
-		filter.eventDate = { $lt: now };
-	}
+	// Project the final fields to send in the response
+	pipeline.push({
+		$project: {
+			title: 1,
+			eventDate: 1,
+			venue: 1,
+			category: 1,
+			status: 1,
+			ticketPrice: 1,
+			posters: { $slice: ['$posters', 1] }, // Only get the first poster for list view
+			registeredUsersCount: 1,
+		},
+	});
 
-	const pageNum = parseInt(page, 10);
-	const limitNum = parseInt(limit, 10);
-
-	const sortDirection = sortOrder === 'desc' ? -1 : 1;
-	const allowedSortFields = ['eventDate', 'createdAt', 'title', 'status'];
-	const sortField = allowedSortFields.includes(sortBy) ? sortBy : 'eventDate';
-
+	const aggregate = Event.aggregate(pipeline);
 	const options = {
-		page: pageNum,
-		limit: limitNum,
-		sort: { [sortField]: sortDirection },
+		page: parseInt(page, 10),
+		limit: parseInt(limit, 10),
+		sort: { [sortBy]: sortOrder === 'asc' ? 1 : 1 },
 		lean: true,
-		populate: 'registeredUsers', // Optionally populate registered users
 	};
 
-	const events = await Event.paginate(filter, options);
-
-	return ApiResponse.paginated(
-		res,
-		events.docs,
-		{
-			totalDocs: events.totalDocs,
-			totalPages: events.totalPages,
-			currentPage: events.page,
-			limit: events.limit,
-			hasNextPage: events.hasNextPage,
-			hasPrevPage: events.hasPrevPage,
-		},
-		'Events retrieved successfully'
-	);
+	const events = await Event.aggregatePaginate(aggregate, options);
+	return ApiResponse.paginated(res, events.docs, events, 'Events retrieved successfully');
 });
 
 // Get a single event by ID
 const getEventById = asyncHandler(async (req, res) => {
-	const { id } = req.params;
-
-	if (!mongoose.Types.ObjectId.isValid(id)) {
-		throw ApiError.BadRequest('Invalid event ID format');
-	}
-
-	const event = await Event.findById(id).populate('registeredUsers', 'name email'); // Populate with user details
-	if (!event) {
-		throw ApiError.NotFound('Event not found');
-	}
-
-	return ApiResponse.success(res, { event }, 'Event retrieved successfully');
+	const event = await findEventById(req.params.id);
+	await event.populate('registeredUsers', 'fullname email LpuId');
+	return ApiResponse.success(res, event, 'Event retrieved successfully');
 });
 
-// Update an existing event
-const updateEvent = asyncHandler(async (req, res) => {
-	const { id } = req.params;
-	if (!mongoose.Types.ObjectId.isValid(id)) {
-		throw ApiError.BadRequest('Invalid event ID format');
-	}
-
-	const {
-		title,
-		description,
-		date,
-		time,
-		venue,
-		organizer,
-		category,
-		tags,
-		totalSpots,
-		ticketPrice,
-		status,
-		registrationOpenDate,
-		registrationCloseDate,
-	} = req.body;
-
-	const event = await Event.findById(id);
-	if (!event) {
-		throw ApiError.NotFound('Event not found');
-	}
-
-	// --- Handle Poster Updates ---
-	if (req.files && req.files.length > 0) {
-		// Delete old posters from Cloudinary
-		const deletePromises = event.posters.map((poster) =>
-			deleteFile({ public_id: poster.publicId, resource_type: 'image' })
-		);
-		await Promise.all(deletePromises);
-
-		// Upload new posters
-		const uploadPromises = req.files.map((file) => uploadFile(file));
-		event.posters = await Promise.all(uploadPromises);
-	}
-
-	// --- Update Fields ---
-	if (title) event.title = title;
-	if (description) event.description = description;
-	if (venue) event.venue = venue;
-	if (organizer) event.organizer = organizer;
-	if (category) event.category = category;
-	if (status) event.status = status;
-	if (tags) event.tags = tags.split(',').map((tag) => tag.trim());
-	if (totalSpots) event.totalSpots = parseInt(totalSpots, 10);
-	if (ticketPrice) event.ticketPrice = parseFloat(ticketPrice);
-	if (date && time) event.eventDate = parseEventDate(date, time);
-	if (registrationOpenDate) event.registrationOpenDate = new Date(registrationOpenDate);
-	if (registrationCloseDate) event.registrationCloseDate = new Date(registrationCloseDate);
-
+// Update an existing event's details
+const updateEventDetails = asyncHandler(async (req, res) => {
+	const event = await findEventById(req.params.id);
+	Object.assign(event, req.body);
 	const updatedEvent = await event.save();
-
-	return ApiResponse.success(res, { event: updatedEvent }, 'Event updated successfully');
+	return ApiResponse.success(res, updatedEvent, 'Event details updated successfully');
 });
 
 // Delete an event
 const deleteEvent = asyncHandler(async (req, res) => {
-	const { id } = req.params;
-	if (!mongoose.Types.ObjectId.isValid(id)) {
-		throw ApiError.BadRequest('Invalid event ID format');
-	}
+	const event = await findEventById(req.params.id);
 
-	const event = await Event.findById(id);
-	if (!event) {
-		throw ApiError.NotFound('Event not found');
-	}
-
-	// Delete posters from Cloudinary
 	if (event.posters && event.posters.length > 0) {
-		const deletePromises = event.posters.map((poster) =>
-			deleteFile({ public_id: poster.publicId, resource_type: 'image' })
-		);
-		await Promise.all(deletePromises);
+		const mediaToDelete = event.posters.map((p) => ({
+			public_id: p.publicId,
+			resource_type: p.resource_type,
+		}));
+		await deleteFiles(mediaToDelete);
 	}
 
-	await Event.findByIdAndDelete(id);
-
-	return ApiResponse.success(res, null, 'Event deleted successfully');
+	await Event.findByIdAndDelete(req.params.id);
+	return ApiResponse.success(res, null, 'Event deleted successfully', 204);
 });
+
+// --- Poster Management ---
+
+// Add a new poster to an event
+const addEventPoster = asyncHandler(async (req, res) => {
+	const event = await findEventById(req.params.id);
+	if (!req.file) throw new ApiError(400, 'Poster file is required.');
+
+	const poster = await uploadFile(req.file, { folder: 'events/posters' });
+	event.posters.push(poster);
+	await event.save();
+
+	return ApiResponse.success(res, event.posters, 'Poster added successfully', 201);
+});
+
+// Remove a poster from an event by its publicId
+const removeEventPoster = asyncHandler(async (req, res) => {
+	const { id, publicId } = req.params;
+	const event = await findEventById(id);
+
+	const posterIndex = event.posters.findIndex((p) => p.publicId === publicId);
+	if (posterIndex === -1) throw new ApiError(404, 'Poster not found on this event.');
+
+	const [removedPoster] = event.posters.splice(posterIndex, 1);
+	await deleteFile({
+		public_id: removedPoster.publicId,
+		resource_type: removedPoster.resource_type,
+	});
+	await event.save();
+
+	return ApiResponse.success(res, null, 'Poster removed successfully');
+});
+
+// --- Analytics & Registrations ---
 
 // Get statistics about all events
 const getEventStats = asyncHandler(async (req, res) => {
@@ -257,8 +197,10 @@ const getEventStats = asyncHandler(async (req, res) => {
 		},
 		{
 			$project: {
-				totalEvents: { $arrayElemAt: ['$totalEvents.count', 0] },
-				totalRegistrations: { $arrayElemAt: ['$totalRegistrations.total', 0] },
+				totalEvents: { $ifNull: [{ $arrayElemAt: ['$totalEvents.count', 0] }, 0] },
+				totalRegistrations: {
+					$ifNull: [{ $arrayElemAt: ['$totalRegistrations.total', 0] }, 0],
+				},
 				statusCounts: {
 					$arrayToObject: {
 						$map: {
@@ -272,39 +214,20 @@ const getEventStats = asyncHandler(async (req, res) => {
 		},
 	]);
 
-	const formattedStats = {
-		totalEvents: stats[0]?.totalEvents || 0,
-		totalRegistrations: stats[0]?.totalRegistrations || 0,
-		...stats[0]?.statusCounts,
-	};
-
-	return ApiResponse.success(
-		res,
-		{ stats: formattedStats },
-		'Event statistics retrieved successfully.'
-	);
+	return ApiResponse.success(res, stats[0], 'Event statistics retrieved successfully.');
 });
 
 // Get a list of all users registered for a specific event
 const getEventRegistrations = asyncHandler(async (req, res) => {
-	const { id: eventId } = req.params;
-
-	if (!mongoose.Types.ObjectId.isValid(eventId)) {
-		throw ApiError.BadRequest('Invalid event ID format');
-	}
-
-	const event = await Event.findById(eventId).populate({
+	const event = await findEventById(req.params.id);
+	await event.populate({
 		path: 'registeredUsers',
-		select: 'fullname email LpuId department', // Select fields you want to show
+		select: 'fullname email LpuId department',
 	});
-
-	if (!event) {
-		throw ApiError.NotFound('Event not found');
-	}
 
 	return ApiResponse.success(
 		res,
-		{ registrations: event.registeredUsers },
+		event.registeredUsers,
 		'Successfully retrieved event registrations.'
 	);
 });
@@ -313,8 +236,10 @@ export {
 	createEvent,
 	getAllEvents,
 	getEventById,
-	updateEvent,
+	updateEventDetails,
 	deleteEvent,
+	addEventPoster,
+	removeEventPoster,
 	getEventStats,
 	getEventRegistrations,
 };
