@@ -1,9 +1,9 @@
-import React, { useEffect, useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { useInView } from 'react-intersection-observer';
-import { Calendar, MapPin, Users, ArrowRight, Sparkles, Ticket, Clock } from 'lucide-react';
+import { Calendar, MapPin, Users, ArrowRight, Sparkles, Ticket, Clock, Star } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
-import { publicClient } from '../services/api.js';
+import { useUpcomingEvent } from '../hooks/useEvents.js';
 
 const containerVariants = {
 	hidden: { opacity: 0, y: 50 },
@@ -49,26 +49,11 @@ const UpcomingEventShowcase = () => {
 		threshold: 0.1,
 	});
 
-	const [event, setEvent] = useState(null);
-	const [loading, setLoading] = useState(true);
+	const { data: event, isLoading, isError } = useUpcomingEvent();
 	const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
 	const navigate = useNavigate();
 
 	useEffect(() => {
-		const fetchUpcomingEvent = async () => {
-			try {
-				const res = await publicClient.get('/api/events/upcoming-event');
-				setTimeout(() => {
-					setEvent(res.data.data);
-					setLoading(false);
-				}, 700);
-			} catch (error) {
-				setLoading(false);
-			}
-		};
-
-		fetchUpcomingEvent();
-
 		const handleResize = () => {
 			setIsMobile(window.innerWidth < 768);
 		};
@@ -76,7 +61,7 @@ const UpcomingEventShowcase = () => {
 		return () => window.removeEventListener('resize', handleResize);
 	}, []);
 
-	if (loading) {
+	if (isLoading) {
 		return (
 			<section className="section-container py-normal relative z-10 bg-transparent min-h-[60vh]">
 				<div className="max-w-4xl mx-auto">
@@ -102,7 +87,7 @@ const UpcomingEventShowcase = () => {
 		);
 	}
 
-	if (!event) {
+	if (isError || !event) {
 		return (
 			<section className="py-24 px-4 relative z-10 bg-transparent min-h-[60vh] flex items-center justify-center">
 				<motion.div
@@ -144,8 +129,8 @@ const UpcomingEventShowcase = () => {
 	// Format date and time (robust)
 	let dateStr = '--';
 	let timeStr = '--';
-	if (event?.date) {
-		const eventDate = new Date(event.date);
+	if (event?.eventDate) {
+		const eventDate = new Date(event.eventDate);
 		if (!isNaN(eventDate)) {
 			dateStr = eventDate.toLocaleDateString(undefined, {
 				weekday: 'long',
@@ -153,12 +138,10 @@ const UpcomingEventShowcase = () => {
 				month: 'short',
 				day: 'numeric',
 			});
-			timeStr = event.time
-				? event.time
-				: eventDate.toLocaleTimeString(undefined, {
-						hour: '2-digit',
-						minute: '2-digit',
-				  });
+			timeStr = eventDate.toLocaleTimeString(undefined, {
+				hour: '2-digit',
+				minute: '2-digit',
+			});
 		}
 	}
 
@@ -166,13 +149,13 @@ const UpcomingEventShowcase = () => {
 	const poster = event.posters && event.posters.length > 0 ? event.posters[0] : null;
 
 	// Slots available (never negative)
+	const spotsLeft = event.spotsLeft;
 	const slots =
-		typeof event.totalSpots === 'number'
-			? Math.max(
-					0,
-					event.totalSpots - 152 - (event.registrations ? event.registrations.length : 0)
-			  )
-			: null;
+		spotsLeft === Infinity
+			? 'Open Registration'
+			: spotsLeft !== null
+			? `${spotsLeft} spots left`
+			: 'N/A';
 
 	// ExpandableText component for mobile description
 	function ExpandableText({ text, maxChars = 100, className }) {
@@ -288,9 +271,7 @@ const UpcomingEventShowcase = () => {
 												style={{ color: 'var(--accent-1)' }}
 											/>
 											<span className="text-white text-xs font-bold">
-												{slots !== null
-													? `${slots} spots`
-													: 'Open Registration'}
+												{slots}
 											</span>
 										</motion.div>
 									</div>
@@ -447,19 +428,7 @@ const UpcomingEventShowcase = () => {
 							<div className="relative z-10">
 								<div className="flex items-center gap-3 mb-6">
 									<div className="w-12 h-12 rounded-full bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center shadow-lg">
-										<svg
-											className="w-6 h-6 text-white"
-											fill="none"
-											stroke="currentColor"
-											viewBox="0 0 24 24"
-										>
-											<path
-												strokeLinecap="round"
-												strokeLinejoin="round"
-												strokeWidth={2}
-												d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"
-											/>
-										</svg>
+										<Calendar className="w-6 h-6 text-white" />
 									</div>
 									<h3 className="text-2xl md:text-3xl font-bold bg-gradient-to-r from-indigo-300 to-purple-300 bg-clip-text text-transparent">
 										{event?.title || 'Upcoming Event'}
@@ -510,19 +479,7 @@ const UpcomingEventShowcase = () => {
 							<div className="relative z-10">
 								<div className="flex items-center gap-3 mb-6">
 									<div className="w-12 h-12 rounded-full bg-gradient-to-br from-purple-500 to-pink-600 flex items-center justify-center shadow-lg">
-										<svg
-											className="w-6 h-6 text-white"
-											fill="none"
-											stroke="currentColor"
-											viewBox="0 0 24 24"
-										>
-											<path
-												strokeLinecap="round"
-												strokeLinejoin="round"
-												strokeWidth={2}
-												d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"
-											/>
-										</svg>
+										<Star className="w-6 h-6 text-white" />
 									</div>
 									<h3 className="text-2xl md:text-3xl font-bold bg-gradient-to-r from-purple-300 to-pink-300 bg-clip-text text-transparent">
 										Event Poster
@@ -536,27 +493,15 @@ const UpcomingEventShowcase = () => {
 											'linear-gradient(135deg, rgba(0,200,255,0.15), rgba(0,150,255,0.15))',
 									}}
 								>
-									{event?.images?.[0] ? (
+									{poster?.url ? (
 										<img
-											src={event.images[0]}
+											src={poster.url}
 											alt="Event Poster"
 											className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
 										/>
 									) : (
 										<div className="w-full h-full flex items-center justify-center text-indigo-300">
-											<svg
-												className="w-16 h-16"
-												fill="none"
-												stroke="currentColor"
-												viewBox="0 0 24 24"
-											>
-												<path
-													strokeLinecap="round"
-													strokeLinejoin="round"
-													strokeWidth={2}
-													d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"
-												/>
-											</svg>
+											<Star className="w-16 h-16 opacity-50" />
 										</div>
 									)}
 								</div>

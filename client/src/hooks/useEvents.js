@@ -26,6 +26,16 @@ export const useEvent = (id) => {
 	});
 };
 
+// Hook to fetch the single next upcoming event
+export const useUpcomingEvent = () => {
+	return useQuery({
+		queryKey: ['upcomingEvent'],
+		queryFn: () => getAllEvents({ period: 'upcoming', limit: 1, sortBy: 'eventDate' }),
+		// The data will be the first event in the returned array
+		select: (data) => data?.docs?.[0],
+	});
+};
+
 // Hook to manage event mutations (create, update, delete)
 export const useManageEvent = () => {
 	const queryClient = useQueryClient();
