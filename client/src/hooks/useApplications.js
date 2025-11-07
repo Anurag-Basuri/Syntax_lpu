@@ -13,7 +13,7 @@ export const useApplications = (params) => {
 	return useQuery({
 		queryKey: ['applications', params],
 		queryFn: () => getAllApplications(params),
-		keepPreviousData: true, // Useful for pagination
+		keepPreviousData: true,
 	});
 };
 
@@ -22,7 +22,7 @@ export const useApplication = (id) => {
 	return useQuery({
 		queryKey: ['application', id],
 		queryFn: () => getApplicationById(id),
-		enabled: !!id, // Only run the query if an ID is provided
+		enabled: !!id,
 	});
 };
 
@@ -40,10 +40,13 @@ export const useManageApplication = () => {
 
 	const { mutate: updateStatus, isPending: isUpdating } = useMutation({
 		mutationFn: ({ id, status }) => updateApplicationStatus(id, status),
-		onSuccess: () => {
-			// Invalidate and refetch the applications list to show the change
+		onSuccess: (data, { id }) => {
 			queryClient.invalidateQueries({ queryKey: ['applications'] });
+			queryClient.invalidateQueries({ queryKey: ['application', id] });
 			queryClient.invalidateQueries({ queryKey: ['applicationStats'] });
+		},
+		onError: (error) => {
+			console.error('Failed to update status:', error);
 		},
 	});
 
@@ -52,6 +55,9 @@ export const useManageApplication = () => {
 		onSuccess: () => {
 			queryClient.invalidateQueries({ queryKey: ['applications'] });
 			queryClient.invalidateQueries({ queryKey: ['applicationStats'] });
+		},
+		onError: (error) => {
+			console.error('Failed to delete application:', error);
 		},
 	});
 
