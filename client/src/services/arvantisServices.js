@@ -56,7 +56,7 @@ export const getFestDetails = async (identifier) => {
  */
 export const createFest = async (festData) => {
 	try {
-		const response = await apiClient.post('/api/v1/arvanis', festData);
+		const response = await apiClient.post('/api/v1/arvantis', festData);
 		return response.data.data;
 	} catch (error) {
 		throw new Error(error.message || 'Failed to create fest.');

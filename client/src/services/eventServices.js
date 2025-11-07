@@ -6,7 +6,7 @@ export const getAllEvents = async (params) => {
 		const response = await publicClient.get('/api/v1/events', { params });
 		return response.data;
 	} catch (error) {
-		throw new Error(error.message || 'Failed to fetch events.');
+		throw new Error(error.response?.data?.message || 'Failed to fetch events.');
 	}
 };
 
@@ -16,7 +16,7 @@ export const getEventById = async (id) => {
 		const response = await publicClient.get(`/api/v1/events/${id}`);
 		return response.data.data;
 	} catch (error) {
-		throw new Error(error.message || 'Failed to fetch event details.');
+		throw new Error(error.response?.data?.message || 'Failed to fetch event details.');
 	}
 };
 

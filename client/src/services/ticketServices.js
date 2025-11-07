@@ -36,7 +36,7 @@ export const getTicketsByEvent = async (params) => {
 		const response = await apiClient.get('/api/v1/tickets', { params });
 		return response.data;
 	} catch (error) {
-		throw new Error(error.response?.data?.message || 'Failed to fetch tickets.');
+		throw new Error(error.message || 'Failed to fetch tickets.');
 	}
 };
 
@@ -46,7 +46,7 @@ export const updateTicketStatus = async (ticketId, status) => {
 		const response = await apiClient.patch(`/api/v1/tickets/${ticketId}/status`, { status });
 		return response.data.data;
 	} catch (error) {
-		throw new Error(error.response?.data?.message || 'Failed to update ticket status.');
+		throw new Error(error.message || 'Failed to update ticket status.');
 	}
 };
 
@@ -56,6 +56,6 @@ export const deleteTicket = async (ticketId) => {
 		const response = await apiClient.delete(`/api/v1/tickets/${ticketId}`);
 		return response.data;
 	} catch (error) {
-		throw new Error(error.response?.data?.message || 'Failed to delete ticket.');
+		throw new Error(error.message || 'Failed to delete ticket.');
 	}
 };
