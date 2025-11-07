@@ -19,7 +19,7 @@ import {
 	generateFestReport,
 } from '../controllers/arvantis.controller.js';
 import { authMiddleware } from '../middlewares/auth.middleware.js';
-import { upload } from '../middlewares/multer.middleware.js';
+import { uploadFile } from '../middlewares/multer.middleware.js';
 import { validate } from '../middlewares/validator.middleware.js';
 import { body, param } from 'express-validator';
 
@@ -102,7 +102,7 @@ router.delete(
 // --- Partner Management ---
 router.post(
 	'/:identifier/partners',
-	upload.single('logo'), // Expect a single file in a field named 'logo'
+	uploadFile('logo'), // Correctly use the uploadFile middleware factory
 	validate([
 		param('identifier').notEmpty().withMessage('Fest identifier is required'),
 		body('name').notEmpty().trim().withMessage('Partner name is required'),
@@ -144,14 +144,14 @@ router.delete(
 // --- Media Management ---
 router.patch(
 	'/:identifier/poster',
-	upload.single('poster'), // Expect a single file in a field named 'poster'
+	uploadFile('poster'), // Correctly use the uploadFile middleware factory
 	validate([param('identifier').notEmpty().withMessage('Fest identifier is required')]),
 	updateFestPoster
 );
 
 router.post(
 	'/:identifier/gallery',
-	upload.array('media', 10), // Expect multiple files (up to 10) in a field named 'media'
+	uploadFile('media'), // Correctly use the uploadFile middleware factory
 	validate([param('identifier').notEmpty().withMessage('Fest identifier is required')]),
 	addGalleryMedia
 );
