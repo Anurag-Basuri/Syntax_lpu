@@ -1,11 +1,11 @@
 import express from 'express';
 import cookieParser from 'cookie-parser';
 import helmet from 'helmet';
-import hpp from 'hpp';
 import mongoSanitize from 'express-mongo-sanitize';
 import { applyCors } from './middlewares/cors.middleware.js';
 import { ApiError } from './utils/ApiError.js';
 import { ApiResponse } from './utils/ApiResponse.js';
+import colors from 'colors';
 
 // --- Route Imports ---
 import adminRouter from './routes/admin.routes.js';
@@ -26,7 +26,48 @@ app.use(express.json({ limit: '16kb' }));
 app.use(express.urlencoded({ extended: true, limit: '16kb' }));
 app.use(cookieParser());
 app.use(mongoSanitize()); // Sanitize user-supplied data
-app.use(hpp()); // Protect against HTTP Parameter Pollution
+
+// --- Query Pollution Prevention Middleware ---
+app.use((req, _res, next) => {
+	if (req.query) {
+		for (const key of Object.keys(req.query)) {
+			const val = req.query[key];
+			if (Array.isArray(val)) {
+				// keep the first value (typical anti-pollution strategy)
+				req.query[key] = val[0];
+			}
+		}
+	}
+	next();
+});
+
+// --- Request Logging Middleware (routes visibility) ---
+app.use((req, res, next) => {
+	const start = process.hrtime.bigint();
+	res.on('finish', () => {
+		const diffMs = Number(process.hrtime.bigint() - start) / 1e6;
+		const status = res.statusCode;
+
+		const statusColor =
+			status >= 500 ? 'red' : status >= 400 ? 'yellow' : status >= 300 ? 'cyan' : 'green';
+
+		const methodColorMap = {
+			GET: 'blue',
+			POST: 'magenta',
+			PUT: 'yellow',
+			PATCH: 'white',
+			DELETE: 'red',
+		};
+		const methodColored = colors[methodColorMap[req.method] || 'grey'](req.method);
+		const statusColored = colors[statusColor](String(status));
+		const timeColored = colors.gray(`${diffMs.toFixed(1)}ms`);
+
+		console.log(
+			`${colors.bold('[ROUTE]')} ${methodColored} ${colors.gray(req.originalUrl)} => ${statusColored} ${timeColored}`
+		);
+	});
+	next();
+});
 
 // --- API Routes ---
 app.use('/api/v1/admin', adminRouter);
@@ -43,29 +84,26 @@ app.get('/api/v1/health', (req, res) => {
 	return ApiResponse.success(res, { status: 'ok' }, 'API is healthy');
 });
 
-// --- Error Handling ---
-// 404 Not Found handler for API routes
-app.use('/api', (req, res, next) => {
+// --- 404 Handler (only API namespace) ---
+app.use('/api', (req, _res, next) => {
 	next(ApiError.NotFound('The requested resource was not found on this server.'));
 });
 
-// Global error handler
-app.use((err, req, res, next) => {
-	// If the error is not an instance of our custom ApiError, create one
+// --- Global Error Handler ---
+app.use((err, req, res, _next) => {
 	const apiError =
 		err instanceof ApiError
 			? err
 			: new ApiError(err.statusCode || 500, err.message || 'Internal Server Error');
 
-	// Log the error for debugging
 	console.error(
-		`❌ [${apiError.statusCode}] - ${apiError.message} - ${req.originalUrl} - ${req.method}`.red
+		`❌ [${apiError.statusCode}] ${apiError.message} - ${req.method} ${req.originalUrl}`.red
 	);
+
 	if (process.env.NODE_ENV === 'development' && apiError.stack) {
 		console.error(apiError.stack.grey);
 	}
 
-	// Send a standardized error response
 	return ApiResponse.error(res, apiError);
 });
 
