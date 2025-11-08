@@ -62,7 +62,9 @@ const memberSchema = new mongoose.Schema(
 		},
 		email: {
 			type: String,
-			default: uuidv4(),
+			required: true,
+			unique: true,
+			lowercase: true,
 		},
 		phone: {
 			type: String,
@@ -287,17 +289,17 @@ memberSchema.statics.findByLpuID = async function (lpuID) {
 
 memberSchema.methods.generateAuthToken = function () {
 	return jwt.sign(
-		{ id: this._id, memberID: this.memberID, role: 'member', designation: this.designation },
+		{ id: this._id, memberID: this.memberID, role: this.role, designation: this.designation },
 		process.env.ACCESS_TOKEN_SECRET,
-        { expiresIn: process.env.ACCESS_TOKEN_EXPIRY || '1d' }
+		{ expiresIn: process.env.ACCESS_TOKEN_EXPIRY || '1d' }
 	);
 };
 
 memberSchema.methods.generateRefreshToken = function () {
 	return jwt.sign(
-		{ id: this._id, memberID: this.memberID },
+		{ id: this._id, role: this.role },
 		process.env.REFRESH_TOKEN_SECRET,
-        { expiresIn: process.env.REFRESH_TOKEN_EXPIRY || '7d' }
+		{ expiresIn: process.env.REFRESH_TOKEN_EXPIRY || '7d' }
 	);
 };
 

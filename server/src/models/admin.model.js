@@ -21,6 +21,12 @@ const adminSchema = new mongoose.Schema(
 			minlength: 6,
 		},
 
+		role: {
+			type: String,
+			default: 'admin',
+			enum: ['admin'],
+		},
+
 		refreshToken: {
 			type: String,
 			select: false,
@@ -48,7 +54,7 @@ adminSchema.methods.comparePassword = async function (candidatePassword) {
 // Generate JWT token
 adminSchema.methods.generateAuthToken = function () {
 	return jwt.sign(
-		{ id: this._id, role:'admin', adminID: this.adminID },
+		{ id: this._id, role: this.role, adminID: this.adminID },
 		process.env.ACCESS_TOKEN_SECRET,
 		{ expiresIn: process.env.ACCESS_TOKEN_EXPIRY || '1d' }
 	);
@@ -57,7 +63,7 @@ adminSchema.methods.generateAuthToken = function () {
 // Generate refresh token
 adminSchema.methods.generateRefreshToken = function () {
 	return jwt.sign(
-		{ id: this._id, role: 'admin' },
+		{ id: this._id, role: this.role },
 		process.env.REFRESH_TOKEN_SECRET,
 		{ expiresIn: process.env.REFRESH_TOKEN_EXPIRY || '7d' }
 	);
