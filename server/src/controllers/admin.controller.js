@@ -2,6 +2,7 @@ import Admin from '../models/admin.model.js';
 import { ApiError } from '../utils/ApiError.js';
 import { ApiResponse } from '../utils/ApiResponse.js';
 import { asyncHandler } from '../utils/asyncHandler.js';
+import jwt from 'jsonwebtoken';
 
 const generateAndSendTokens = async (admin, res, message, statusCode) => {
 	const accessToken = admin.generateAuthToken();
@@ -89,8 +90,33 @@ const currentAdmin = asyncHandler(async (req, res) => {
 	if (!admin) {
 		throw ApiError.Unauthorized('Unauthorized request');
 	}
-	
+
 	return ApiResponse.success(res, admin, 'Current admin retrieved successfully');
 });
 
-export { createAdmin, loginAdmin, logoutAdmin, currentAdmin };
+// Add this new controller function
+const refreshAccessToken = asyncHandler(async (req, res) => {
+	const incomingRefreshToken = req.body.refreshToken || req.cookies.refreshToken;
+
+	if (!incomingRefreshToken) {
+		throw new ApiError(401, 'Refresh token is required');
+	}
+
+	const decodedToken = jwt.verify(incomingRefreshToken, process.env.REFRESH_TOKEN_SECRET);
+
+	const admin = await Admin.findById(decodedToken._id);
+
+	if (!admin) {
+		throw new ApiError(401, 'Invalid refresh token');
+	}
+
+	if (incomingRefreshToken !== admin.refreshToken) {
+		throw new ApiError(401, 'Refresh token is expired or has been used');
+	}
+
+	const accessToken = admin.generateAuthToken();
+
+	return ApiResponse.success(res, { accessToken }, 'Access token refreshed successfully');
+});
+
+export { createAdmin, loginAdmin, logoutAdmin, currentAdmin, refreshAccessToken };
