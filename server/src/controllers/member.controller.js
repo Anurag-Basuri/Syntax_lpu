@@ -140,7 +140,7 @@ const unbanMember = asyncHandler(async (req, res) => {
 
 // Logout member
 const logoutMember = asyncHandler(async (req, res) => {
-	const member = req.user; // FIX: Changed from req.member to req.user
+	const member = req.user;
 
 	if (!member) {
 		throw ApiError.Unauthorized('Unauthorized access');

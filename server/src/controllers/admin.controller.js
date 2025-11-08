@@ -66,11 +66,11 @@ const loginAdmin = asyncHandler(async (req, res) => {
 
 // Logout Admin
 const logoutAdmin = asyncHandler(async (req, res) => {
-	const adminId = req.admin?._id;
+    const adminId = req.user?._id;
 
-	if (!adminId) {
-		throw ApiError.Unauthorized('No admin to logout');
-	}
+    if (!adminId) {
+        throw ApiError.Unauthorized('No admin to logout');
+    }
 
 	// Clear the refresh token from the database
 	await Admin.findByIdAndUpdate(adminId, { $unset: { refreshToken: 1 } }, { new: true });
@@ -86,12 +86,12 @@ const logoutAdmin = asyncHandler(async (req, res) => {
 
 // Get current admin
 const currentAdmin = asyncHandler(async (req, res) => {
-	const admin = req.admin;
-	if (!admin) {
-		throw ApiError.Unauthorized('Unauthorized request');
-	}
+    const admin = req.user;
+    if (!admin) {
+        throw ApiError.Unauthorized('Unauthorized request');
+    }
 
-	return ApiResponse.success(res, admin, 'Current admin retrieved successfully');
+    return ApiResponse.success(res, admin, 'Current admin retrieved successfully');
 });
 
 // Add this new controller function
