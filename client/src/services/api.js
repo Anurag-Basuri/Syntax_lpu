@@ -26,37 +26,28 @@ const publicClient = axios.create({
 	withCredentials: true,
 });
 
-apiClient.interceptors.request.use((config) => {
-	const { accessToken } = getToken();
+apiClient.interceptors.request.use(
+	(config) => {
+		const { accessToken } = getToken();
 
-	// Check if token is valid before making request
-	if (accessToken && isTokenValid()) {
-		config.headers['Authorization'] = `Bearer ${accessToken}`;
-	} else if (accessToken && !isTokenValid()) {
-		// Token is expired, remove it and redirect
-		removeToken();
-		window.location.href = '/auth';
-		return Promise.reject(new Error('Token expired'));
+		if (accessToken && isTokenValid()) {
+			config.headers['Authorization'] = `Bearer ${accessToken}`;
+		} else if (accessToken && !isTokenValid()) {
+			return Promise.reject(new Error('Token expired'));
+		}
+
+		return config;
+	},
+	(error) => {
+		return Promise.reject(error);
 	}
-
-	return config;
-});
+);
 
 apiClient.interceptors.response.use(
 	(response) => {
-		// Handle successful responses
 		return response;
 	},
 	(error) => {
-		// Handle errors
-		if (error.response) {
-			const { status } = error.response;
-			if (status === 401) {
-				removeToken();
-				window.location.href = '/auth';
-			}
-			return Promise.reject(error.response.data);
-		}
 		return Promise.reject(error);
 	}
 );

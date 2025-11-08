@@ -5,6 +5,8 @@ import { setToken, removeToken } from '../utils/handleTokens.js';
 export const memberRegister = async (data) => {
 	try {
 		const response = await apiClient.post('/api/v1/members/register', data);
+		const { accessToken, refreshToken } = response.data.data;
+		setToken({ accessToken, refreshToken });
 		return response.data;
 	} catch (error) {
 		throw new Error(error.message || 'Failed to register member.');
@@ -49,6 +51,7 @@ export const adminRegister = async (data) => {
 export const adminLogin = async (data) => {
 	try {
 		const response = await publicClient.post('/api/v1/admin/login', data);
+		console.log(response);
 		const { accessToken, refreshToken, user } = response.data.data;
 		setToken({ accessToken, refreshToken });
 		return user;
