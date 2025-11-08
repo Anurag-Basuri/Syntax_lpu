@@ -1,78 +1,78 @@
-import { useEffect } from 'react';
-import { Navigate, useLocation } from 'react-router-dom';
+import React, { useEffect } from 'react';
+import { Navigate, Outlet, useLocation } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth.js';
 import { isTokenValid, shouldBeAuthenticated } from '../utils/handleTokens.js';
 
-// Loading component
-const AuthLoadingScreen = () => (
-	<div className="min-h-screen bg-gradient-to-br from-[#0a0e17] to-[#0f172a] flex items-center justify-center">
-		<div className="text-center">
-			<div className="w-12 h-12 border-4 border-blue-500 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
-			<p className="text-blue-300 text-lg font-medium">Checking authentication...</p>
-		</div>
+// A loading spinner component to show while authentication status is being checked.
+const AuthLoadingSpinner = () => (
+	<div className="fixed inset-0 bg-gray-900 bg-opacity-50 backdrop-blur-sm flex items-center justify-center z-50">
+		<div className="w-12 h-12 border-4 border-cyan-400 border-t-transparent rounded-full animate-spin"></div>
 	</div>
 );
 
-export const ProtectedRoute = ({ children, requireAuth = true, adminOnly = false }) => {
-	const { isAuthenticated, loading, user, revalidateAuth } = useAuth();
+// A route guard for protected routes that require authentication.
+export const ProtectedRoute = () => {
+	const { isAuthenticated, loading, revalidateAuth } = useAuth();
 	const location = useLocation();
 
 	useEffect(() => {
 		// If we expect to be authenticated but token is invalid, revalidate
 		if (shouldBeAuthenticated() && !isTokenValid()) {
 			console.log('Token validation failed, revalidating auth...');
-			revalidateAuth();
+			if (typeof revalidateAuth === 'function') {
+				revalidateAuth();
+			}
 		}
 	}, [revalidateAuth]);
 
-	// Show loading while checking authentication
 	if (loading) {
-		return <AuthLoadingScreen />;
+		return <AuthLoadingSpinner />;
 	}
 
-	// Check if authentication is required
-	if (requireAuth && !isAuthenticated) {
-		console.log('Authentication required but user not authenticated, redirecting to /auth');
-		return <Navigate to="/auth" state={{ from: location }} replace />;
-	}
-
-	// Check if admin access is required
-	if (adminOnly && (!user || !user.adminID)) {
-		console.log('Admin access required but user is not admin, redirecting to /auth');
-		return <Navigate to="/auth" replace />;
-	}
-
-	// If member tries to access admin routes
-	if (location.pathname.startsWith('/admin') && user?.memberID) {
-		console.log('Member trying to access admin route, redirecting to member dashboard');
-		return <Navigate to="/member/dashboard" replace />;
-	}
-
-	// If admin tries to access member routes
-	if (location.pathname.startsWith('/member') && user?.adminID) {
-		console.log('Admin trying to access member route, redirecting to admin dashboard');
-		return <Navigate to="/admin/dashboard" replace />;
-	}
-
-	return children;
+	return isAuthenticated ? (
+		<Outlet />
+	) : (
+		<Navigate to="/login" state={{ from: location }} replace />
+	);
 };
 
-export const PublicRoute = ({ children }) => {
+// A route guard for admin-only routes.
+export const AdminRoute = () => {
+	const { isAuthenticated, user, loading } = useAuth();
+	const location = useLocation();
+
+	if (loading) {
+		return <AuthLoadingSpinner />;
+	}
+
+	// Safely check for role after confirming authentication and user object exist.
+	if (isAuthenticated && user?.role === 'admin') {
+		return <Outlet />;
+	}
+
+	// If authenticated but not an admin, redirect to member dashboard.
+	if (isAuthenticated) {
+		return <Navigate to="/member" replace />;
+	}
+
+	// If not authenticated at all, redirect to the admin login page.
+	return <Navigate to="/auth/admin" state={{ from: location }} replace />;
+};
+
+// A route guard for public routes that should not be accessible to authenticated users.
+export const PublicRoute = () => {
 	const { isAuthenticated, user, loading } = useAuth();
 
-	// Show loading while checking authentication
 	if (loading) {
-		return <AuthLoadingScreen />;
+		// It's often fine to show the public route during load, but a spinner is safer.
+		return <AuthLoadingSpinner />;
 	}
 
-	// If already authenticated, redirect to appropriate dashboard
-	if (isAuthenticated && user) {
-		if (user.adminID) {
-			return <Navigate to="/admin/dashboard" replace />;
-		} else if (user.memberID) {
-			return <Navigate to="/member/dashboard" replace />;
-		}
+	if (isAuthenticated) {
+		// Redirect to the appropriate dashboard based on role.
+		const redirectTo = user?.role === 'admin' ? '/admin/dashboard' : '/member';
+		return <Navigate to={redirectTo} replace />;
 	}
 
-	return children;
+	return <Outlet />;
 };
