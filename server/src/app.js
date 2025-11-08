@@ -1,7 +1,6 @@
 import express from 'express';
 import cookieParser from 'cookie-parser';
 import helmet from 'helmet';
-import mongoSanitize from 'express-mongo-sanitize';
 import { applyCors } from './middlewares/cors.middleware.js';
 import { ApiError } from './utils/ApiError.js';
 import { ApiResponse } from './utils/ApiResponse.js';
@@ -25,21 +24,6 @@ app.use(applyCors); // Apply custom CORS policy
 app.use(express.json({ limit: '16kb' }));
 app.use(express.urlencoded({ extended: true, limit: '16kb' }));
 app.use(cookieParser());
-app.use(mongoSanitize()); // Sanitize user-supplied data
-
-// --- Query Pollution Prevention Middleware ---
-app.use((req, _res, next) => {
-	if (req.query) {
-		for (const key of Object.keys(req.query)) {
-			const val = req.query[key];
-			if (Array.isArray(val)) {
-				// keep the first value (typical anti-pollution strategy)
-				req.query[key] = val[0];
-			}
-		}
-	}
-	next();
-});
 
 // --- Request Logging Middleware (routes visibility) ---
 app.use((req, res, next) => {
