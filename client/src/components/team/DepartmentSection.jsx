@@ -8,7 +8,6 @@ const DepartmentSection = ({ title, members, onClick, isExpanded, onToggle }) =>
 
 	return (
 		<motion.section layout className="mb-8">
-			{/* Simplified Header */}
 			<div
 				onClick={onToggle}
 				className="flex items-center justify-between p-3 mb-4 rounded-lg border border-gray-200 dark:border-gray-700 cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
@@ -26,14 +25,13 @@ const DepartmentSection = ({ title, members, onClick, isExpanded, onToggle }) =>
 				</motion.div>
 			</div>
 
-			{/* Animated Cards Grid */}
 			<AnimatePresence>
 				{isExpanded && (
 					<motion.div
 						initial={{ opacity: 0, height: 0 }}
 						animate={{ opacity: 1, height: 'auto' }}
 						exit={{ opacity: 0, height: 0 }}
-						transition={{ duration: 0.3, ease: 'easeInOut' }}
+						transition={{ duration: 0.25, ease: 'easeInOut' }}
 						className="overflow-hidden"
 					>
 						<div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-4 pt-2">
