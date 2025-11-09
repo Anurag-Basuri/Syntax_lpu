@@ -139,6 +139,13 @@ html {
 	-moz-osx-font-smoothing: grayscale;
 	text-rendering: optimizeLegibility;
 	overflow-x: hidden;
+	color-scheme: dark light;
+}
+:root[data-theme='light'] {
+	color-scheme: light;
+}
+:root:not([data-theme='light']) {
+	color-scheme: dark;
 }
 body {
 	font-family: 'Inter', system-ui, -apple-system, sans-serif;
