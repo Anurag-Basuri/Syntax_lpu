@@ -16,8 +16,16 @@ import {
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth.js';
 import ThemeToggle from './ThemeToggle.jsx';
-import NavLogo from './NavLogo.jsx';
-import logo from '../assets/logo.png';
+
+const NavLink = ({ to, children, onClick }) => (
+	<NavLinkBase
+		to={to}
+		onClick={onClick}
+		className="flex items-center p-2 text-sm font-medium rounded-md"
+	>
+		{children}
+	</NavLinkBase>
+);
 
 const navSections = [
 	{
@@ -41,7 +49,7 @@ const pathToNavName = (pathname) => {
 const Navbar = ({ scrollProgress }) => {
 	const [isOpen, setIsOpen] = useState(false);
 	const [activeLink, setActiveLink] = useState('Home');
-	const { user, isAuthenticated, loading, logoutMember, logoutAdmin } = useAuth();
+	const { isAuthenticated, user, logout } = useAuth();
 	const [isUserOpen, setIsUserOpen] = useState(false);
 	const [elevated, setElevated] = useState(false);
 	const userRef = useRef(null);
@@ -176,6 +184,36 @@ const Navbar = ({ scrollProgress }) => {
 		setIsUserOpen(false);
 		navigate('/auth/register');
 	};
+
+	const navLinks = [
+		{ to: '/', text: 'Home' },
+		{ to: '/events', text: 'Events' },
+		{ to: '/team', text: 'Team' },
+		{ to: '/arvantis', text: 'Arvantis' },
+		{ to: '/socials', text: 'Socials' },
+		{ to: '/contact', text: 'Contact' },
+	];
+
+	const authLinks = isAuthenticated
+		? [
+				{
+					onClick: handleLogout,
+					icon: <LogOut className="h-4 w-4" />,
+					text: 'Logout',
+				},
+		  ]
+		: [
+				{
+					onClick: handleAlreadyMember,
+					icon: <LogIn className="h-4 w-4" />,
+					text: 'Login',
+				},
+				{
+					onClick: handleJoinClub,
+					icon: <UserPlus className="h-4 w-4" />,
+					text: 'Join',
+				},
+		  ];
 
 	if (loading) return null;
 
