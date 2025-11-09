@@ -127,7 +127,7 @@ const TeamMemberModal = ({ member, isOpen, onClose, isAuthenticated = false }) =
 			aria-label={`Profile of ${member.fullname}`}
 		>
 			<div
-				className="relative w-full max-w-3xl h-[85vh] bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 shadow-xl flex flex-col"
+				className="relative w-full max-w-3xl h-[85vh] max-h-[900px] bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 shadow-xl flex flex-col team-member-modal"
 				onClick={(e) => e.stopPropagation()}
 			>
 				<button
