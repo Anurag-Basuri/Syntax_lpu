@@ -1,29 +1,11 @@
 import React, { useState, useMemo } from 'react';
 import { useMembers } from '../hooks/useMembers.js';
-import ErrorBoundary from '../components/team/ErrorBoundary';
+import DepartmentSection from '../components/team/DepartmentSection.jsx';
+import TeamMemberModal from '../components/team/TeamMemberModal.jsx';
+import TeamSkeleton from '../components/team/TeamSkeleton.jsx';
+import ErrorBoundary from '../components/team/ErrorBoundary.jsx';
 
-// Import components
-import UnifiedTeamCard from '../components/team/UnifiedTeamCard';
-import DepartmentSection from '../components/team/DepartmentSection';
-import TeamMemberModal from '../components/team/TeamMemberModal';
-
-// Simple states like Event page
-const LoadingGrid = () => (
-	<div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-4">
-		{Array.from({ length: 8 }).map((_, i) => (
-			<div
-				key={i}
-				className="rounded-xl border border-gray-200 dark:border-gray-700 p-4 animate-pulse space-y-3"
-			>
-				<div className="w-16 h-16 rounded-full bg-gray-200 dark:bg-gray-700 mx-auto" />
-				<div className="h-4 bg-gray-200 dark:bg-gray-700 rounded" />
-				<div className="h-3 bg-gray-200 dark:bg-gray-700 rounded w-2/3" />
-				<div className="h-8 bg-gray-200 dark:bg-gray-700 rounded" />
-			</div>
-		))}
-	</div>
-);
-
+// Error and Empty states remain the same as they are already good.
 const ErrorBlock = ({ message, onRetry }) => (
 	<div className="py-24 text-center">
 		<div className="text-5xl mb-4">⚠️</div>
@@ -54,48 +36,45 @@ const EmptyState = () => (
 
 const TeamsPage = () => {
 	const { data, isLoading, isError, error, refetch } = useMembers();
-	const [selected, setSelected] = useState(null);
-	const [modalOpen, setModalOpen] = useState(false);
+	const [selectedMember, setSelectedMember] = useState(null);
+	// FIX: Centralize expansion state here
+	const [expandedDepartments, setExpandedDepartments] = useState({});
 
 	const members = data?.members || [];
 
-	// Leadership filtering supports array designations
-	const leadership = useMemo(
-		() =>
-			members.filter((m) =>
-				(m.designation || []).some((d) => ['CEO', 'CTO', 'CMO', 'COO'].includes(d))
-			),
-		[members]
-	);
+	// FIX: Use the 'isLeader' virtual from the backend for filtering
+	const leadership = useMemo(() => members.filter((m) => m.isLeader), [members]);
+	const nonLeadership = useMemo(() => members.filter((m) => !m.isLeader), [members]);
 
-	// Exclude leadership for departmental grouping
-	const nonLeadership = members.filter((m) => !leadership.some((l) => l._id === m._id));
-
-	const groupByPrimaryDepartment = useMemo(() => {
-		const map = {};
-		for (const m of nonLeadership) {
-			const dep = m.primaryDepartment || 'Other';
-			if (!map[dep]) map[dep] = [];
-			map[dep].push(m);
-		}
-		return map;
+	const departments = useMemo(() => {
+		return nonLeadership.reduce((acc, member) => {
+			const dept = member.primaryDepartment || 'Other';
+			if (!acc[dept]) {
+				acc[dept] = [];
+			}
+			acc[dept].push(member);
+			return acc;
+		}, {});
 	}, [nonLeadership]);
 
-	const openModal = (member) => {
-		setSelected(member);
-		setModalOpen(true);
-	};
-	const closeModal = () => {
-		setModalOpen(false);
-		setTimeout(() => setSelected(null), 200);
+	const openModal = (member) => setSelectedMember(member);
+	const closeModal = () => setSelectedMember(null);
+
+	// FIX: Handler to toggle department expansion state
+	const toggleDepartment = (deptName) => {
+		setExpandedDepartments((prev) => ({
+			...prev,
+			[deptName]: !prev[deptName],
+		}));
 	};
 
-	if (isError)
+	if (isError) {
 		return (
 			<div className="min-h-screen max-w-7xl mx-auto px-4 py-8">
 				<ErrorBlock message={error?.message || 'Unknown error'} onRetry={refetch} />
 			</div>
 		);
+	}
 
 	return (
 		<div className="min-h-screen max-w-7xl mx-auto px-4 py-8 text-gray-900 dark:text-gray-100">
@@ -116,39 +95,39 @@ const TeamsPage = () => {
 			</header>
 
 			{isLoading ? (
-				<LoadingGrid />
+				<TeamSkeleton />
 			) : members.length === 0 ? (
 				<EmptyState />
 			) : (
 				<>
 					{leadership.length > 0 && (
-						<section className="mb-10">
-							<div className="flex items-center gap-2 mb-4">
-								<h2 className="text-lg font-semibold">Leadership</h2>
-								<span className="text-xs px-2 py-0.5 rounded bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300">
-									{leadership.length}
-								</span>
-							</div>
-							<div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-4">
-								{leadership.map((m) => (
-									<UnifiedTeamCard key={m._id} member={m} onClick={openModal} />
-								))}
-							</div>
-						</section>
+						<DepartmentSection
+							title="Leadership"
+							members={leadership}
+							onClick={openModal}
+							isExpanded={true} // Always show leadership
+							onToggle={() => {}} // No toggle for leadership
+						/>
 					)}
 
-					{Object.entries(groupByPrimaryDepartment).map(([dep, list]) => (
+					{Object.entries(departments).map(([dept, memberList]) => (
 						<DepartmentSection
-							key={dep}
-							title={dep}
-							members={list}
+							key={dept}
+							title={dept}
+							members={memberList}
 							onClick={openModal}
+							isExpanded={expandedDepartments[dept] ?? false} // Use centralized state
+							onToggle={() => toggleDepartment(dept)} // Pass handler
 						/>
 					))}
 				</>
 			)}
 
-			<TeamMemberModal member={selected} isOpen={modalOpen} onClose={closeModal} />
+			<TeamMemberModal
+				member={selectedMember}
+				isOpen={!!selectedMember}
+				onClose={closeModal}
+			/>
 		</div>
 	);
 };
