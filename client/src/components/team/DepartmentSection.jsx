@@ -11,7 +11,7 @@ const DepartmentSection = ({ title, members, onClick, isExpanded, onToggle }) =>
 			<button
 				type="button"
 				onClick={onToggle}
-				className="w-full flex items-center justify-between p-3 mb-4 rounded-lg border border-gray-200 dark:border-gray-700 cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors text-left"
+				className="w-full flex items-center justify-between p-3 mb-4 rounded-lg border border-gray-200 dark:border-gray-700 cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors text-left bg-white dark:bg-gray-900"
 				aria-expanded={isExpanded}
 			>
 				<div className="flex items-center gap-3">
@@ -22,7 +22,10 @@ const DepartmentSection = ({ title, members, onClick, isExpanded, onToggle }) =>
 						{members.length}
 					</span>
 				</div>
-				<motion.div animate={{ rotate: isExpanded ? 90 : 0 }}>
+				<motion.div
+					animate={{ rotate: isExpanded ? 90 : 0 }}
+					transition={{ duration: 0.2 }}
+				>
 					<ChevronRight size={20} className="text-gray-500" />
 				</motion.div>
 			</button>
@@ -39,7 +42,7 @@ const DepartmentSection = ({ title, members, onClick, isExpanded, onToggle }) =>
 						<div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-4 pt-2">
 							{members.map((member) => (
 								<UnifiedTeamCard
-									key={member._id}
+									key={member._id || member.id || member.fullname}
 									member={member}
 									onClick={onClick}
 								/>
