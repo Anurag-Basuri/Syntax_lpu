@@ -2,12 +2,37 @@
 /* GLOBAL LAYOUT & CONTENT POSITIONING */
 /* ========================================================================== */
 
-/* Ensure content starts below navbar with proper spacing */
+/* Ensure content starts just below navbar (a little tighter) */
 #main {
 	position: relative;
 	z-index: 10;
 	min-height: 100vh;
-	padding-top: var(--navbar-height, 4.75rem);
+	padding-top: calc(env(safe-area-inset-top, 0px) + var(--navbar-height, 4.5rem));
+}
+
+/* Optional tighter top padding for pages that opt-in */
+.page-container.tight-top {
+	padding-top: 1rem;
+}
+@media (min-width: 640px) {
+	.page-container.tight-top {
+		padding-top: 1.25rem;
+	}
+}
+@media (min-width: 768px) {
+	.page-container.tight-top {
+		padding-top: 1.5rem;
+	}
+}
+@media (min-width: 1024px) {
+	.page-container.tight-top {
+		padding-top: 2rem;
+	}
+}
+@media (min-width: 1280px) {
+	.page-container.tight-top {
+		padding-top: 2.25rem;
+	}
 }
 
 /* Add breathing room for content */
