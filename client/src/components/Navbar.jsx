@@ -323,6 +323,21 @@ const Navbar = ({ scrollProgress, isVisible }) => {
 		return () => window.removeEventListener('scroll', handleScroll);
 	}, []);
 
+	// Keep --navbar-height accurate on resize for perfect content offset
+	useEffect(() => {
+		const setHeight = () => {
+			if (navRef.current) {
+				document.documentElement.style.setProperty(
+					'--navbar-height',
+					`${navRef.current.offsetHeight}px`
+				);
+			}
+		};
+		setHeight();
+		window.addEventListener('resize', setHeight);
+		return () => window.removeEventListener('resize', setHeight);
+	}, []);
+
 	useEffect(() => {
 		const handleEsc = (e) => {
 			if (e.key === 'Escape') setIsMobileMenuOpen(false);
@@ -330,13 +345,6 @@ const Navbar = ({ scrollProgress, isVisible }) => {
 		document.addEventListener('keydown', handleEsc);
 		return () => document.removeEventListener('keydown', handleEsc);
 	}, []);
-
-	useEffect(() => {
-		if (navRef.current) {
-			const height = navRef.current.offsetHeight;
-			document.documentElement.style.setProperty('--navbar-height', `${height}px`);
-		}
-	}, [isElevated]);
 
 	if (loading) {
 		return <NavbarSkeleton />;

@@ -35,14 +35,13 @@ function App() {
 					const progress = docHeight > 0 ? (currentScrollY / docHeight) * 100 : 0;
 					setScrollProgress(Math.min(100, Math.max(0, progress)));
 
-					// Direction-based visibility (with small threshold for stability)
 					const delta = currentScrollY - lastScrollY.current;
-					const threshold = 6; // ignore micro scroll
+					const threshold = 6;
 					if (Math.abs(delta) > threshold) {
 						if (delta > 0 && currentScrollY > 120) {
-							setIsNavbarVisible(false); // scrolling down
+							setIsNavbarVisible(false);
 						} else {
-							setIsNavbarVisible(true); // scrolling up
+							setIsNavbarVisible(true);
 						}
 					}
 					lastScrollY.current = currentScrollY;
@@ -57,9 +56,15 @@ function App() {
 			return () => window.removeEventListener('scroll', handleScroll);
 		} else {
 			setScrollProgress(0);
-			setIsNavbarVisible(true); // Ensure it's visible if we navigate back to a page with a navbar
+			setIsNavbarVisible(true);
 		}
 	}, [shouldHideNavbar]);
+
+	// Ensure navbar is visible on route changes and reset scroll state for top-consistency
+	useEffect(() => {
+		setIsNavbarVisible(true);
+		lastScrollY.current = window.scrollY || 0;
+	}, [location.pathname]);
 
 	const pageVariants = {
 		initial: { opacity: 0, y: 15 },
