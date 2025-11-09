@@ -630,73 +630,94 @@
 	filter: drop-shadow(0 2px 8px rgba(255, 255, 255, 0.28));
 }
 
-/* Responsive breakpoints */
-@media (min-width: 640px) {
-	.navbar-grid {
-		gap: 1.25rem;
-		padding: 0 1.5rem;
-		grid-template-columns: minmax(200px, auto) 1fr minmax(auto, max-content);
-	}
+/* Skip link */
+.skip-link {
+	position: fixed;
+	top: 0.5rem;
+	left: 0.5rem;
+	z-index: 120;
+	transform: translateY(-120%);
+	background: var(--nav-bg);
+	color: var(--text-primary);
+	padding: 0.6rem 1rem;
+	border-radius: 0.75rem;
+	border: 1px solid var(--glass-border);
+	font-size: 0.85rem;
+	font-weight: 600;
+	transition: transform 0.25s ease;
+}
+.skip-link:focus {
+	transform: translateY(0);
+}
 
-	.navbar-section-left {
-		padding-left: 1rem;
+@supports (padding: env(safe-area-inset-top)) {
+	.nav-shell {
+		padding-top: env(safe-area-inset-top);
 	}
+}
 
-	.navbar-theme-toggle {
-		display: flex;
+.nav-shell {
+	touch-action: none;
+}
+
+.navbar {
+	display: flex;
+	flex-direction: column;
+	justify-content: center;
+}
+
+@media (max-width: 640px) {
+	.navbar {
+		height: 4.25rem;
 	}
-
 	.user-role-text {
-		display: block;
+		display: none !important;
 	}
-
 	.navbar-auth-buttons {
-		display: flex;
-	}
-}
-
-@media (min-width: 768px) {
-	.navbar-grid {
-		grid-template-columns: minmax(220px, auto) 1fr minmax(auto, max-content);
-	}
-
-	.navbar-section-left {
-		padding-left: 1.5rem;
-	}
-}
-
-@media (min-width: 1024px) {
-	.navbar-grid {
-		padding: 0 2rem;
-	}
-
-	.navbar-section-left {
-		padding-left: 2rem;
-	}
-
-	.navbar-section-center {
-		display: flex;
 		gap: 0.5rem;
 	}
+}
 
+@media (max-width: 480px) {
+	.navbar-section-center {
+		display: none !important;
+	}
+	.navbar-grid {
+		gap: 0.5rem;
+		padding: 0 0.75rem;
+	}
 	.mobile-menu-button {
-		display: none;
+		padding: 0.5rem;
+	}
+	.nav-link-text {
+		display: none !important;
 	}
 }
 
 @media (min-width: 1280px) {
-	.navbar-section-center {
-		gap: 0.75rem;
+	.navbar-grid {
+		gap: 1.5rem;
 	}
-
 	.nav-link {
-		font-size: 1rem;
-		padding: 0.75rem 1.125rem;
+		font-size: 0.95rem;
 	}
 }
 
-@media (min-width: 1536px) {
-	.navbar-grid {
-		max-width: 100rem;
+@media (hover: hover) {
+	.nav-link:hover,
+	.mobile-nav-item:hover {
+		background: var(--glass-hover);
+	}
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.nav-shell,
+	.navbar,
+	.nav-link,
+	.user-menu-button,
+	.mobile-drawer,
+	.mobile-drawer-backdrop {
+		transition: none !important;
+		animation: none !important;
 	}
 }
