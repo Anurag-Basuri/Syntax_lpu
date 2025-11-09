@@ -2,367 +2,197 @@ import { useState, useMemo } from 'react';
 import { useEvents } from '../hooks/useEvents.js';
 import EventCard from '../components/event/EventCard.jsx';
 import EventFilter from '../components/event/EventFilter.jsx';
-import LoadingSpinner from '../components/event/LoadingSpinner.jsx';
-import { AnimatePresence, motion } from 'framer-motion';
 
-// Floating background with light/dark support
-const EventFloatingBackground = () => (
-	<div className="absolute inset-0 overflow-hidden pointer-events-none">
-		<motion.div
-			animate={{ x: [0, 30, 0], y: [0, -20, 0], rotate: [0, 180, 360] }}
-			transition={{ duration: 25, repeat: Infinity, ease: 'easeInOut' }}
-			className="absolute -top-20 -left-20 w-40 h-40 bg-gradient-to-br from-blue-500/10 to-cyan-500/10 rounded-full blur-2xl"
-		/>
-		<motion.div
-			animate={{ x: [0, -25, 0], y: [0, 15, 0], scale: [1, 1.2, 1] }}
-			transition={{ duration: 20, repeat: Infinity, ease: 'easeInOut', delay: 3 }}
-			className="absolute -top-10 -right-10 w-32 h-32 bg-gradient-to-bl from-purple-500/10 to-pink-500/10 rounded-full blur-2xl"
-		/>
-		<motion.div
-			animate={{ x: [0, 20, 0], y: [0, -15, 0], scale: [1, 1.1, 1] }}
-			transition={{ duration: 30, repeat: Infinity, ease: 'easeInOut', delay: 5 }}
-			className="absolute bottom-20 left-20 w-24 h-24 bg-gradient-to-tr from-indigo-500/10 to-blue-500/10 rounded-full blur-2xl"
-		/>
+const pickDate = (e) => new Date(e?.eventDate || e?.date || Date.now());
+
+const categorize = (events) => {
+	const now = new Date();
+	return events.reduce(
+		(acc, ev) => {
+			if (ev.status === 'cancelled') return acc;
+			const dt = pickDate(ev);
+			if (ev.status === 'ongoing' || dt.toDateString() === now.toDateString())
+				acc.ongoing.push(ev);
+			else if (dt > now) acc.upcoming.push(ev);
+			else acc.past.push(ev);
+			return acc;
+		},
+		{ ongoing: [], upcoming: [], past: [] }
+	);
+};
+
+const LoadingGrid = () => (
+	<div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-6">
+		{Array.from({ length: 6 }).map((_, i) => (
+			<div
+				key={i}
+				className="animate-pulse rounded-xl border border-gray-200 dark:border-gray-700 p-4 space-y-4"
+			>
+				<div className="h-32 rounded-md bg-gray-200 dark:bg-gray-700" />
+				<div className="h-4 w-3/4 bg-gray-200 dark:bg-gray-700 rounded" />
+				<div className="h-3 w-1/2 bg-gray-200 dark:bg-gray-700 rounded" />
+				<div className="h-3 w-full bg-gray-200 dark:bg-gray-700 rounded" />
+			</div>
+		))}
 	</div>
 );
 
-const pickDate = (e) => new Date(e?.eventDate || e?.date);
-
-// Hero with light/dark background
-const EventHero = ({ events, loading }) => {
-	const now = new Date();
-	const upcomingCount = events?.filter((e) => pickDate(e) > now).length || 0;
-	const ongoingCount = events?.filter((e) => e.status === 'ongoing').length || 0;
-	const pastCount =
-		events?.filter((e) => pickDate(e) < now && e.status !== 'ongoing').length || 0;
-
-	return (
-		<div className="relative bg-gradient-to-b from-gray-50 to-white dark:from-[#0a0e17] dark:to-[#1a1f3a] text-gray-900 dark:text-white py-12 sm:py-16 lg:py-20 overflow-hidden">
-			<EventFloatingBackground />
-			<div className="absolute inset-0 bg-[linear-gradient(rgba(0,0,0,0.02)_1px,transparent_1px),linear-gradient(90deg,rgba(0,0,0,0.02)_1px,transparent_1px)] dark:bg-[linear-gradient(rgba(255,255,255,0.06)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.06)_1px,transparent_1px)] bg-[size:20px_20px] pointer-events-none" />
-
-			<div className="container mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
-				<motion.div
-					initial={{ opacity: 0, y: 30 }}
-					animate={{ opacity: 1, y: 0 }}
-					transition={{ duration: 0.8, ease: 'easeOut' }}
-					className="text-center mb-8 sm:mb-12"
-				>
-					<p className="text-base sm:text-lg lg:text-xl text-blue-700/80 dark:text-blue-200 max-w-3xl mx-auto leading-relaxed px-4">
-						Discover, join, and explore our vibrant community events
-					</p>
-				</motion.div>
-
-				{/* Enhanced Stats */}
-				{!loading && events && events.length > 0 && (
-					<motion.div
-						initial={{ opacity: 0, y: 30 }}
-						animate={{ opacity: 1, y: 0 }}
-						transition={{ delay: 0.1, duration: 0.6 }}
-						className="grid grid-cols-3 gap-4 sm:gap-6 md:gap-8 max-w-2xl mx-auto"
-					>
-						<div className="glass-card-success p-4 sm:p-6 rounded-xl text-center border border-emerald-400/20">
-							<div className="text-2xl sm:text-3xl font-bold text-emerald-500 dark:text-emerald-300">
-								{upcomingCount}
-							</div>
-							<div className="text-xs sm:text-sm text-emerald-700 dark:text-emerald-200">
-								Upcoming
-							</div>
-						</div>
-						<div className="glass-card-error p-4 sm:p-6 rounded-xl text-center border border-red-400/20">
-							<div className="text-2xl sm:text-3xl font-bold text-red-500 dark:text-red-300">
-								{ongoingCount}
-							</div>
-							<div className="text-xs sm:text-sm text-red-700 dark:text-red-200">
-								Live Now
-							</div>
-						</div>
-						<div className="glass-card p-4 sm:p-6 rounded-xl text-center border border-purple-400/20">
-							<div className="text-2xl sm:text-3xl font-bold text-purple-500 dark:text-purple-300">
-								{pastCount}
-							</div>
-							<div className="text-xs sm:text-sm text-purple-700 dark:text-purple-200">
-								Past Events
-							</div>
-						</div>
-					</motion.div>
-				)}
-			</div>
+const EmptyCreative = ({ searchActive }) => (
+	<div className="flex flex-col items-center justify-center py-24 text-center">
+		<div className="text-6xl mb-4 animate-pulse">🛰️</div>
+		<h2 className="text-2xl font-semibold text-gray-800 dark:text-gray-100 mb-2">
+			{searchActive ? 'No matches found' : 'No events yet'}
+		</h2>
+		<p className="text-sm text-gray-500 dark:text-gray-400 max-w-md">
+			{searchActive
+				? 'Try different keywords or remove filters.'
+				: 'Stay tuned. Fresh experiences are being prepared.'}
+		</p>
+		<div className="mt-6 text-xs text-gray-400 dark:text-gray-600">
+			<pre>{`/* orbit idle – queue awaiting launch */`}</pre>
 		</div>
-	);
-};
+	</div>
+);
 
-const getCategorizedEvents = (events) => {
-	const now = new Date();
-	const categorized = { ongoing: [], upcoming: [], past: [] };
+const ErrorBlock = ({ message, onRetry }) => (
+	<div className="py-24 text-center">
+		<div className="text-5xl mb-4">⚠️</div>
+		<h2 className="text-xl font-semibold text-red-600 dark:text-red-400 mb-2">
+			Failed to load events
+		</h2>
+		<p className="text-sm text-gray-600 dark:text-gray-400 mb-6">{message}</p>
+		<button
+			onClick={onRetry}
+			className="px-4 py-2 rounded-md bg-blue-600 text-white text-sm hover:bg-blue-500"
+		>
+			Retry
+		</button>
+	</div>
+);
 
-	events.forEach((event) => {
-		if (event.status === 'cancelled') return;
-		const eventDate = pickDate(event);
-		if (event.status === 'ongoing' || eventDate.toDateString() === now.toDateString()) {
-			categorized.ongoing.push(event);
-		} else if (eventDate > now) {
-			categorized.upcoming.push(event);
-		} else {
-			categorized.past.push(event);
-		}
-	});
-	return categorized;
-};
-
-const EventCategorySection = ({ categoryKey, events, emptyMessage }) => {
-	const meta = {
-		ongoing: {
-			title: 'Live Events',
-			emoji: '🔴',
-			countBadgeClass:
-				'glass-card px-3 sm:px-4 py-2 rounded-full text-sm font-bold shrink-0 border border-red-400/20',
-			desc: 'Happening right now',
-		},
-		upcoming: {
-			title: 'Upcoming Events',
-			emoji: '🚀',
-			countBadgeClass:
-				'glass-card px-3 sm:px-4 py-2 rounded-full text-sm font-bold shrink-0 border border-blue-400/20',
-			desc: 'Coming soon',
-		},
-		past: {
-			title: 'Past Events',
-			emoji: '🏆',
-			countBadgeClass:
-				'glass-card px-3 sm:px-4 py-2 rounded-full text-sm font-bold shrink-0 border border-purple-400/20',
-			desc: 'Event archive',
-		},
-	}[categoryKey];
-
-	return (
-		<section className="mb-16 sm:mb-20 lg:mb-24">
-			<motion.div
-				initial={{ opacity: 0, x: -20 }}
-				whileInView={{ opacity: 1, x: 0 }}
-				viewport={{ once: true }}
-				transition={{ duration: 0.4 }}
-				className="mb-8 sm:mb-12 lg:mb-16"
-			>
-				<div className="flex items-center gap-3 sm:gap-4 lg:gap-6 mb-3">
-					<span className="text-2xl sm:text-3xl lg:text-4xl">{meta.emoji}</span>
-					<h2 className="text-2xl sm:text-3xl md:text-4xl lg:text-5xl font-bold text-gray-900 dark:text-white">
-						{meta.title}
-					</h2>
-					<div className="flex-1 h-px bg-gradient-to-r from-gray-300/50 via-transparent to-transparent dark:from-white/30 ml-4" />
-					<span className={meta.countBadgeClass}>{events.length}</span>
-				</div>
-				<p className="text-gray-600 dark:text-gray-400 text-sm sm:text-base ml-8 sm:ml-12 lg:ml-16">
-					{meta.desc}
-				</p>
-			</motion.div>
-
-			{events.length === 0 ? (
-				<motion.div
-					initial={{ opacity: 0, y: 20 }}
-					whileInView={{ opacity: 1, y: 0 }}
-					viewport={{ once: true }}
-					className="glass-card p-10 sm:p-14 rounded-3xl text-center border border-gray-200/20 dark:border-white/10"
-				>
-					<div className="text-6xl sm:text-7xl mb-4 opacity-60">{meta.emoji}</div>
-					<p className="text-lg sm:text-xl text-gray-700 dark:text-gray-300">
-						{emptyMessage}
-					</p>
-				</motion.div>
-			) : (
-				<motion.div layout className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-6">
-					<AnimatePresence mode="popLayout">
-						{events.map((event, index) => (
-							<motion.div
-								key={event._id}
-								layout
-								initial={{ opacity: 0, scale: 0.98, y: 10 }}
-								whileInView={{ opacity: 1, scale: 1, y: 0 }}
-								exit={{ opacity: 0, scale: 0.98, y: -10 }}
-								viewport={{ once: true, margin: '-50px' }}
-								transition={{ duration: 0.35, delay: index * 0.05 }}
-							>
-								<EventCard event={event} />
-							</motion.div>
-						))}
-					</AnimatePresence>
-				</motion.div>
-			)}
-		</section>
-	);
-};
+const Stat = ({ label, value }) => (
+	<div className="flex flex-col items-center p-4 rounded-lg border border-gray-200 dark:border-gray-700 bg-transparent">
+		<div className="text-xl font-bold text-gray-900 dark:text-gray-100">{value}</div>
+		<div className="text-xs text-gray-500 dark:text-gray-400">{label}</div>
+	</div>
+);
 
 const EventPage = () => {
-	// Fetch events via react-query (auto fetch, handles caching)
+	const [filter, setFilter] = useState('all');
+	const [search, setSearch] = useState('');
 	const { data, isLoading, isError, error, refetch } = useEvents();
-	const events = useMemo(() => data?.docs || [], [data]);
+	const events = data?.docs || [];
 
-	const [activeCategory, setActiveCategory] = useState('all');
-	const [searchTerm, setSearchTerm] = useState('');
+	const categorized = useMemo(() => categorize(events), [events]);
 
-	const categorizedEvents = useMemo(() => getCategorizedEvents(events), [events]);
+	const filtered = useMemo(() => {
+		const applySearch = (list) =>
+			!search
+				? list
+				: list.filter((e) =>
+						[
+							e.title,
+							e.description,
+							e.venue,
+							...(e.tags || []),
+							pickDate(e).toLocaleDateString(),
+						]
+							.filter(Boolean)
+							.join(' ')
+							.toLowerCase()
+							.includes(search.toLowerCase())
+				  );
 
-	const filteredCategories = useMemo(() => {
-		const filterEvents = (eventList) => {
-			if (!searchTerm) return eventList;
-			return eventList.filter((event) => {
-				const date = pickDate(event);
-				const hay = [
-					event.title,
-					event.description,
-					event.venue,
-					...(event.tags || []),
-					date.toLocaleDateString(),
-				]
-					.filter(Boolean)
-					.join(' ')
-					.toLowerCase();
-				return hay.includes(searchTerm.toLowerCase());
-			});
-		};
-		if (activeCategory === 'all') {
+		if (filter === 'all')
 			return {
-				ongoing: filterEvents(categorizedEvents.ongoing),
-				upcoming: filterEvents(categorizedEvents.upcoming),
-				past: filterEvents(categorizedEvents.past),
+				ongoing: applySearch(categorized.ongoing),
+				upcoming: applySearch(categorized.upcoming),
+				past: applySearch(categorized.past),
 			};
-		}
-		return { [activeCategory]: filterEvents(categorizedEvents[activeCategory] || []) };
-	}, [categorizedEvents, activeCategory, searchTerm]);
+		return { [filter]: applySearch(categorized[filter]) };
+	}, [categorized, filter, search]);
 
-	const isEmpty =
-		Object.values(filteredCategories).reduce((acc, arr) => acc + arr.length, 0) === 0;
+	const totalUpcoming = categorized.upcoming.length;
+	const totalOngoing = categorized.ongoing.length;
+	const totalPast = categorized.past.length;
+	const empty = Object.values(filtered).reduce((sum, list) => sum + list.length, 0) === 0;
 
 	if (isError) {
-		return (
-			<div className="min-h-screen flex items-center justify-center p-4">
-				<motion.div
-					initial={{ opacity: 0, y: 20 }}
-					animate={{ opacity: 1, y: 0 }}
-					className="glass-card-error p-8 text-center max-w-lg w-full rounded-3xl border border-red-400/20"
-				>
-					<div className="text-6xl mb-4">⚠️</div>
-					<h2 className="text-2xl font-bold text-red-200 mb-3">Unable to Load Events</h2>
-					<p className="text-sm text-red-100 mb-6">
-						{error?.message || 'Something went wrong.'}
-					</p>
-					<motion.button
-						whileHover={{ scale: 1.03, y: -1 }}
-						whileTap={{ scale: 0.98 }}
-						onClick={() => refetch()}
-						className="px-8 py-3 bg-gradient-to-r from-blue-600 to-cyan-600 text-white rounded-xl font-medium"
-					>
-						Try Again
-					</motion.button>
-				</motion.div>
-			</div>
-		);
+		return <ErrorBlock message={error?.message || 'Unknown error'} onRetry={refetch} />;
 	}
 
 	return (
-		<div className="min-h-screen text-gray-900 dark:text-white bg-white dark:bg-[#0b0f19]">
-			<div className="relative z-10">
-				<EventHero events={events} loading={isLoading} />
-
-				<div className="container mx-auto px-4 sm:px-6 lg:px-8 py-10 sm:py-14 lg:py-16">
-					<motion.div
-						initial={{ opacity: 0, y: 20 }}
-						animate={{ opacity: 1, y: 0 }}
-						transition={{ duration: 0.3 }}
-						className="sticky top-4 sm:top-6 z-30 mb-10"
-					>
-						<div className="glass-card p-4 sm:p-6 rounded-2xl border border-gray-200/40 dark:border-white/10">
-							<div className="flex flex-col gap-4">
-								<div className="relative group">
-									<div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
-										<svg
-											className="w-5 h-5 text-gray-500 dark:text-blue-300"
-											fill="none"
-											stroke="currentColor"
-											viewBox="0 0 24 24"
-										>
-											<path
-												strokeLinecap="round"
-												strokeLinejoin="round"
-												strokeWidth="2"
-												d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
-											/>
-										</svg>
-									</div>
-									<input
-										type="text"
-										placeholder="Search events by title, description, venue, or tags..."
-										value={searchTerm}
-										onChange={(e) => setSearchTerm(e.target.value)}
-										className="pl-12 pr-12 py-3 w-full bg-white/70 dark:bg-white/5 border border-gray-300 dark:border-white/20 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all text-sm placeholder-gray-400 dark:text-white"
-									/>
-									{searchTerm && (
-										<button
-											onClick={() => setSearchTerm('')}
-											className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-700 dark:text-gray-300 dark:hover:text-white w-6 h-6 flex items-center justify-center rounded-full"
-										>
-											✕
-										</button>
-									)}
-								</div>
-								<EventFilter
-									activeFilter={activeCategory}
-									setActiveFilter={setActiveCategory}
-								/>
-							</div>
-						</div>
-					</motion.div>
-
-					{isLoading ? (
-						<div className="flex justify-center py-16">
-							<LoadingSpinner />
-						</div>
-					) : isEmpty ? (
-						<motion.div
-							initial={{ opacity: 0, scale: 0.98 }}
-							animate={{ opacity: 1, scale: 1 }}
-							className="glass-card p-12 rounded-3xl text-center max-w-3xl mx-auto border border-gray-200/40 dark:border-white/10"
-						>
-							<div className="text-7xl mb-6">🔍</div>
-							<h2 className="text-3xl font-bold mb-4 bg-clip-text text-transparent bg-gradient-to-r from-blue-500 to-cyan-400">
-								{searchTerm ? 'No results found' : 'No events found'}
-							</h2>
-							<p className="text-gray-600 dark:text-blue-200 mb-8">
-								{searchTerm
-									? 'Try adjusting your search terms or browse all events'
-									: 'New events are being planned. Check back soon!'}
-							</p>
-							{searchTerm && (
-								<button
-									onClick={() => {
-										setSearchTerm('');
-										setActiveCategory('all');
-									}}
-									className="px-8 py-3 bg-gradient-to-r from-blue-600 to-cyan-600 text-white rounded-xl font-medium"
-								>
-									Show All Events
-								</button>
-							)}
-						</motion.div>
-					) : (
-						<div>
-							{Object.entries(filteredCategories).map(
-								([category, eventsArr]) =>
-									eventsArr.length > 0 && (
-										<EventCategorySection
-											key={category}
-											categoryKey={category}
-											events={eventsArr}
-											emptyMessage={`No ${
-												category === 'ongoing' ? 'live' : category
-											} events`}
-										/>
-									)
-							)}
-						</div>
-					)}
+		<div className="min-h-screen mx-auto max-w-7xl px-4 py-8 text-gray-900 dark:text-gray-100 bg-transparent">
+			<header className="space-y-6 mb-10">
+				<div className="space-y-2">
+					<h1 className="text-3xl font-bold tracking-tight">
+						Events
+						<span className="ml-2 text-base font-medium text-gray-500 dark:text-gray-400">
+							/ discover & engage
+						</span>
+					</h1>
+					<p className="text-sm text-gray-600 dark:text-gray-400 max-w-xl">
+						Browse live, upcoming and archived activities.
+					</p>
 				</div>
-			</div>
+
+				<div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+					<EventFilter activeFilter={filter} setActiveFilter={setFilter} />
+					<div className="relative w-full md:w-72">
+						<input
+							type="text"
+							value={search}
+							onChange={(e) => setSearch(e.target.value)}
+							placeholder="Search events..."
+							className="w-full px-3 py-2 rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-sm focus:ring-2 focus:ring-blue-500 outline-none"
+						/>
+						{search && (
+							<button
+								type="button"
+								aria-label="Clear search"
+								onClick={() => setSearch('')}
+								className="absolute top-1/2 -translate-y-1/2 right-2 text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 text-xs"
+							>
+								✕
+							</button>
+						)}
+					</div>
+				</div>
+
+				<div className="grid grid-cols-3 gap-3">
+					<Stat label="Upcoming" value={totalUpcoming} />
+					<Stat label="Live" value={totalOngoing} />
+					<Stat label="Past" value={totalPast} />
+				</div>
+			</header>
+
+			{isLoading ? (
+				<LoadingGrid />
+			) : empty ? (
+				<EmptyCreative searchActive={!!search} />
+			) : (
+				Object.entries(filtered).map(([category, list]) =>
+					list.length ? (
+						<section key={category} className="mb-10">
+							<h2 className="text-lg font-semibold mb-4 capitalize flex items-center gap-2">
+								{category === 'ongoing'
+									? '🔴 Live'
+									: category === 'upcoming'
+									? '🚀 Upcoming'
+									: '📚 Past'}
+								<span className="text-xs font-medium text-gray-500 dark:text-gray-400">
+									({list.length})
+								</span>
+							</h2>
+							<div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-6">
+								{list.map((ev) => (
+									<EventCard key={ev._id} event={ev} />
+								))}
+							</div>
+						</section>
+					) : null
+				)
+			)}
 		</div>
 	);
 };

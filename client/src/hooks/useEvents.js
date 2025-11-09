@@ -13,7 +13,8 @@ export const useEvents = (params) => {
 	return useQuery({
 		queryKey: ['events', params],
 		queryFn: () => getAllEvents(params),
-		keepPreviousData: true,
+		staleTime: 60_000,
+		refetchOnWindowFocus: false,
 	});
 };
 
@@ -23,6 +24,7 @@ export const useEvent = (id) => {
 		queryKey: ['event', id],
 		queryFn: () => getEventById(id),
 		enabled: !!id,
+		staleTime: 60_000,
 	});
 };
 
