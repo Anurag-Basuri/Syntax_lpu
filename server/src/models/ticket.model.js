@@ -1,7 +1,7 @@
 import mongoose from 'mongoose';
 import validator from 'validator';
 import { v4 as uuidv4 } from 'uuid';
-import mongoosePaginate from 'mongoose-paginate-v2';
+import mongooseAggregatePaginate from 'mongoose-aggregate-paginate-v2';
 
 const ticketSchema = new mongoose.Schema(
 	{
@@ -122,9 +122,7 @@ ticketSchema.index({ eventId: 1, lpuId: 1 }, { unique: true });
 ticketSchema.index({ eventId: 1, status: 1 });
 
 // --- PLUGIN ---
-
-// Add pagination plugin for easier listing of tickets
-ticketSchema.plugin(mongoosePaginate);
+ticketSchema.plugin(mongooseAggregatePaginate);
 
 const Ticket = mongoose.model('Ticket', ticketSchema);
 

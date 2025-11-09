@@ -41,7 +41,7 @@ const transactionSchema = new mongoose.Schema(
 				},
 			},
 			lpuId: {
-				type: Number,
+				type: String,
 				required: [true, 'LPU ID is required'],
 				unique: true,
 				validate: {
@@ -72,7 +72,7 @@ const transactionSchema = new mongoose.Schema(
 				required: [true, 'Course is required'],
 			},
 			club: {
-				type: String
+				type: String,
 			},
 		},
 		amount: {
