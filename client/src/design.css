@@ -355,8 +355,250 @@ select.auth-input {
 	color: var(--accent-1);
 }
 
-@media (max-width: 640px) {
-	.auth-card {
-		padding: 1.5rem;
+/* ==========================================================================
+   4. TEAM PAGE - NEW RESPONSIVE LAYOUT
+   ========================================================================== */
+
+.team-page-layout {
+	display: grid;
+	grid-template-columns: 1fr;
+	gap: 2rem;
+}
+
+@media (min-width: 1024px) {
+	.team-page-layout {
+		grid-template-columns: 240px 1fr;
+		gap: 3rem;
 	}
+}
+
+/* --- Sidebar --- */
+.team-sidebar {
+	position: relative;
+}
+
+@media (min-width: 1024px) {
+	.team-sidebar-content {
+		position: sticky;
+		top: calc(var(--navbar-height, 4.75rem) + 2rem);
+		height: calc(100vh - var(--navbar-height, 4.75rem) - 4rem);
+		overflow-y: auto;
+	}
+}
+
+.filter-header {
+	display: flex;
+	align-items: center;
+	gap: 0.75rem;
+	font-size: 1.125rem;
+	font-weight: 600;
+	color: var(--text-primary);
+	padding-bottom: 1rem;
+	margin-bottom: 1rem;
+	border-bottom: 1px solid var(--glass-border);
+}
+
+.filter-nav {
+	display: flex;
+	flex-direction: row;
+	gap: 0.5rem;
+	overflow-x: auto;
+	padding-bottom: 0.75rem; /* For scrollbar */
+}
+
+@media (min-width: 1024px) {
+	.filter-nav {
+		flex-direction: column;
+		overflow-x: hidden;
+		padding-bottom: 0;
+	}
+}
+
+.filter-button {
+	display: inline-flex;
+	align-items: center;
+	gap: 0.75rem;
+	width: 100%;
+	padding: 0.6rem 1rem;
+	border-radius: 0.625rem;
+	font-size: 0.9rem;
+	font-weight: 500;
+	text-align: left;
+	white-space: nowrap;
+	color: var(--text-secondary);
+	background: transparent;
+	border: 1px solid transparent;
+	transition: all 0.2s ease;
+}
+
+.filter-button:hover {
+	background: var(--glass-bg);
+	color: var(--text-primary);
+}
+
+.filter-button.active {
+	color: var(--text-primary);
+	font-weight: 600;
+	background: var(--glass-hover);
+	border-color: var(--glass-border);
+	box-shadow: var(--shadow-sm);
+}
+
+/* --- Main Content --- */
+.team-main-content {
+	min-width: 0; /* Prevents overflow in grid layouts */
+}
+
+.search-bar-wrapper {
+	position: relative;
+	margin-bottom: 2rem;
+}
+
+.search-input {
+	width: 100%;
+	padding: 0.875rem 3rem;
+	border-radius: 0.75rem;
+	border: 1px solid var(--input-border);
+	background-color: var(--input-bg);
+	color: var(--input-text);
+	font-size: 1rem;
+	transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+.search-input:focus {
+	outline: none;
+	border-color: var(--input-border-focus);
+	box-shadow: var(--focus-ring);
+}
+.search-input::placeholder {
+	color: var(--input-placeholder);
+}
+
+.search-icon {
+	position: absolute;
+	left: 1rem;
+	top: 50%;
+	transform: translateY(-50%);
+	width: 1.25rem;
+	height: 1.25rem;
+	pointer-events: none;
+}
+
+.clear-search-button {
+	position: absolute;
+	right: 1rem;
+	top: 50%;
+	transform: translateY(-50%);
+	width: 1.75rem;
+	height: 1.75rem;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	border-radius: 99px;
+	color: var(--text-muted);
+	background: transparent;
+	transition: all 0.2s ease;
+}
+.clear-search-button:hover {
+	color: var(--text-primary);
+	background: var(--glass-bg);
+	transform: translateY(-50%) scale(1.1);
+}
+
+/* --- Team Grid & Cards --- */
+.team-grid {
+	display: grid;
+	grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+	gap: 1.5rem;
+}
+
+@media (max-width: 640px) {
+	.team-grid {
+		grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+		gap: 1rem;
+	}
+}
+
+.team-card {
+	position: relative;
+	border-radius: 1rem;
+	overflow: hidden;
+	background: var(--card-bg);
+	border: 1px solid var(--card-border);
+	box-shadow: var(--shadow-sm);
+	cursor: pointer;
+	transition: all 0.3s ease;
+}
+.team-card:hover {
+	transform: translateY(-8px) scale(1.03);
+	box-shadow: var(--shadow-lg);
+	border-color: var(--accent-1);
+}
+
+.team-card-image-wrapper {
+	position: relative;
+	aspect-ratio: 1 / 1;
+}
+
+.team-card-image {
+	width: 100%;
+	height: 100%;
+	object-fit: cover;
+	transition: transform 0.4s ease;
+}
+.team-card:hover .team-card-image {
+	transform: scale(1.05);
+}
+
+.team-card-image-overlay {
+	position: absolute;
+	inset: 0;
+	background: linear-gradient(to top, rgba(0, 0, 0, 0.7) 0%, transparent 50%);
+}
+
+.team-card-content {
+	position: absolute;
+	bottom: 0;
+	left: 0;
+	right: 0;
+	padding: 1rem;
+	color: white;
+	z-index: 2;
+}
+
+.team-card-name {
+	font-family: 'Space Grotesk', sans-serif;
+	font-size: 1.125rem;
+	font-weight: 600;
+	line-height: 1.2;
+	color: #fff;
+	margin: 0;
+}
+
+.team-card-role {
+	font-size: 0.8rem;
+	color: var(--text-secondary);
+	opacity: 0.9;
+	margin: 0;
+}
+
+.team-card-socials {
+	display: flex;
+	gap: 0.75rem;
+	margin-top: 0.75rem;
+	opacity: 0;
+	transform: translateY(10px);
+	transition: all 0.3s ease;
+}
+.team-card:hover .team-card-socials {
+	opacity: 1;
+	transform: translateY(0);
+}
+
+.social-link {
+	color: rgba(255, 255, 255, 0.7);
+	transition: color 0.2s ease, transform 0.2s ease;
+}
+.social-link:hover {
+	color: #fff;
+	transform: scale(1.1);
 }
