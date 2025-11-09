@@ -1,10 +1,11 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState, useCallback } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import {
 	getArvantisLandingData,
 	getFestDetails,
 	getAllFests,
 } from '../services/arvantisServices.js';
+import EventDetailModal from '../components/event/EventDetailModal.jsx';
 import {
 	Calendar,
 	ChevronRight,
@@ -14,7 +15,9 @@ import {
 	Loader2,
 	Sparkles,
 	Users,
+	X,
 } from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
 
 const formatDate = (date) => {
 	if (!date) return 'TBA';
@@ -170,7 +173,7 @@ const PartnersGrid = ({ partners }) => {
 	);
 };
 
-const EventsGrid = ({ events }) => {
+const EventsGrid = ({ events, onEventClick }) => {
 	if (!events?.length) return null;
 	return (
 		<section>
@@ -182,9 +185,10 @@ const EventsGrid = ({ events }) => {
 			</div>
 			<div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
 				{events.map((e) => (
-					<div
+					<button
 						key={e?._id || e?.id || e?.name}
-						className="p-4 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 hover:shadow-sm transition"
+						onClick={() => onEventClick(e)}
+						className="p-4 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 hover:shadow-md hover:border-blue-400 dark:hover:border-blue-500 transition text-left"
 					>
 						<div className="flex items-center justify-between mb-2">
 							<span className="text-xs px-2 py-0.5 rounded-md bg-slate-100 dark:bg-slate-800 text-gray-700 dark:text-gray-200">
@@ -198,14 +202,14 @@ const EventsGrid = ({ events }) => {
 						<div className="font-semibold text-gray-900 dark:text-gray-100 truncate">
 							{e?.name || 'Event'}
 						</div>
-					</div>
+					</button>
 				))}
 			</div>
 		</section>
 	);
 };
 
-const GalleryGrid = ({ gallery }) => {
+const GalleryGrid = ({ gallery, onImageClick }) => {
 	if (!gallery?.length) return null;
 	return (
 		<section>
@@ -217,23 +221,57 @@ const GalleryGrid = ({ gallery }) => {
 			</div>
 			<div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
 				{gallery.map((m, idx) => (
-					<a
+					<button
 						key={m?.publicId || idx}
-						href={m?.url || '#'}
-						target="_blank"
-						rel="noopener noreferrer"
-						className="group relative rounded-lg overflow-hidden border border-gray-200 dark:border-gray-700 bg-gray-100 dark:bg-gray-800"
+						onClick={() => onImageClick(m)}
+						className="group relative rounded-lg overflow-hidden border border-gray-200 dark:border-gray-700 bg-gray-100 dark:bg-gray-800 aspect-video"
 					>
 						<img
 							src={m?.url}
 							alt={m?.caption || `Gallery ${idx + 1}`}
 							loading="lazy"
-							className="w-full h-36 object-cover group-hover:opacity-95 transition"
+							className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
 						/>
-					</a>
+						<div className="absolute inset-0 bg-black/20 group-hover:bg-black/40 transition-colors"></div>
+					</button>
 				))}
 			</div>
 		</section>
+	);
+};
+
+const ImageLightbox = ({ image, onClose }) => {
+	if (!image) return null;
+
+	return (
+		<motion.div
+			initial={{ opacity: 0 }}
+			animate={{ opacity: 1 }}
+			exit={{ opacity: 0 }}
+			className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4"
+			onClick={onClose}
+		>
+			<motion.div
+				initial={{ scale: 0.8, y: 20 }}
+				animate={{ scale: 1, y: 0 }}
+				exit={{ scale: 0.8, y: 20 }}
+				className="relative"
+				onClick={(e) => e.stopPropagation()}
+			>
+				<img
+					src={image.url}
+					alt={image.caption || 'Gallery Image'}
+					className="max-w-[90vw] max-h-[85vh] object-contain rounded-lg shadow-2xl"
+				/>
+				<button
+					onClick={onClose}
+					className="absolute -top-3 -right-3 p-2 rounded-full bg-white/20 hover:bg-white/40 text-white transition"
+					aria-label="Close image view"
+				>
+					<X size={20} />
+				</button>
+			</motion.div>
+		</motion.div>
 	);
 };
 
@@ -273,6 +311,8 @@ const EditionsStrip = ({ editions, currentIdentifier, onSelect }) => {
 
 const ArvantisPage = () => {
 	const [identifier, setIdentifier] = useState(null);
+	const [selectedEvent, setSelectedEvent] = useState(null);
+	const [selectedImage, setSelectedImage] = useState(null);
 
 	const landingQuery = useQuery({
 		queryKey: ['arvantis', 'landing'],
@@ -333,6 +373,19 @@ const ArvantisPage = () => {
 	const errorMsg =
 		landingQuery.error?.message || detailsQuery.error?.message || 'Unknown error occurred.';
 
+	const handleEventClick = useCallback((event) => {
+		setSelectedEvent(event);
+	}, []);
+
+	const handleImageClick = useCallback((image) => {
+		setSelectedImage(image);
+	}, []);
+
+	const closeModal = useCallback(() => {
+		setSelectedEvent(null);
+		setSelectedImage(null);
+	}, []);
+
 	return (
 		<div className="min-h-screen max-w-7xl mx-auto px-4 py-8 text-gray-900 dark:text-gray-100">
 			<header className="mb-6">
@@ -382,12 +435,22 @@ const ArvantisPage = () => {
 					</section>
 
 					<div className="mt-8 grid grid-cols-1 gap-8">
-						<EventsGrid events={fest?.events} />
+						<EventsGrid events={fest?.events} onEventClick={handleEventClick} />
 						<PartnersGrid partners={fest?.partners} />
-						<GalleryGrid gallery={fest?.gallery} />
+						<GalleryGrid gallery={fest?.gallery} onImageClick={handleImageClick} />
 					</div>
 				</>
 			)}
+			<AnimatePresence>
+				{selectedEvent && (
+					<EventDetailModal
+						event={selectedEvent}
+						isOpen={!!selectedEvent}
+						onClose={closeModal}
+					/>
+				)}
+				{selectedImage && <ImageLightbox image={selectedImage} onClose={closeModal} />}
+			</AnimatePresence>
 		</div>
 	);
 };
