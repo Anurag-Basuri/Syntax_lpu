@@ -1,3 +1,4 @@
+// Adjusted to safely read picture and normalize strings
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import {
 	X,
@@ -17,24 +18,28 @@ import {
 	Badge,
 	Clock,
 	Sparkles,
-	MapPin,
 	School,
-	Star,
-	Award,
 } from 'lucide-react';
+
+const getAvatarUrl = (profilePicture) => {
+	if (!profilePicture) return null;
+	if (typeof profilePicture === 'string') return profilePicture;
+	if (typeof profilePicture === 'object' && profilePicture.url) return profilePicture.url;
+	return null;
+};
+
+const asText = (value, fallback = 'N/A') => {
+	if (!value) return fallback;
+	return Array.isArray(value) ? value.filter(Boolean).join(', ') || fallback : value;
+};
 
 // Utility function for formatting dates
 const formatDate = (dateString) => {
 	if (!dateString) return 'N/A';
-	try {
-		return new Date(dateString).toLocaleDateString('en-US', {
-			year: 'numeric',
-			month: 'long',
-			day: 'numeric',
-		});
-	} catch {
-		return 'Invalid date';
-	}
+	const d = new Date(dateString);
+	return isNaN(d.getTime())
+		? 'Invalid date'
+		: d.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
 };
 
 // Get icon based on social platform
@@ -350,12 +355,11 @@ const TeamMemberModal = ({ member, isOpen, onClose, isAuthenticated = false }) =
 	const [activeTab, setActiveTab] = useState('about');
 	const [imageError, setImageError] = useState(false);
 
-	// Memoized initials calculation
 	const initials = useMemo(() => {
 		if (!member?.fullname) return '??';
 		return member.fullname
 			.split(' ')
-			.map((n) => n[0])
+			.map((n) => n?.[0] || '')
 			.join('')
 			.substring(0, 2)
 			.toUpperCase();
@@ -448,103 +452,89 @@ const TeamMemberModal = ({ member, isOpen, onClose, isAuthenticated = false }) =
 
 	if (!isOpen || !member) return null;
 
+	const avatar = getAvatarUrl(member.profilePicture);
+	const departmentText = member.primaryDepartment || asText(member.department);
+	const designationText = member.primaryDesignation || asText(member.designation);
+
 	return (
 		<div
-			className="fixed inset-0 z-50 bg-black/90 backdrop-blur-sm flex items-center justify-center p-2 sm:p-4 animate-in fade-in duration-300 overflow-hidden"
-			onClick={handleModalClick}
+			className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-2 sm:p-4"
+			onClick={(e) => e.target === e.currentTarget && onClose()}
 		>
 			<div
-				className="relative w-full max-w-sm sm:max-w-md md:max-w-lg lg:max-w-3xl xl:max-w-4xl h-[95vh] sm:h-[90vh] md:h-[85vh] bg-gradient-to-br from-slate-900 to-slate-800 rounded-2xl border border-slate-600/50 shadow-2xl shadow-black/50 overflow-hidden flex flex-col animate-in slide-in-from-bottom-4 duration-300"
+				className="relative w-full max-w-sm sm:max-w-md md:max-w-lg lg:max-w-3xl xl:max-w-4xl h-[95vh] sm:h-[90vh] md:h-[85vh] bg-gradient-to-br from-slate-900 to-slate-800 rounded-2xl border border-slate-600/50 shadow-2xl overflow-hidden flex flex-col"
 				onClick={(e) => e.stopPropagation()}
 			>
-				{/* Header with glassmorphism effect */}
-				<div className="relative bg-gradient-to-r from-blue-900/80 via-indigo-800/80 to-purple-800/80 backdrop-blur-xl p-4 sm:p-6 md:p-8 flex-shrink-0 border-b border-white/10">
-					{/* Close button with premium styling */}
-					<button
-						onClick={handleClose}
-						className="absolute top-4 right-4 sm:top-6 sm:right-6 p-2.5 rounded-xl bg-black/20 hover:bg-black/40 border border-white/10 hover:border-white/20 transition-all duration-300 backdrop-blur-sm group z-20"
-						aria-label="Close modal"
-						type="button"
-					>
-						<X
-							size={20}
-							className="text-white group-hover:rotate-90 transition-transform duration-300"
-						/>
-					</button>
+				<button
+					onClick={(e) => {
+						e.stopPropagation();
+						onClose();
+					}}
+					className="absolute top-4 right-4 p-2 rounded-lg bg-black/30 border border-white/10 hover:bg-black/50 transition"
+					aria-label="Close modal"
+				>
+					<X size={18} className="text-white" />
+				</button>
 
-					{/* Enhanced Profile section */}
-					<div className="flex flex-col items-center text-center sm:flex-row sm:items-start sm:text-left gap-4 sm:gap-6 pr-16">
-						{/* Profile image with enhanced styling */}
-						<div className="flex-shrink-0 relative">
-							<div className="w-20 h-20 sm:w-24 sm:h-24 md:w-28 md:h-28 rounded-2xl overflow-hidden border-4 border-white/20 shadow-xl">
-								{!imageError && member.profilePicture?.url ? (
-									<img
-										src={member.profilePicture.url}
-										alt={member.fullname || 'Profile'}
-										className="w-full h-full object-cover"
-										onError={() => setImageError(true)}
-										loading="lazy"
-									/>
-								) : (
-									<div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-blue-600 via-indigo-700 to-purple-700">
-										<span className="text-white font-bold text-lg sm:text-xl md:text-2xl">
-											{initials}
-										</span>
-									</div>
-								)}
-							</div>
-							{/* Online status indicator */}
-							<div className="absolute -bottom-1 -right-1 w-6 h-6 bg-green-500 border-4 border-white/20 rounded-full"></div>
+				{/* Header */}
+				<div className="relative p-4 sm:p-6 md:p-8 border-b border-white/10 bg-gradient-to-r from-blue-900/70 via-indigo-800/70 to-purple-800/70">
+					<div className="flex flex-col items-center sm:flex-row sm:items-start gap-4 pr-10">
+						<div className="w-20 h-20 sm:w-24 sm:h-24 rounded-2xl overflow-hidden border-4 border-white/20 shadow">
+							{!imageError && avatar ? (
+								<img
+									src={avatar}
+									alt={member.fullname || 'Profile'}
+									className="w-full h-full object-cover"
+									onError={() => setImageError(true)}
+									loading="lazy"
+								/>
+							) : (
+								<div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-blue-600 via-indigo-700 to-purple-700">
+									<span className="text-white font-bold text-xl">{initials}</span>
+								</div>
+							)}
 						</div>
 
-						{/* Enhanced Profile info */}
 						<div className="flex-1 min-w-0">
-							<h2 className="text-xl sm:text-2xl md:text-3xl font-bold text-white mb-3 break-words leading-tight">
+							<h2 className="text-2xl font-bold text-white mb-2 break-words">
 								{member.fullname}
 							</h2>
-
-							{/* Enhanced info grid */}
 							<div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 text-sm">
-								{/* Department */}
-								{member.department && (
-									<div className="bg-white/10 backdrop-blur-sm rounded-xl p-3 border border-white/20">
-										<div className="flex items-center text-blue-200 mb-2">
-											<Sparkles size={14} className="mr-2 flex-shrink-0" />
+								{departmentText && departmentText !== 'N/A' && (
+									<div className="bg-white/10 rounded-xl p-3 border border-white/15">
+										<div className="flex items-center text-blue-200 mb-1">
+											<Sparkles size={14} className="mr-2" />
 											<span className="font-semibold">Department</span>
 										</div>
 										<div
-											className="text-white font-bold truncate"
-											title={member.department}
+											className="text-white font-medium truncate"
+											title={departmentText}
 										>
-											{member.department}
+											{departmentText}
 										</div>
 									</div>
 								)}
-
-								{/* Designation */}
-								{member.designation && (
-									<div className="bg-white/10 backdrop-blur-sm rounded-xl p-3 border border-white/20">
-										<div className="flex items-center text-blue-200 mb-2">
-											<Badge size={14} className="mr-2 flex-shrink-0" />
+								{designationText && designationText !== 'N/A' && (
+									<div className="bg-white/10 rounded-xl p-3 border border-white/15">
+										<div className="flex items-center text-blue-200 mb-1">
+											<Badge size={14} className="mr-2" />
 											<span className="font-semibold">Role</span>
 										</div>
 										<div
-											className="text-white font-bold truncate"
-											title={member.designation}
+											className="text-white font-medium truncate"
+											title={designationText}
 										>
-											{member.designation}
+											{designationText}
 										</div>
 									</div>
 								)}
-
-								{/* LPU ID for authenticated users */}
 								{isAuthenticated && member.LpuId && (
-									<div className="bg-white/10 backdrop-blur-sm rounded-xl p-3 border border-white/20">
-										<div className="flex items-center text-blue-200 mb-2">
-											<School size={14} className="mr-2 flex-shrink-0" />
+									<div className="bg-white/10 rounded-xl p-3 border border-white/15">
+										<div className="flex items-center text-blue-200 mb-1">
+											<School size={14} className="mr-2" />
 											<span className="font-semibold">Student ID</span>
 										</div>
-										<div className="text-white font-bold">{member.LpuId}</div>
+										<div className="text-white font-medium">{member.LpuId}</div>
 									</div>
 								)}
 							</div>
@@ -552,79 +542,170 @@ const TeamMemberModal = ({ member, isOpen, onClose, isAuthenticated = false }) =
 					</div>
 				</div>
 
-				{/* Tabs with better mobile experience */}
-				<div className="flex border-b border-slate-600/50 bg-slate-800/90 backdrop-blur-sm flex-shrink-0 overflow-x-auto">
+				{/* Tabs */}
+				<div className="flex border-b border-slate-600/50 bg-slate-800/90 overflow-x-auto">
 					<div className="flex min-w-full sm:min-w-0">
 						{tabs.map((tab) => {
-							const IconComponent = tab.icon;
+							const Icon = tab.icon;
 							return (
 								<button
 									key={tab.id}
-									className={`flex items-center justify-center gap-2 px-4 sm:px-6 py-3 sm:py-4 text-sm font-semibold transition-all duration-300 whitespace-nowrap flex-shrink-0 min-w-[100px] sm:min-w-[120px] relative ${
+									className={`flex items-center gap-2 px-4 sm:px-6 py-3 text-sm font-semibold whitespace-nowrap relative ${
 										activeTab === tab.id
 											? 'text-blue-400 bg-blue-900/30 border-b-2 border-blue-400'
 											: 'text-slate-400 hover:text-white hover:bg-slate-700/50'
 									}`}
 									onClick={() => setActiveTab(tab.id)}
 								>
-									<IconComponent size={16} className="flex-shrink-0" />
+									<Icon size={16} />
 									<span>{tab.label}</span>
-									{activeTab === tab.id && (
-										<div className="absolute inset-0 bg-blue-500/10 rounded-t-lg"></div>
-									)}
 								</button>
 							);
 						})}
 					</div>
 				</div>
 
-				{/* Enhanced Tab content with proper scrolling */}
-				<div className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden">
-					<div className="p-4 sm:p-6 md:p-8">
-						<TabContent
-							activeTab={activeTab}
-							member={member}
-							isAuthenticated={isAuthenticated}
-						/>
+				{/* Content */}
+				<div className="flex-1 min-h-0 overflow-y-auto">
+					<div className="p-4 sm:p-6 md:p-8 text-slate-100 text-sm leading-relaxed">
+						{activeTab === 'about' && (
+							<div className="space-y-4">
+								<p className="bg-white/5 border border-white/10 rounded-xl p-4">
+									{member.bio ||
+										'This member prefers to keep their bio private for now.'}
+								</p>
+								{member.joinedAt && (
+									<div className="bg-white/5 border border-white/10 rounded-xl p-4">
+										<div className="flex items-center text-blue-200 mb-1">
+											<Clock size={14} className="mr-2" />
+											<span className="font-semibold">Member Since</span>
+										</div>
+										<div>{formatDate(member.joinedAt)}</div>
+									</div>
+								)}
+							</div>
+						)}
+
+						{activeTab === 'contact' && (
+							<div className="space-y-3">
+								{member.email && (
+									<a
+										href={`mailto:${member.email}`}
+										className="flex items-center gap-2 underline text-blue-300"
+									>
+										<Mail size={16} /> {member.email}
+									</a>
+								)}
+								{member.phone && (
+									<a
+										href={`tel:${member.phone}`}
+										className="flex items-center gap-2 underline text-blue-300"
+									>
+										<Phone size={16} /> {member.phone}
+									</a>
+								)}
+								{member.socialLinks?.length > 0 && (
+									<div className="flex flex-col gap-1">
+										{member.socialLinks.map((s, i) => {
+											const url = s?.url?.startsWith('http')
+												? s.url
+												: `https://${s?.url || ''}`;
+											const Icon = (s.platform || '')
+												.toLowerCase()
+												.includes('github')
+												? Github
+												: (s.platform || '')
+														.toLowerCase()
+														.includes('linkedin')
+												? Linkedin
+												: Globe;
+											return (
+												<a
+													key={i}
+													href={url}
+													target="_blank"
+													rel="noopener noreferrer"
+													className="flex items-center gap-2 underline text-blue-300 truncate"
+												>
+													<Icon size={16} /> {s.platform || 'Profile'}
+												</a>
+											);
+										})}
+									</div>
+								)}
+							</div>
+						)}
+
+						{activeTab === 'skills' && (
+							<div className="flex flex-wrap gap-2">
+								{member.skills?.map((skill, idx) => (
+									<span
+										key={idx}
+										className="px-3 py-1 rounded-md bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300"
+									>
+										{skill}
+									</span>
+								))}
+							</div>
+						)}
+
+						{activeTab === 'academic' && (
+							<div className="grid gap-3 sm:grid-cols-2">
+								{member.program && (
+									<div className="bg-white/5 border border-white/10 rounded-xl p-4">
+										<div className="flex items-center text-blue-200 mb-1">
+											<School size={14} className="mr-2" />
+											<span className="font-semibold">Program</span>
+										</div>
+										<div>{member.program}</div>
+									</div>
+								)}
+								{member.year && (
+									<div className="bg-white/5 border border-white/10 rounded-xl p-4">
+										<div className="flex items-center text-blue-200 mb-1">
+											<Calendar size={14} className="mr-2" />
+											<span className="font-semibold">Academic Year</span>
+										</div>
+										<div>Year {member.year}</div>
+									</div>
+								)}
+								{typeof member.hosteler === 'boolean' && (
+									<div className="bg-white/5 border border-white/10 rounded-xl p-4 sm:col-span-2">
+										<div className="flex items-center text-blue-200 mb-1">
+											<Building size={14} className="mr-2" />
+											<span className="font-semibold">Residence Status</span>
+										</div>
+										<div>
+											{member.hosteler
+												? `Hosteler${
+														member.hostel ? ` - ${member.hostel}` : ''
+												  }`
+												: 'Day Scholar'}
+										</div>
+									</div>
+								)}
+							</div>
+						)}
+
+						{activeTab === 'documents' && (
+							<div>
+								{member.resume?.url ? (
+									<a
+										href={member.resume.url}
+										target="_blank"
+										rel="noopener noreferrer"
+										className="inline-flex items-center gap-2 px-4 py-2 rounded-md bg-emerald-600 text-white hover:bg-emerald-500"
+									>
+										<Download size={16} /> View Resume
+									</a>
+								) : (
+									<p className="text-slate-300">No documents available.</p>
+								)}
+							</div>
+						)}
 					</div>
 				</div>
 			</div>
-
-			{/* Add custom scrollbar styles */}
-			<style jsx>{`
-				.scrollbar-thin {
-					scrollbar-width: thin;
-					scrollbar-color: rgb(71 85 105) rgb(30 41 59);
-				}
-
-				.scrollbar-thin::-webkit-scrollbar {
-					width: 6px;
-				}
-
-				.scrollbar-thin::-webkit-scrollbar-track {
-					background: rgb(30 41 59);
-					border-radius: 3px;
-				}
-
-				.scrollbar-thin::-webkit-scrollbar-thumb {
-					background: rgb(71 85 105);
-					border-radius: 3px;
-				}
-
-				.scrollbar-thin::-webkit-scrollbar-thumb:hover {
-					background: rgb(100 116 139);
-				}
-
-				/* Hide scrollbar for tabs on mobile */
-				.overflow-x-auto::-webkit-scrollbar {
-					height: 2px;
-				}
-
-				.overflow-x-auto::-webkit-scrollbar-thumb {
-					background: rgb(59 130 246);
-					border-radius: 1px;
-				}
-			`}</style>
 		</div>
 	);
 };
