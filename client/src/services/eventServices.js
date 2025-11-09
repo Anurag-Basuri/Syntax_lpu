@@ -1,13 +1,25 @@
 import { apiClient, publicClient } from './api.js';
 
+/**
+ * Normalizes paginated API responses to a single object
+ * { docs, totalDocs, page, totalPages, limit, hasPrevPage, hasNextPage, prevPage, nextPage }
+ */
+const normalizePagination = (res) => {
+	const payload = res?.data ?? {};
+	const docs = payload.data ?? [];
+	const meta = payload.pagination ?? {};
+	return { docs, ...meta };
+};
+
 // Fetches all events with filtering and pagination.
+// params: { page, limit, search, status, period, sortBy, sortOrder }
 export const getAllEvents = async (params) => {
 	try {
 		const response = await publicClient.get('/api/v1/events', { params });
-		// Return the paginated payload only
-		return response.data.data; // { docs, totalDocs, page, totalPages, ... }
+		return normalizePagination(response);
 	} catch (error) {
-		throw new Error(error.response?.data?.message || 'Failed to fetch events.');
+		const msg = error?.response?.data?.message || 'Failed to fetch events.';
+		throw new Error(msg);
 	}
 };
 

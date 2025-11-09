@@ -88,7 +88,6 @@ const getAllEvents = asyncHandler(async (req, res) => {
 
 	if (Object.keys(match).length) pipeline.push({ $match: match });
 
-	// FIX: Safe size computation even if field missing
 	pipeline.push({
 		$addFields: {
 			registeredUsersCount: {
