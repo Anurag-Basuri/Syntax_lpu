@@ -40,6 +40,11 @@
 
 	/* Glows: Aligned with the new accent color */
 	--glow-blue: 0 0 20px rgba(99, 102, 241, 0.4);
+
+	--focus-ring: 0 0 0 3px color-mix(in srgb, var(--accent-1) 55%, transparent);
+	--transition-fast: 140ms;
+	--transition-medium: 280ms;
+	--transition-slow: 480ms;
 }
 
 /* Light Theme: Crisp, clean, and professional */
@@ -80,6 +85,8 @@
 
 	/* Glows: Aligned with the new accent color */
 	--glow-blue: 0 0 20px rgba(79, 70, 229, 0.25);
+
+	--focus-ring: 0 0 0 3px color-mix(in srgb, var(--accent-1) 45%, transparent);
 }
 
 /* ==========================================================================
@@ -225,4 +232,18 @@ html[data-theme] * {
 		transition-duration: 0.01ms !important;
 		scroll-behavior: auto !important;
 	}
+}
+
+@media (max-width: 480px) {
+	.btn {
+		font-size: 0.875rem;
+		padding: 0.65rem 1rem;
+	}
+}
+
+button:focus-visible,
+[role='menuitem']:focus-visible {
+	outline: none;
+	box-shadow: var(--focus-ring);
+	border-radius: 0.65rem;
 }
