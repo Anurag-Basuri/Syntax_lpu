@@ -275,6 +275,15 @@ memberSchema.methods.generateResetToken = function () {
 	return resetToken;
 };
 
+// Add a virtual property to reliably identify leaders
+memberSchema.virtual('isLeader').get(function () {
+	const leadershipRoles = ['CEO', 'CTO', 'CFO', 'CMO', 'COO'];
+	if (Array.isArray(this.designation)) {
+		return this.designation.some((d) => leadershipRoles.includes(d));
+	}
+	return false;
+});
+
 memberSchema.virtual('id').get(function () {
 	return this._id.toHexString();
 });
