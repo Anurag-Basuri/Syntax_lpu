@@ -26,6 +26,8 @@ const TeamsPage = () => {
 	const [selectedMember, setSelectedMember] = useState(null);
 	const [query, setQuery] = useState('');
 	const [activeFilter, setActiveFilter] = useState('All');
+	const [sortBy, setSortBy] = useState('name'); // name | role | dept
+	const [density, setDensity] = useState('cozy'); // compact | cozy | comfortable
 
 	const enrichedMembers = useMemo(() => {
 		const members = data?.members || [];
@@ -56,18 +58,21 @@ const TeamsPage = () => {
 		const q = query.trim().toLowerCase();
 		let filtered = enrichedMembers;
 
-		if (q) {
-			filtered = filtered.filter((m) => m._searchHaystack.includes(q));
-		}
+		if (q) filtered = filtered.filter((m) => m._searchHaystack.includes(q));
 
-		if (activeFilter === 'All') {
-			return filtered;
-		}
-		if (activeFilter === 'Leadership') {
-			return filtered.filter((m) => m.isLeader);
-		}
-		return filtered.filter((m) => m.primaryDept === activeFilter);
-	}, [query, activeFilter, enrichedMembers]);
+		if (activeFilter === 'Leadership') filtered = filtered.filter((m) => m.isLeader);
+		else if (activeFilter !== 'All')
+			filtered = filtered.filter((m) => m.primaryDept === activeFilter);
+
+		// Sorting
+		const by = (v) => (v || '').toString().toLowerCase();
+		const comparators = {
+			name: (a, b) => by(a.fullname).localeCompare(by(b.fullname)),
+			role: (a, b) => by(a.primaryRole).localeCompare(by(b.primaryRole)),
+			dept: (a, b) => by(a.primaryDept).localeCompare(by(b.primaryDept)),
+		};
+		return [...filtered].sort(comparators[sortBy] || comparators.name);
+	}, [query, activeFilter, enrichedMembers, sortBy]);
 
 	const openModal = useCallback((member) => setSelectedMember(member), []);
 	const closeModal = useCallback(() => setSelectedMember(null), []);
@@ -81,7 +86,7 @@ const TeamsPage = () => {
 	}
 
 	return (
-		<div className="page-container team-page-layout">
+		<div className="page-container tight-top team-page-layout">
 			{/* --- Sticky Sidebar for Filters --- */}
 			<aside className="team-sidebar">
 				<div className="team-sidebar-content">
@@ -107,7 +112,7 @@ const TeamsPage = () => {
 
 			{/* --- Main Content Area --- */}
 			<main className="team-main-content">
-				<header className="mb-8">
+				<header className="mb-6 md:mb-8">
 					<h1 className="text-4xl md:text-5xl font-bold tracking-tight mb-3 brand-text">
 						Our Team
 					</h1>
@@ -120,30 +125,79 @@ const TeamsPage = () => {
 					</p>
 				</header>
 
-				<div className="search-bar-wrapper">
-					<Search className="search-icon" style={{ color: 'var(--text-muted)' }} />
-					<input
-						value={query}
-						onChange={(e) => setQuery(e.target.value)}
-						placeholder="Search by name, role, or skill…"
-						className="search-input"
-					/>
-					{query && (
-						<button
-							type="button"
-							aria-label="Clear search"
-							onClick={() => setQuery('')}
-							className="clear-search-button"
-						>
-							<X size={16} />
-						</button>
-					)}
+				{/* Controls: search + sort + density + count */}
+				<div className="team-controls">
+					<div className="search-bar-wrapper">
+						<Search className="search-icon" style={{ color: 'var(--text-muted)' }} />
+						<input
+							value={query}
+							onChange={(e) => setQuery(e.target.value)}
+							placeholder="Search by name, role, or skill…"
+							className="search-input"
+						/>
+						{query && (
+							<button
+								type="button"
+								aria-label="Clear search"
+								onClick={() => setQuery('')}
+								className="clear-search-button"
+							>
+								<X size={16} />
+							</button>
+						)}
+					</div>
+
+					<div className="controls-right">
+						<div className="control-field">
+							<label className="control-label">Sort</label>
+							<select
+								className="control-select"
+								value={sortBy}
+								onChange={(e) => setSortBy(e.target.value)}
+							>
+								<option value="name">Name</option>
+								<option value="role">Role</option>
+								<option value="dept">Department</option>
+							</select>
+						</div>
+
+						<div className="control-field">
+							<label className="control-label">Density</label>
+							<div className="segmented">
+								<button
+									type="button"
+									className={density === 'compact' ? 'active' : ''}
+									onClick={() => setDensity('compact')}
+								>
+									Compact
+								</button>
+								<button
+									type="button"
+									className={density === 'cozy' ? 'active' : ''}
+									onClick={() => setDensity('cozy')}
+								>
+									Cozy
+								</button>
+								<button
+									type="button"
+									className={density === 'comfortable' ? 'active' : ''}
+									onClick={() => setDensity('comfortable')}
+								>
+									Comfort
+								</button>
+							</div>
+						</div>
+
+						<div className="result-count">
+							{isLoading ? '—' : `${filteredMembers.length} results`}
+						</div>
+					</div>
 				</div>
 
 				{isLoading ? (
 					<TeamSkeleton />
 				) : (
-					<TeamGrid members={filteredMembers} onCardClick={openModal} />
+					<TeamGrid members={filteredMembers} onCardClick={openModal} density={density} />
 				)}
 			</main>
 
