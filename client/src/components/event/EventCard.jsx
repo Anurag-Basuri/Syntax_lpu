@@ -4,7 +4,8 @@ import { motion, AnimatePresence } from 'framer-motion';
 const EventDetailModal = ({ event, isOpen, onClose }) => {
 	const [currentImageIndex, setCurrentImageIndex] = useState(0);
 	const [imageLoading, setImageLoading] = useState(true);
-	const eventDate = new Date(event.date);
+	// FIX: Use event.eventDate fallback to event.date
+	const eventDate = new Date(event.eventDate || event.date);
 	const isUpcoming = eventDate > new Date();
 	const isOngoing =
 		eventDate.toDateString() === new Date().toDateString() || event.status === 'ongoing';
@@ -382,7 +383,7 @@ const EventCard = ({ event }) => {
 	const [imageError, setImageError] = useState(false);
 	const [isHovered, setIsHovered] = useState(false);
 	const [showModal, setShowModal] = useState(false);
-	const eventDate = new Date(event.date);
+	const eventDate = new Date(event.eventDate || event.date);
 	const now = new Date();
 	const isUpcoming = eventDate > now;
 	const isOngoing = eventDate.toDateString() === now.toDateString() || event.status === 'ongoing';
