@@ -510,11 +510,22 @@ select.auth-input {
 	grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
 	gap: 1.5rem;
 }
-
+@media (max-width: 1200px) {
+	.team-grid {
+		grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+		gap: 1.2rem;
+	}
+}
+@media (max-width: 900px) {
+	.team-grid {
+		grid-template-columns: repeat(auto-fill, minmax(170px, 1fr));
+		gap: 1rem;
+	}
+}
 @media (max-width: 640px) {
 	.team-grid {
-		grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
-		gap: 1rem;
+		grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+		gap: 0.7rem;
 	}
 }
 
@@ -526,7 +537,10 @@ select.auth-input {
 	border: 1px solid var(--card-border);
 	box-shadow: var(--shadow-sm);
 	cursor: pointer;
-	transition: all 0.3s ease;
+	transition: all 0.3s cubic-bezier(0.4, 2, 0.3, 1);
+	display: flex;
+	flex-direction: column;
+	min-height: 260px;
 }
 .team-card:hover {
 	transform: translateY(-8px) scale(1.03);
@@ -537,22 +551,22 @@ select.auth-input {
 .team-card-image-wrapper {
 	position: relative;
 	aspect-ratio: 1 / 1;
+	width: 100%;
+	overflow: hidden;
 }
-
 .team-card-image {
 	width: 100%;
 	height: 100%;
 	object-fit: cover;
-	transition: transform 0.4s ease;
+	transition: transform 0.4s cubic-bezier(0.4, 2, 0.3, 1);
 }
 .team-card:hover .team-card-image {
-	transform: scale(1.05);
+	transform: scale(1.07);
 }
-
 .team-card-image-overlay {
 	position: absolute;
 	inset: 0;
-	background: linear-gradient(to top, rgba(0, 0, 0, 0.7) 0%, transparent 50%);
+	background: linear-gradient(to top, rgba(0, 0, 0, 0.7) 0%, transparent 60%);
 }
 
 .team-card-content {
@@ -563,35 +577,51 @@ select.auth-input {
 	padding: 1rem;
 	color: white;
 	z-index: 2;
+	display: flex;
+	flex-direction: column;
+	align-items: flex-start;
 }
-
 .team-card-name {
 	font-family: 'Space Grotesk', sans-serif;
-	font-size: 1.125rem;
+	font-size: 1.1rem;
 	font-weight: 600;
 	line-height: 1.2;
 	color: #fff;
-	margin: 0;
+	margin: 0 0 2px 0;
+	max-width: 90%;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
 }
-
 .team-card-role {
-	font-size: 0.8rem;
+	font-size: 0.85rem;
 	color: var(--text-secondary);
-	opacity: 0.9;
-	margin: 0;
+	opacity: 0.95;
+	margin: 0 0 2px 0;
+	max-width: 90%;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
 }
-
 .team-card-socials {
 	display: flex;
 	gap: 0.75rem;
-	margin-top: 0.75rem;
+	margin-top: 0.5rem;
 	opacity: 0;
 	transform: translateY(10px);
-	transition: all 0.3s ease;
+	transition: all 0.3s cubic-bezier(0.4, 2, 0.3, 1);
 }
 .team-card:hover .team-card-socials {
 	opacity: 1;
 	transform: translateY(0);
+}
+.social-link {
+	color: rgba(255, 255, 255, 0.7);
+	transition: color 0.2s, transform 0.2s;
+}
+.social-link:hover {
+	color: #fff;
+	transform: scale(1.1);
 }
 
 /* ===== Team page controls ===== */
