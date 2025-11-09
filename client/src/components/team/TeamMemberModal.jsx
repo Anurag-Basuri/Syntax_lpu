@@ -1,4 +1,3 @@
-// Adjusted to safely read picture and normalize strings
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import {
 	X,
