@@ -19,6 +19,9 @@ import {
 	Lightbulb,
 	AlertCircle,
 	Loader2,
+	Image as ImageIcon,
+	Clock,
+	User,
 } from 'lucide-react';
 import { useAuth } from '../hooks/useAuth.js';
 import { createPost, deletePost } from '../services/socialsServices.js';
@@ -40,6 +43,7 @@ const formatTimeAgo = (dateString) => {
 
 // Transform backend post to frontend format
 const transformPost = (post) => {
+	// Backend returns: { _id, author: { fullname, _id }, title, content, media: [{ url, publicId, resource_type }], createdAt, ... }
 	const media = (post.media || []).map((item) => ({
 		id: item.publicId || item._id || Math.random().toString(36),
 		url: item.url,
@@ -53,9 +57,9 @@ const transformPost = (post) => {
 			id: post.author?._id || post.author?.id,
 			name: post.author?.fullname || 'Unknown',
 			fullname: post.author?.fullname || 'Unknown',
-			role: post.author?.role || 'admin',
-			avatar: post.author?.profilePicture?.url || post.author?.avatar || '',
-			verified: post.author?.verified || false,
+			role: 'admin', // Posts are always by admins
+			avatar: '', // Admin model doesn't have profilePicture
+			verified: false,
 		},
 		title: post.title || '',
 		content: post.content || '',
@@ -74,6 +78,7 @@ const PostCard = ({ post, currentUser, onDelete }) => {
 	const [isLiked, setIsLiked] = useState(false);
 	const [imageLoaded, setImageLoaded] = useState({});
 	const [videoStates, setVideoStates] = useState({});
+	const [expandedMedia, setExpandedMedia] = useState(null);
 	const videoRefs = useRef({});
 	const optionsRef = useRef(null);
 
@@ -113,6 +118,13 @@ const PostCard = ({ post, currentUser, onDelete }) => {
 	}, []);
 
 	const media = post.media || [];
+	const initials =
+		post.user?.name
+			?.split(' ')
+			.map((n) => n?.[0] || '')
+			.join('')
+			.substring(0, 2)
+			.toUpperCase() || '??';
 
 	return (
 		<motion.div
@@ -127,28 +139,32 @@ const PostCard = ({ post, currentUser, onDelete }) => {
 				<div className="flex items-center justify-between gap-3">
 					<div className="flex items-center space-x-3 flex-1 min-w-0">
 						<div className="relative flex-shrink-0">
-							<motion.img
-								whileHover={{ scale: 1.05 }}
-								src={
-									post.user?.avatar ||
-									`https://api.dicebear.com/8.x/initials/svg?seed=${encodeURIComponent(
-										post.user?.name || 'User'
-									)}`
-								}
-								alt={post.user?.name || 'User'}
-								className="w-10 h-10 sm:w-12 sm:h-12 rounded-full object-cover ring-2 ring-[var(--accent-1)]/50 transition-all duration-300"
-								onError={(e) => {
-									e.target.src = `https://api.dicebear.com/8.x/initials/svg?seed=${encodeURIComponent(
-										post.user?.name || 'User'
-									)}`;
-								}}
-							/>
+							{post.user?.avatar ? (
+								<motion.img
+									whileHover={{ scale: 1.05 }}
+									src={post.user.avatar}
+									alt={post.user?.name || 'User'}
+									className="w-10 h-10 sm:w-12 sm:h-12 rounded-full object-cover ring-2 ring-[var(--accent-1)]/50 transition-all duration-300"
+									onError={(e) => {
+										e.target.style.display = 'none';
+										const fallback = e.target.nextElementSibling;
+										if (fallback) fallback.style.display = 'flex';
+									}}
+								/>
+							) : null}
+							<div
+								className={`w-10 h-10 sm:w-12 sm:h-12 rounded-full bg-gradient-to-br from-[var(--accent-1)] to-[var(--accent-2)] flex items-center justify-center text-white font-bold text-xs sm:text-sm ring-2 ring-[var(--accent-1)]/50 ${
+									post.user?.avatar ? 'hidden' : ''
+								}`}
+							>
+								{initials}
+							</div>
 							{post.user?.verified && (
 								<motion.div
 									initial={{ scale: 0 }}
 									animate={{ scale: 1 }}
 									transition={{ delay: 0.2 }}
-									className="absolute -bottom-1 -right-1 w-4 h-4 sm:w-5 sm:h-5 bg-gradient-to-r from-[var(--accent-1)] to-[var(--accent-2)] rounded-full flex items-center justify-center"
+									className="absolute -bottom-1 -right-1 w-4 h-4 sm:w-5 sm:h-5 bg-gradient-to-r from-[var(--accent-1)] to-[var(--accent-2)] rounded-full flex items-center justify-center shadow-[var(--shadow-sm)]"
 								>
 									<div className="w-2 h-2 bg-white rounded-full"></div>
 								</motion.div>
@@ -163,15 +179,18 @@ const PostCard = ({ post, currentUser, onDelete }) => {
 									<motion.span
 										initial={{ opacity: 0, scale: 0.8 }}
 										animate={{ opacity: 1, scale: 1 }}
-										className="px-2 py-0.5 text-xs font-medium bg-gradient-to-r from-[var(--accent-1)] to-[var(--accent-2)] text-white rounded-full flex-shrink-0"
+										className="px-2 py-0.5 text-xs font-medium bg-gradient-to-r from-[var(--accent-1)] to-[var(--accent-2)] text-white rounded-full flex-shrink-0 shadow-[var(--shadow-sm)]"
 									>
 										Admin
 									</motion.span>
 								)}
 							</div>
-							<p className="text-xs sm:text-sm text-[var(--text-muted)] mt-0.5">
-								{formatTimeAgo(post.createdAt)}
-							</p>
+							<div className="flex items-center gap-2 mt-0.5">
+								<Clock className="w-3 h-3 text-[var(--text-muted)]" />
+								<p className="text-xs sm:text-sm text-[var(--text-muted)]">
+									{formatTimeAgo(post.createdAt)}
+								</p>
+							</div>
 						</div>
 					</div>
 					{canDelete && (
@@ -180,7 +199,7 @@ const PostCard = ({ post, currentUser, onDelete }) => {
 								whileHover={{ scale: 1.1 }}
 								whileTap={{ scale: 0.95 }}
 								onClick={() => setShowOptions(!showOptions)}
-								className="p-2 rounded-full transition-colors opacity-0 group-hover:opacity-100 hover:bg-[var(--glass-hover)]"
+								className="p-2 rounded-full transition-colors opacity-0 group-hover:opacity-100 hover:bg-[var(--glass-hover)] touch-manipulation"
 								aria-label="Post options"
 							>
 								<MoreHorizontal className="w-5 h-5 text-[var(--accent-1)]" />
@@ -198,7 +217,7 @@ const PostCard = ({ post, currentUser, onDelete }) => {
 												onDelete(post._id);
 												setShowOptions(false);
 											}}
-											className="flex items-center space-x-2 px-4 py-3 text-red-400 hover:bg-[var(--glass-hover)] w-full text-left rounded-lg transition-colors text-sm"
+											className="flex items-center space-x-2 px-4 py-3 text-red-400 hover:bg-[var(--glass-hover)] w-full text-left rounded-lg transition-colors text-sm touch-manipulation"
 										>
 											<Trash2 className="w-4 h-4" />
 											<span>Delete Post</span>
@@ -215,18 +234,20 @@ const PostCard = ({ post, currentUser, onDelete }) => {
 			{(post.title || post.content) && (
 				<div className="px-4 sm:px-6 pb-4">
 					{post.title && (
-						<h2 className="text-lg sm:text-xl font-bold text-[var(--text-primary)] mb-2">
+						<h2 className="text-lg sm:text-xl md:text-2xl font-bold text-[var(--text-primary)] mb-2 leading-tight">
 							{post.title}
 						</h2>
 					)}
-					<motion.p
-						initial={{ opacity: 0 }}
-						animate={{ opacity: 1 }}
-						transition={{ delay: 0.1 }}
-						className="text-[var(--text-secondary)] leading-relaxed whitespace-pre-wrap break-words text-sm sm:text-base"
-					>
-						{post.content}
-					</motion.p>
+					{post.content && (
+						<motion.p
+							initial={{ opacity: 0 }}
+							animate={{ opacity: 1 }}
+							transition={{ delay: 0.1 }}
+							className="text-[var(--text-secondary)] leading-relaxed whitespace-pre-wrap break-words text-sm sm:text-base"
+						>
+							{post.content}
+						</motion.p>
+					)}
 				</div>
 			)}
 
@@ -235,18 +256,19 @@ const PostCard = ({ post, currentUser, onDelete }) => {
 				<div className="mb-4">
 					{media.length === 1 ? (
 						<div className="px-4 sm:px-6">
-							<div className="rounded-xl overflow-hidden">
+							<div className="rounded-xl overflow-hidden border border-[var(--glass-border)]">
 								{media[0].type === 'image' ? (
 									<motion.div
 										initial={{ opacity: 0, scale: 1.05 }}
 										animate={{ opacity: 1, scale: 1 }}
 										transition={{ duration: 0.4 }}
-										className="relative overflow-hidden"
+										className="relative overflow-hidden cursor-pointer"
+										onClick={() => setExpandedMedia(media[0])}
 									>
 										<img
 											src={media[0].url}
 											alt="Post media"
-											className="w-full h-64 sm:h-80 md:h-96 object-cover transition-transform duration-500 hover:scale-105"
+											className="w-full h-auto max-h-[500px] sm:max-h-[600px] object-cover transition-transform duration-500 hover:scale-105"
 											onLoad={() =>
 												setImageLoaded((prev) => ({
 													...prev,
@@ -256,9 +278,12 @@ const PostCard = ({ post, currentUser, onDelete }) => {
 											onError={(e) => {
 												e.target.style.display = 'none';
 											}}
+											loading="lazy"
 										/>
 										{!imageLoaded[media[0].id] && (
-											<div className="absolute inset-0 bg-[var(--bg-soft)] animate-pulse"></div>
+											<div className="absolute inset-0 bg-[var(--bg-soft)] animate-pulse flex items-center justify-center">
+												<ImageIcon className="w-8 h-8 text-[var(--text-muted)]" />
+											</div>
 										)}
 									</motion.div>
 								) : (
@@ -266,18 +291,35 @@ const PostCard = ({ post, currentUser, onDelete }) => {
 										<video
 											ref={(el) => (videoRefs.current[media[0].id] = el)}
 											src={media[0].url}
-											className="w-full h-64 sm:h-80 md:h-96 object-cover"
+											className="w-full h-auto max-h-[500px] sm:max-h-[600px] object-cover"
 											muted
 											loop
 											playsInline
+											onLoadedData={() => {
+												setVideoStates((prev) => ({
+													...prev,
+													[media[0].id]: {
+														...prev[media[0].id],
+														loaded: true,
+													},
+												}));
+											}}
 										/>
-										<div className="absolute inset-0 flex items-center justify-center">
-											<div className="flex space-x-3 sm:space-x-4">
+										{!videoStates[media[0].id]?.loaded && (
+											<div className="absolute inset-0 bg-[var(--bg-soft)] animate-pulse flex items-center justify-center">
+												<VideoIcon className="w-8 h-8 text-[var(--text-muted)]" />
+											</div>
+										)}
+										<div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+											<div className="flex space-x-3 sm:space-x-4 pointer-events-auto">
 												<motion.button
 													whileHover={{ scale: 1.1 }}
 													whileTap={{ scale: 0.95 }}
-													onClick={() => toggleVideo(media[0].id)}
-													className="p-2.5 sm:p-3 bg-black/50 hover:bg-black/70 rounded-full transition-colors backdrop-blur-sm"
+													onClick={(e) => {
+														e.stopPropagation();
+														toggleVideo(media[0].id);
+													}}
+													className="p-2.5 sm:p-3 bg-black/60 hover:bg-black/80 rounded-full transition-colors backdrop-blur-sm touch-manipulation"
 													aria-label={
 														videoStates[media[0].id]?.playing
 															? 'Pause'
@@ -293,8 +335,11 @@ const PostCard = ({ post, currentUser, onDelete }) => {
 												<motion.button
 													whileHover={{ scale: 1.1 }}
 													whileTap={{ scale: 0.95 }}
-													onClick={() => toggleMute(media[0].id)}
-													className="p-2.5 sm:p-3 bg-black/50 hover:bg-black/70 rounded-full transition-colors backdrop-blur-sm"
+													onClick={(e) => {
+														e.stopPropagation();
+														toggleMute(media[0].id);
+													}}
+													className="p-2.5 sm:p-3 bg-black/60 hover:bg-black/80 rounded-full transition-colors backdrop-blur-sm touch-manipulation"
 													aria-label={
 														videoStates[media[0].id]?.muted !== false
 															? 'Unmute'
@@ -319,11 +364,11 @@ const PostCard = ({ post, currentUser, onDelete }) => {
 								initial={{ opacity: 0 }}
 								animate={{ opacity: 1 }}
 								transition={{ duration: 0.4 }}
-								className={`grid gap-2 rounded-xl overflow-hidden ${
+								className={`grid gap-2 rounded-xl overflow-hidden border border-[var(--glass-border)] ${
 									media.length === 2
 										? 'grid-cols-2'
 										: media.length === 3
-										? 'grid-cols-3'
+										? 'grid-cols-2 sm:grid-cols-3'
 										: media.length === 4
 										? 'grid-cols-2 grid-rows-2'
 										: 'grid-cols-2 grid-rows-3'
@@ -335,32 +380,44 @@ const PostCard = ({ post, currentUser, onDelete }) => {
 										initial={{ opacity: 0, scale: 0.9 }}
 										animate={{ opacity: 1, scale: 1 }}
 										transition={{ duration: 0.3, delay: index * 0.1 }}
-										className={`relative overflow-hidden ${
+										className={`relative overflow-hidden cursor-pointer group ${
 											media.length === 5 && index === 0 ? 'row-span-2' : ''
 										}`}
+										onClick={() => setExpandedMedia(m)}
 									>
 										{m.type === 'image' ? (
-											<img
-												src={m.url}
-												alt="Post media"
-												className="w-full h-full object-cover min-h-[120px] sm:min-h-[150px] transition-transform duration-300 hover:scale-110"
-												onError={(e) => {
-													e.target.style.display = 'none';
-												}}
-											/>
+											<>
+												<img
+													src={m.url}
+													alt="Post media"
+													className="w-full h-full object-cover min-h-[120px] sm:min-h-[150px] md:min-h-[180px] transition-transform duration-300 group-hover:scale-110"
+													onError={(e) => {
+														e.target.style.display = 'none';
+													}}
+													loading="lazy"
+												/>
+												{!imageLoaded[m.id] && (
+													<div className="absolute inset-0 bg-[var(--bg-soft)] animate-pulse flex items-center justify-center">
+														<ImageIcon className="w-6 h-6 text-[var(--text-muted)]" />
+													</div>
+												)}
+											</>
 										) : (
 											<div className="relative">
 												<video
 													ref={(el) => (videoRefs.current[m.id] = el)}
 													src={m.url}
-													className="w-full h-full object-cover min-h-[120px] sm:min-h-[150px]"
+													className="w-full h-full object-cover min-h-[120px] sm:min-h-[150px] md:min-h-[180px]"
 													muted
 													loop
 													playsInline
 												/>
 												<button
-													onClick={() => toggleVideo(m.id)}
-													className="absolute inset-0 flex items-center justify-center"
+													onClick={(e) => {
+														e.stopPropagation();
+														toggleVideo(m.id);
+													}}
+													className="absolute inset-0 flex items-center justify-center group-hover:bg-black/20 transition-colors touch-manipulation"
 													aria-label={
 														videoStates[m.id]?.playing
 															? 'Pause'
@@ -370,7 +427,7 @@ const PostCard = ({ post, currentUser, onDelete }) => {
 													<motion.div
 														whileHover={{ scale: 1.1 }}
 														whileTap={{ scale: 0.95 }}
-														className="p-2 bg-black/50 hover:bg-black/70 rounded-full transition-colors backdrop-blur-sm"
+														className="p-2 bg-black/60 hover:bg-black/80 rounded-full transition-colors backdrop-blur-sm"
 													>
 														{videoStates[m.id]?.playing ? (
 															<Pause className="w-4 h-4 sm:w-5 sm:h-5 text-white" />
@@ -385,7 +442,7 @@ const PostCard = ({ post, currentUser, onDelete }) => {
 											<motion.div
 												initial={{ opacity: 0 }}
 												animate={{ opacity: 1 }}
-												className="absolute inset-0 bg-black/60 flex items-center justify-center backdrop-blur-sm"
+												className="absolute inset-0 bg-black/70 flex items-center justify-center backdrop-blur-sm"
 											>
 												<span className="text-white font-semibold text-base sm:text-lg">
 													+{media.length - 4}
@@ -407,7 +464,7 @@ const PostCard = ({ post, currentUser, onDelete }) => {
 						whileHover={{ scale: 1.05 }}
 						whileTap={{ scale: 0.95 }}
 						onClick={() => setIsLiked(!isLiked)}
-						className={`flex items-center space-x-2 transition-all duration-300 ${
+						className={`flex items-center space-x-2 transition-all duration-300 touch-manipulation ${
 							isLiked
 								? 'text-red-500 dark:text-red-400'
 								: 'text-[var(--text-muted)] hover:text-red-500 dark:hover:text-red-400'
@@ -426,7 +483,7 @@ const PostCard = ({ post, currentUser, onDelete }) => {
 					<motion.button
 						whileHover={{ scale: 1.05 }}
 						whileTap={{ scale: 0.95 }}
-						className="flex items-center space-x-2 text-[var(--text-muted)] hover:text-[var(--accent-1)] transition-colors"
+						className="flex items-center space-x-2 text-[var(--text-muted)] hover:text-[var(--accent-1)] transition-colors touch-manipulation"
 						aria-label="Comments"
 					>
 						<MessageCircle className="w-5 h-5" />
@@ -435,7 +492,7 @@ const PostCard = ({ post, currentUser, onDelete }) => {
 					<motion.button
 						whileHover={{ scale: 1.05 }}
 						whileTap={{ scale: 0.95 }}
-						className="flex items-center space-x-2 text-[var(--text-muted)] hover:text-emerald-400 transition-colors"
+						className="flex items-center space-x-2 text-[var(--text-muted)] hover:text-emerald-400 transition-colors touch-manipulation"
 						aria-label="Share"
 					>
 						<Share2 className="w-5 h-5" />
@@ -443,6 +500,49 @@ const PostCard = ({ post, currentUser, onDelete }) => {
 					</motion.button>
 				</div>
 			</div>
+
+			{/* Expanded Media Modal */}
+			<AnimatePresence>
+				{expandedMedia && (
+					<motion.div
+						initial={{ opacity: 0 }}
+						animate={{ opacity: 1 }}
+						exit={{ opacity: 0 }}
+						className="fixed inset-0 z-[10000] bg-black/90 backdrop-blur-sm flex items-center justify-center p-4"
+						onClick={() => setExpandedMedia(null)}
+					>
+						<motion.div
+							initial={{ scale: 0.9, opacity: 0 }}
+							animate={{ scale: 1, opacity: 1 }}
+							exit={{ scale: 0.9, opacity: 0 }}
+							onClick={(e) => e.stopPropagation()}
+							className="relative max-w-7xl max-h-[90vh] w-full"
+						>
+							<button
+								onClick={() => setExpandedMedia(null)}
+								className="absolute -top-12 right-0 p-2 bg-white/10 hover:bg-white/20 rounded-full text-white transition-colors z-10"
+								aria-label="Close"
+							>
+								<X className="w-6 h-6" />
+							</button>
+							{expandedMedia.type === 'image' ? (
+								<img
+									src={expandedMedia.url}
+									alt="Expanded media"
+									className="w-full h-auto max-h-[90vh] object-contain rounded-lg"
+								/>
+							) : (
+								<video
+									src={expandedMedia.url}
+									className="w-full h-auto max-h-[90vh] object-contain rounded-lg"
+									controls
+									autoPlay
+								/>
+							)}
+						</motion.div>
+					</motion.div>
+				)}
+			</AnimatePresence>
 		</motion.div>
 	);
 };
@@ -491,13 +591,13 @@ const CreatePostModal = ({ isOpen, onClose, onSubmit }) => {
 		e.preventDefault();
 		setError('');
 
-		if (!content.trim() && selectedFiles.length === 0) {
-			setError('Please add content or media');
+		if (!title.trim()) {
+			setError('Title is required');
 			return;
 		}
 
-		if (!title.trim()) {
-			setError('Title is required');
+		if (!content.trim() && selectedFiles.length === 0) {
+			setError('Please add content or media');
 			return;
 		}
 
@@ -510,7 +610,7 @@ const CreatePostModal = ({ isOpen, onClose, onSubmit }) => {
 		try {
 			const formData = new FormData();
 			formData.append('title', title.trim());
-			formData.append('content', content.trim());
+			formData.append('content', content.trim() || '');
 			formData.append('status', 'published');
 			selectedFiles.forEach((f) => formData.append('media', f.file));
 
@@ -566,7 +666,7 @@ const CreatePostModal = ({ isOpen, onClose, onSubmit }) => {
 						whileHover={{ scale: 1.1 }}
 						whileTap={{ scale: 0.95 }}
 						onClick={handleClose}
-						className="p-2 rounded-full transition-colors hover:bg-[var(--glass-hover)]"
+						className="p-2 rounded-full transition-colors hover:bg-[var(--glass-hover)] touch-manipulation"
 						aria-label="Close"
 					>
 						<X className="w-5 h-5 text-[var(--accent-1)]" />
@@ -612,7 +712,7 @@ const CreatePostModal = ({ isOpen, onClose, onSubmit }) => {
 						<motion.div
 							initial={{ opacity: 0, y: 20 }}
 							animate={{ opacity: 1, y: 0 }}
-							className="grid grid-cols-2 gap-4"
+							className="grid grid-cols-2 sm:grid-cols-3 gap-3 sm:gap-4"
 						>
 							{selectedFiles.map((file, index) => (
 								<motion.div
@@ -626,10 +726,10 @@ const CreatePostModal = ({ isOpen, onClose, onSubmit }) => {
 										<img
 											src={file.url}
 											alt="Selected"
-											className="w-full h-32 object-cover rounded-lg"
+											className="w-full h-28 sm:h-32 object-cover rounded-lg border border-[var(--glass-border)]"
 										/>
 									) : (
-										<div className="w-full h-32 bg-[var(--bg-soft)] rounded-lg flex items-center justify-center">
+										<div className="w-full h-28 sm:h-32 bg-[var(--bg-soft)] rounded-lg flex items-center justify-center border border-[var(--glass-border)]">
 											<VideoIcon className="w-8 h-8 text-[var(--accent-1)]" />
 										</div>
 									)}
@@ -638,10 +738,10 @@ const CreatePostModal = ({ isOpen, onClose, onSubmit }) => {
 										whileTap={{ scale: 0.95 }}
 										type="button"
 										onClick={() => removeFile(file.id)}
-										className="absolute -top-2 -right-2 p-1 bg-red-500 text-white rounded-full hover:bg-red-600 transition-colors"
+										className="absolute -top-2 -right-2 p-1 bg-red-500 text-white rounded-full hover:bg-red-600 transition-colors shadow-[var(--shadow-sm)] touch-manipulation"
 										aria-label="Remove file"
 									>
-										<X className="w-4 h-4" />
+										<X className="w-3 h-3 sm:w-4 sm:h-4" />
 									</motion.button>
 								</motion.div>
 							))}
@@ -663,10 +763,13 @@ const CreatePostModal = ({ isOpen, onClose, onSubmit }) => {
 								type="button"
 								onClick={() => fileInputRef.current?.click()}
 								disabled={selectedFiles.length >= 5}
-								className="flex items-center space-x-2 px-4 py-2 bg-[var(--button-secondary-bg)] border border-[var(--button-secondary-border)] text-[var(--accent-1)] rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed text-sm sm:text-base hover:bg-[var(--button-secondary-hover)]"
+								className="flex items-center space-x-2 px-3 sm:px-4 py-2 bg-[var(--button-secondary-bg)] border border-[var(--button-secondary-border)] text-[var(--accent-1)] rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed text-sm sm:text-base hover:bg-[var(--button-secondary-hover)] touch-manipulation"
 							>
 								<Upload className="w-4 h-4 sm:w-5 sm:h-5" />
-								<span>Add Media ({selectedFiles.length}/5)</span>
+								<span className="hidden sm:inline">
+									Add Media ({selectedFiles.length}/5)
+								</span>
+								<span className="sm:hidden">Media ({selectedFiles.length}/5)</span>
 							</motion.button>
 						</div>
 						<div className="flex items-center space-x-3">
@@ -675,7 +778,7 @@ const CreatePostModal = ({ isOpen, onClose, onSubmit }) => {
 								whileTap={{ scale: 0.95 }}
 								type="button"
 								onClick={handleClose}
-								className="px-4 sm:px-6 py-2 text-[var(--text-secondary)] hover:bg-[var(--glass-hover)] rounded-lg transition-colors text-sm sm:text-base"
+								className="px-4 sm:px-6 py-2 text-[var(--text-secondary)] hover:bg-[var(--glass-hover)] rounded-lg transition-colors text-sm sm:text-base touch-manipulation"
 							>
 								Cancel
 							</motion.button>
@@ -686,7 +789,7 @@ const CreatePostModal = ({ isOpen, onClose, onSubmit }) => {
 								disabled={
 									isSubmitting || !title.trim() || selectedFiles.length === 0
 								}
-								className="px-4 sm:px-6 py-2 bg-[var(--button-primary-bg)] text-white rounded-lg hover:opacity-90 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed flex items-center space-x-2 text-sm sm:text-base shadow-[var(--shadow-md)]"
+								className="px-4 sm:px-6 py-2 bg-[var(--button-primary-bg)] text-white rounded-lg hover:opacity-90 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed flex items-center space-x-2 text-sm sm:text-base shadow-[var(--shadow-md)] touch-manipulation"
 							>
 								{isSubmitting ? (
 									<>
@@ -735,7 +838,7 @@ const SocialsFeedPage = () => {
 
 	useEffect(() => {
 		const handleScroll = () => setShowScrollTop(window.scrollY > 200);
-		window.addEventListener('scroll', handleScroll);
+		window.addEventListener('scroll', handleScroll, { passive: true });
 		return () => window.removeEventListener('scroll', handleScroll);
 	}, []);
 
@@ -774,7 +877,7 @@ const SocialsFeedPage = () => {
 								<Sparkles className="w-6 h-6 sm:w-8 sm:h-8 text-white" />
 							</div>
 							<div>
-								<h1 className="text-2xl sm:text-3xl font-bold brand-text">
+								<h1 className="text-xl sm:text-2xl md:text-3xl font-bold brand-text">
 									Vibrant Community
 								</h1>
 								<p className="text-[var(--text-secondary)] mt-1 text-xs sm:text-sm">
@@ -787,10 +890,11 @@ const SocialsFeedPage = () => {
 								whileHover={{ scale: 1.05 }}
 								whileTap={{ scale: 0.95 }}
 								onClick={() => setShowCreateModal(true)}
-								className="btn btn-primary flex items-center gap-2 text-sm sm:text-base"
+								className="btn btn-primary flex items-center gap-2 text-xs sm:text-sm md:text-base whitespace-nowrap"
 							>
 								<Plus className="w-4 h-4 sm:w-5 sm:h-5" />
-								<span>Create Post</span>
+								<span className="hidden xs:inline">Create Post</span>
+								<span className="xs:hidden">Create</span>
 							</motion.button>
 						)}
 					</div>
@@ -798,11 +902,11 @@ const SocialsFeedPage = () => {
 			</div>
 
 			{/* Content Tips Banner */}
-			<div className="page-container mt-6 sm:mt-8">
+			<div className="page-container mt-4 sm:mt-6 md:mt-8">
 				<div className="bg-[var(--glass-bg)] backdrop-blur-lg rounded-xl border border-[var(--glass-border)] p-3 sm:p-4 shadow-[var(--shadow-sm)]">
 					<div className="flex items-center justify-between flex-wrap gap-3">
-						<div className="flex items-center gap-3 flex-1 min-w-0">
-							<Lightbulb className="w-5 h-5 text-[var(--accent-1)] flex-shrink-0" />
+						<div className="flex items-center gap-2 sm:gap-3 flex-1 min-w-0">
+							<Lightbulb className="w-4 h-4 sm:w-5 sm:h-5 text-[var(--accent-1)] flex-shrink-0" />
 							<p className="text-[var(--text-secondary)] text-xs sm:text-sm">
 								<span className="font-semibold text-[var(--text-primary)]">
 									Content Tip:
@@ -813,13 +917,13 @@ const SocialsFeedPage = () => {
 						<div className="flex gap-2">
 							<motion.button
 								whileHover={{ scale: 1.05 }}
-								className="text-xs px-3 py-1 bg-[var(--glass-hover)] rounded-full text-[var(--text-muted)] hover:text-[var(--accent-1)] transition-colors"
+								className="text-xs px-2 sm:px-3 py-1 bg-[var(--glass-hover)] rounded-full text-[var(--text-muted)] hover:text-[var(--accent-1)] transition-colors touch-manipulation"
 							>
 								#ImpactCoding
 							</motion.button>
 							<motion.button
 								whileHover={{ scale: 1.05 }}
-								className="text-xs px-3 py-1 bg-[var(--glass-hover)] rounded-full text-[var(--text-muted)] hover:text-[var(--accent-1)] transition-colors"
+								className="text-xs px-2 sm:px-3 py-1 bg-[var(--glass-hover)] rounded-full text-[var(--text-muted)] hover:text-[var(--accent-1)] transition-colors touch-manipulation"
 							>
 								#TechForGood
 							</motion.button>
@@ -829,11 +933,11 @@ const SocialsFeedPage = () => {
 			</div>
 
 			{/* Feed */}
-			<div className="page-container py-6 sm:py-10">
+			<div className="page-container py-6 sm:py-8 md:py-10">
 				{error && (
 					<div className="flex items-center gap-2 p-4 bg-red-500/20 border border-red-500/50 rounded-lg text-red-400 mb-6">
-						<AlertCircle className="w-5 h-5" />
-						<span>{error}</span>
+						<AlertCircle className="w-5 h-5 flex-shrink-0" />
+						<span className="text-sm sm:text-base">{error}</span>
 					</div>
 				)}
 				<AnimatePresence>
@@ -842,13 +946,17 @@ const SocialsFeedPage = () => {
 							initial={{ opacity: 0, y: 20 }}
 							animate={{ opacity: 1, y: 0 }}
 							exit={{ opacity: 0, y: 20 }}
-							className="text-center text-[var(--text-secondary)] py-20"
+							className="text-center text-[var(--text-secondary)] py-16 sm:py-20"
 						>
-							<Sparkles className="w-16 h-16 mx-auto mb-4 text-[var(--accent-1)] opacity-50" />
-							<p className="text-lg font-semibold text-[var(--text-primary)] mb-2">
+							<div className="w-16 h-16 sm:w-20 sm:h-20 mx-auto mb-4 bg-[var(--glass-bg)] rounded-full flex items-center justify-center">
+								<Sparkles className="w-8 h-8 sm:w-10 sm:h-10 text-[var(--accent-1)] opacity-50" />
+							</div>
+							<p className="text-lg sm:text-xl font-semibold text-[var(--text-primary)] mb-2">
 								No posts found
 							</p>
-							<p className="text-sm">Be the first to share something amazing!</p>
+							<p className="text-sm sm:text-base">
+								Be the first to share something amazing!
+							</p>
 						</motion.div>
 					)}
 					{transformedPosts.map((post) => (
@@ -861,8 +969,8 @@ const SocialsFeedPage = () => {
 					))}
 				</AnimatePresence>
 				{loading && (
-					<div className="flex justify-center py-10">
-						<Loader2 className="w-8 h-8 border-4 border-[var(--accent-1)] border-t-transparent rounded-full animate-spin" />
+					<div className="flex justify-center py-10 sm:py-16">
+						<Loader2 className="w-8 h-8 sm:w-10 sm:h-10 border-4 border-[var(--accent-1)] border-t-transparent rounded-full animate-spin" />
 					</div>
 				)}
 			</div>
@@ -875,7 +983,7 @@ const SocialsFeedPage = () => {
 						animate={{ opacity: 1, y: 0 }}
 						exit={{ opacity: 0, y: 40 }}
 						onClick={scrollToTop}
-						className="fixed bottom-6 right-6 sm:bottom-8 sm:right-8 z-50 p-3 rounded-full bg-[var(--button-primary-bg)] text-white shadow-[var(--shadow-lg)] hover:scale-110 transition-transform"
+						className="fixed bottom-4 right-4 sm:bottom-6 sm:right-6 md:bottom-8 md:right-8 z-50 p-3 rounded-full bg-[var(--button-primary-bg)] text-white shadow-[var(--shadow-lg)] hover:scale-110 transition-transform touch-manipulation"
 						aria-label="Scroll to top"
 					>
 						<ChevronUp className="w-5 h-5 sm:w-6 sm:h-6" />
