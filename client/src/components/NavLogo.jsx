@@ -2,11 +2,10 @@ import React from 'react';
 import { useTheme } from '../hooks/useTheme.js';
 import logo from '../assets/logo.png';
 
-const NavLogo = ({ onClick, elevated }) => {
+const NavLogo = ({ onClick }) => {
 	const { mode } = useTheme();
 	const isLight = mode === 'light';
 
-	// Fixed size - no change on elevation
 	const logoHeight = 'clamp(44px, 4vw, 52px)';
 
 	return (

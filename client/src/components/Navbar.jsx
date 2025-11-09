@@ -1,8 +1,7 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
 	Home,
 	Calendar,
-	Mail,
 	UserPlus,
 	LogIn,
 	LayoutDashboard,
@@ -17,12 +16,13 @@ import {
 	Contact,
 	Info,
 } from 'lucide-react';
-import { useNavigate, useLocation, NavLink as NavLinkBase } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
+import { motion, AnimatePresence } from 'framer-motion';
 import { useAuth } from '../hooks/useAuth.js';
 import ThemeToggle from './ThemeToggle.jsx';
 import NavLogo from './NavLogo.jsx';
 
-// Custom hook to handle clicks outside of a referenced element
+// --- Hooks ---
 const useClickOutside = (ref, callback) => {
 	useEffect(() => {
 		const handleClick = (e) => {
@@ -35,7 +35,7 @@ const useClickOutside = (ref, callback) => {
 	}, [ref, callback]);
 };
 
-// Unified navigation items
+// --- Data ---
 const navItems = [
 	{ name: 'Home', icon: Home, path: '/' },
 	{ name: 'Events', icon: Calendar, path: '/events' },
@@ -45,65 +45,296 @@ const navItems = [
 	{ name: 'Contact', icon: Contact, path: '/contact' },
 ];
 
-const Navbar = ({ scrollProgress, isVisible }) => {
-	const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
-	const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
-	const [isElevated, setIsElevated] = useState(false);
+// --- Sub-components ---
 
-	const { isAuthenticated, user, logout, loading } = useAuth();
-	const navigate = useNavigate();
+const DesktopNav = ({ onNavigate }) => {
 	const { pathname } = useLocation();
+	return (
+		<div className="navbar-section-center">
+			{navItems.map((item) => {
+				const isActive =
+					item.path === '/' ? pathname === '/' : pathname.startsWith(item.path);
+				return (
+					<button
+						key={item.name}
+						onClick={() => onNavigate(item.path)}
+						className={`nav-link ${isActive ? 'active' : ''}`}
+						aria-current={isActive ? 'page' : undefined}
+					>
+						<item.icon size={18} className="nav-link-icon" />
+						<span className="nav-link-text">{item.name}</span>
+						{isActive && <motion.span layoutId="nav-pill" className="nav-pill" />}
+					</button>
+				);
+			})}
+		</div>
+	);
+};
 
+const AuthSection = ({ onNavigate }) => {
+	const { isAuthenticated, user, logout } = useAuth();
+	const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
 	const userMenuRef = useRef(null);
-	const mobileMenuRef = useRef(null);
+	useClickOutside(userMenuRef, () => setIsUserMenuOpen(false));
 
 	const isMember = !!user?.memberID;
 
-	// Close menus on outside click
-	useClickOutside(userMenuRef, () => setIsUserMenuOpen(false));
-	useClickOutside(mobileMenuRef, () => setIsMobileMenuOpen(false));
+	const handleLogout = () => {
+		logout();
+		onNavigate('/auth/login');
+	};
 
-	// Handle scroll elevation effect
+	if (isAuthenticated) {
+		return (
+			<div className="navbar-user-menu" ref={userMenuRef}>
+				<button
+					onClick={() => setIsUserMenuOpen((v) => !v)}
+					className="user-menu-button"
+					aria-haspopup="menu"
+					aria-expanded={isUserMenuOpen}
+					aria-controls="user-menu"
+				>
+					<div className="user-avatar">
+						<User className="user-avatar-icon" />
+					</div>
+					<span className="user-role-text">{isMember ? 'Member' : 'Admin'}</span>
+					<ChevronDown
+						className="user-menu-chevron"
+						style={{
+							transform: `rotate(${isUserMenuOpen ? 180 : 0}deg)`,
+						}}
+					/>
+				</button>
+				<AnimatePresence>
+					{isUserMenuOpen && (
+						<motion.div
+							id="user-menu"
+							className="user-dropdown"
+							role="menu"
+							initial={{ opacity: 0, y: -10 }}
+							animate={{ opacity: 1, y: 0 }}
+							exit={{ opacity: 0, y: -10 }}
+							transition={{ duration: 0.2, ease: 'easeOut' }}
+						>
+							<div className="user-dropdown-items">
+								<button
+									onClick={() =>
+										onNavigate(isMember ? '/member' : '/admin/dashboard')
+									}
+									className="user-dropdown-item"
+									role="menuitem"
+								>
+									<LayoutDashboard className="dropdown-icon" />
+									<span>Dashboard</span>
+								</button>
+								<button
+									onClick={() => onNavigate('/show')}
+									className="user-dropdown-item"
+									role="menuitem"
+								>
+									<QrCode className="dropdown-icon" />
+									<span>Show</span>
+								</button>
+							</div>
+							<div className="user-dropdown-footer">
+								<button className="logout-button" onClick={handleLogout}>
+									<LogOut className="h-4 w-4" />
+									<span>Log Out</span>
+								</button>
+							</div>
+						</motion.div>
+					)}
+				</AnimatePresence>
+			</div>
+		);
+	}
+
+	return (
+		<div className="navbar-auth-buttons">
+			<button
+				onClick={() => onNavigate('/auth/login')}
+				className="auth-button auth-button-secondary"
+			>
+				<LogIn className="h-4 w-4" />
+				<span>Login</span>
+			</button>
+			<button
+				onClick={() => onNavigate('/auth/join')}
+				className="auth-button auth-button-primary"
+			>
+				<UserPlus className="h-4 w-4" />
+				<span>Join</span>
+			</button>
+		</div>
+	);
+};
+
+const MobileDrawer = ({ isOpen, onClose, onNavigate }) => {
+	const { pathname } = useLocation();
+	const { isAuthenticated } = useAuth();
+	const mobileMenuRef = useRef(null);
+	useClickOutside(mobileMenuRef, onClose);
+
+	useEffect(() => {
+		document.body.style.overflow = isOpen ? 'hidden' : '';
+		return () => {
+			document.body.style.overflow = '';
+		};
+	}, [isOpen]);
+
+	return (
+		<AnimatePresence>
+			{isOpen && (
+				<div
+					className="mobile-drawer-overlay"
+					role="dialog"
+					aria-modal="true"
+					id="mobile-drawer"
+				>
+					<motion.div
+						className="mobile-drawer-backdrop"
+						initial={{ opacity: 0 }}
+						animate={{ opacity: 1 }}
+						exit={{ opacity: 0 }}
+						transition={{ duration: 0.3 }}
+						onClick={onClose}
+						aria-hidden="true"
+					/>
+					<motion.div
+						ref={mobileMenuRef}
+						className="mobile-drawer"
+						initial={{ x: '100%' }}
+						animate={{ x: 0 }}
+						exit={{ x: '100%' }}
+						transition={{ type: 'spring', stiffness: 300, damping: 30 }}
+					>
+						<div className="mobile-drawer-content">
+							<div className="mobile-drawer-header">
+								<NavLogo onClick={() => onNavigate('/')} />
+								<div className="mobile-drawer-actions">
+									<ThemeToggle size="sm" />
+									<button
+										className="mobile-drawer-close"
+										onClick={onClose}
+										aria-label="Close menu"
+									>
+										<X size={20} />
+									</button>
+								</div>
+							</div>
+							<div className="mobile-drawer-nav">
+								<ul className="mobile-nav-list">
+									{navItems.map((item) => {
+										const isActive = pathname.startsWith(item.path);
+										return (
+											<li key={item.name}>
+												<button
+													onClick={() => onNavigate(item.path)}
+													className={`mobile-nav-item ${
+														isActive ? 'active' : ''
+													}`}
+												>
+													<div className="mobile-nav-icon">
+														<item.icon size={20} />
+													</div>
+													<span className="mobile-nav-text">
+														{item.name}
+													</span>
+												</button>
+											</li>
+										);
+									})}
+								</ul>
+							</div>
+							{!isAuthenticated && (
+								<div className="mobile-drawer-auth">
+									<button
+										onClick={() => onNavigate('/auth/login')}
+										className="mobile-auth-button secondary"
+									>
+										<LogIn className="h-4 w-4" />
+										<span>Login</span>
+									</button>
+									<button
+										onClick={() => onNavigate('/auth/join')}
+										className="mobile-auth-button primary"
+									>
+										<UserPlus className="h-4 w-4" />
+										<span>Join Club</span>
+									</button>
+								</div>
+							)}
+						</div>
+					</motion.div>
+				</div>
+			)}
+		</AnimatePresence>
+	);
+};
+
+const NavbarSkeleton = () => (
+	<div className="navbar" data-elevated="false" data-visible="true">
+		<div className="navbar-grid">
+			<div className="navbar-section-left">
+				<div className="h-12 w-12 bg-gray-200 dark:bg-gray-700 rounded-full animate-pulse" />
+			</div>
+			<div className="navbar-section-center">
+				{[...Array(5)].map((_, i) => (
+					<div
+						key={i}
+						className="h-6 w-20 bg-gray-200 dark:bg-gray-700 rounded-md animate-pulse"
+					/>
+				))}
+			</div>
+			<div className="navbar-section-right">
+				<div className="h-8 w-20 bg-gray-200 dark:bg-gray-700 rounded-md animate-pulse" />
+				<div className="h-8 w-20 bg-gray-200 dark:bg-gray-700 rounded-md animate-pulse" />
+			</div>
+		</div>
+	</div>
+);
+
+// --- Main Component ---
+
+const Navbar = ({ scrollProgress, isVisible }) => {
+	const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+	const [isElevated, setIsElevated] = useState(false);
+	const { loading } = useAuth();
+	const navigate = useNavigate();
+	const navRef = useRef(null);
+
+	const handleNavigation = useCallback(
+		(path) => {
+			navigate(path);
+			setIsMobileMenuOpen(false);
+		},
+		[navigate]
+	);
+
 	useEffect(() => {
 		const handleScroll = () => setIsElevated(window.scrollY > 10);
 		window.addEventListener('scroll', handleScroll, { passive: true });
-		handleScroll(); // Initial check
+		handleScroll();
 		return () => window.removeEventListener('scroll', handleScroll);
 	}, []);
 
-	// Close menus on Escape key press
 	useEffect(() => {
 		const handleEsc = (e) => {
-			if (e.key === 'Escape') {
-				setIsMobileMenuOpen(false);
-				setIsUserMenuOpen(false);
-			}
+			if (e.key === 'Escape') setIsMobileMenuOpen(false);
 		};
 		document.addEventListener('keydown', handleEsc);
 		return () => document.removeEventListener('keydown', handleEsc);
 	}, []);
 
-	// Prevent body scroll when mobile menu is open
 	useEffect(() => {
-		document.body.style.overflow = isMobileMenuOpen ? 'hidden' : '';
-		return () => {
-			document.body.style.overflow = '';
-		};
-	}, [isMobileMenuOpen]);
-
-	const handleNavigation = (path) => {
-		navigate(path);
-		setIsMobileMenuOpen(false);
-		setIsUserMenuOpen(false);
-	};
-
-	const handleLogout = () => {
-		logout();
-		handleNavigation('/auth/login');
-	};
+		if (navRef.current) {
+			const height = navRef.current.offsetHeight;
+			document.documentElement.style.setProperty('--navbar-height', `${height}px`);
+		}
+	}, [isElevated]);
 
 	if (loading) {
-		return null;
+		return <NavbarSkeleton />;
 	}
 
 	return (
@@ -116,6 +347,7 @@ const Navbar = ({ scrollProgress, isVisible }) => {
 			</a>
 
 			<nav
+				ref={navRef}
 				role="navigation"
 				aria-label="Primary"
 				className="navbar"
@@ -123,133 +355,18 @@ const Navbar = ({ scrollProgress, isVisible }) => {
 				data-visible={isVisible}
 			>
 				<div className="navbar-progress-bar" style={{ width: `${scrollProgress}%` }} />
-
 				<div className="navbar-grid">
-					{/* Left Section - Logo */}
 					<div className="navbar-section-left">
-						<button onClick={() => handleNavigation('/')} aria-label="Go to Homepage">
-							<NavLogo elevated={isElevated} />
-						</button>
+						<NavLogo onClick={() => handleNavigation('/')} />
 					</div>
 
-					{/* Center Section - Navigation Links */}
-					<div className="navbar-section-center">
-						{navItems.map((item) => {
-							const isActive =
-								item.path === '/'
-									? pathname === '/'
-									: pathname.startsWith(item.path);
-							return (
-								<button
-									key={item.name}
-									onClick={() => handleNavigation(item.path)}
-									className={`nav-link ${isActive ? 'active' : ''}`}
-									aria-current={isActive ? 'page' : undefined}
-								>
-									<item.icon size={18} className="nav-link-icon" />
-									<span className="nav-link-text">{item.name}</span>
-									{isActive && <span className="nav-pill" />}
-								</button>
-							);
-						})}
-					</div>
+					<DesktopNav onNavigate={handleNavigation} />
 
-					{/* Right Section - Theme + Auth */}
 					<div className="navbar-section-right">
 						<div className="navbar-theme-toggle">
 							<ThemeToggle size="sm" />
 						</div>
-
-						{isAuthenticated ? (
-							<div className="navbar-user-menu" ref={userMenuRef}>
-								<button
-									onClick={() => setIsUserMenuOpen((v) => !v)}
-									className="user-menu-button"
-									aria-haspopup="menu"
-									aria-expanded={isUserMenuOpen}
-									aria-controls="user-menu"
-								>
-									<div className="user-avatar">
-										<User className="user-avatar-icon" />
-									</div>
-									<span className="user-role-text">
-										{isMember ? 'Member' : 'Admin'}
-									</span>
-									<ChevronDown
-										className="user-menu-chevron"
-										style={{
-											transform: `rotate(${isUserMenuOpen ? 180 : 0}deg)`,
-										}}
-									/>
-								</button>
-
-								<AnimatePresence>
-									{isUserMenuOpen && (
-										<motion.div
-											id="user-menu"
-											className="user-dropdown"
-											role="menu"
-											initial={{ opacity: 0, y: -10 }}
-											animate={{ opacity: 1, y: 0 }}
-											exit={{ opacity: 0, y: -10 }}
-											transition={{ duration: 0.2, ease: 'easeOut' }}
-										>
-											<div className="user-dropdown-items">
-												<button
-													onClick={() =>
-														handleNavigation(
-															isMember
-																? '/member'
-																: '/admin/dashboard'
-														)
-													}
-													className="user-dropdown-item"
-													role="menuitem"
-												>
-													<LayoutDashboard className="dropdown-icon" />
-													<span>Dashboard</span>
-												</button>
-												<button
-													onClick={() => handleNavigation('/show')}
-													className="user-dropdown-item"
-													role="menuitem"
-												>
-													<QrCode className="dropdown-icon" />
-													<span>Show</span>
-												</button>
-											</div>
-											<div className="user-dropdown-footer">
-												<button
-													className="logout-button"
-													onClick={handleLogout}
-												>
-													<LogOut className="h-4 w-4" />
-													<span>Log Out</span>
-												</button>
-											</div>
-										</motion.div>
-									)}
-								</AnimatePresence>
-							</div>
-						) : (
-							<div className="navbar-auth-buttons">
-								<button
-									onClick={() => handleNavigation('/auth/login')}
-									className="auth-button auth-button-secondary"
-								>
-									<LogIn className="h-4 w-4" />
-									<span>Login</span>
-								</button>
-								<button
-									onClick={() => handleNavigation('/auth/join')}
-									className="auth-button auth-button-primary"
-								>
-									<UserPlus className="h-4 w-4" />
-									<span>Join</span>
-								</button>
-							</div>
-						)}
-
+						<AuthSection onNavigate={handleNavigation} />
 						<button
 							className="mobile-menu-button"
 							onClick={() => setIsMobileMenuOpen(true)}
@@ -263,95 +380,11 @@ const Navbar = ({ scrollProgress, isVisible }) => {
 				</div>
 			</nav>
 
-			{/* Mobile Drawer */}
-			<AnimatePresence>
-				{isMobileMenuOpen && (
-					<div
-						className="mobile-drawer-overlay"
-						role="dialog"
-						aria-modal="true"
-						id="mobile-drawer"
-					>
-						<motion.div
-							className="mobile-drawer-backdrop"
-							initial={{ opacity: 0 }}
-							animate={{ opacity: 1 }}
-							exit={{ opacity: 0 }}
-							transition={{ duration: 0.3 }}
-							onClick={() => setIsMobileMenuOpen(false)}
-							aria-hidden="true"
-						/>
-						<motion.div
-							ref={mobileMenuRef}
-							className="mobile-drawer"
-							initial={{ x: '100%' }}
-							animate={{ x: 0 }}
-							exit={{ x: '100%' }}
-							transition={{ type: 'spring', stiffness: 300, damping: 30 }}
-						>
-							<div className="mobile-drawer-content">
-								<div className="mobile-drawer-header">
-									<NavLogo />
-									<div className="mobile-drawer-actions">
-										<ThemeToggle size="sm" />
-										<button
-											className="mobile-drawer-close"
-											onClick={() => setIsMobileMenuOpen(false)}
-											aria-label="Close menu"
-										>
-											<X size={20} />
-										</button>
-									</div>
-								</div>
-
-								<div className="mobile-drawer-nav">
-									<ul className="mobile-nav-list">
-										{navItems.map((item) => {
-											const isActive = pathname.startsWith(item.path);
-											return (
-												<li key={item.name}>
-													<button
-														onClick={() => handleNavigation(item.path)}
-														className={`mobile-nav-item ${
-															isActive ? 'active' : ''
-														}`}
-													>
-														<div className="mobile-nav-icon">
-															<item.icon size={20} />
-														</div>
-														<span className="mobile-nav-text">
-															{item.name}
-														</span>
-													</button>
-												</li>
-											);
-										})}
-									</ul>
-								</div>
-
-								{!isAuthenticated && (
-									<div className="mobile-drawer-auth">
-										<button
-											onClick={() => handleNavigation('/auth/login')}
-											className="mobile-auth-button secondary"
-										>
-											<LogIn className="h-4 w-4" />
-											<span>Login</span>
-										</button>
-										<button
-											onClick={() => handleNavigation('/auth/join')}
-											className="mobile-auth-button primary"
-										>
-											<UserPlus className="h-4 w-4" />
-											<span>Join Club</span>
-										</button>
-									</div>
-								)}
-							</div>
-						</motion.div>
-					</div>
-				)}
-			</AnimatePresence>
+			<MobileDrawer
+				isOpen={isMobileMenuOpen}
+				onClose={() => setIsMobileMenuOpen(false)}
+				onNavigate={handleNavigation}
+			/>
 		</>
 	);
 };
