@@ -9,10 +9,13 @@ import {
 import { toast } from 'react-hot-toast';
 
 // Hook to fetch a paginated list of all events
-export const useEvents = (params) => {
+export const useEvents = (params = {}) => {
+	const defaultParams = { page: 1, limit: 9, sortBy: 'eventDate', sortOrder: 'desc' };
+	const merged = { ...defaultParams, ...params };
+
 	return useQuery({
-		queryKey: ['events', params],
-		queryFn: () => getAllEvents(params),
+		queryKey: ['events', merged],
+		queryFn: () => getAllEvents(merged),
 		staleTime: 60_000,
 		refetchOnWindowFocus: false,
 	});
@@ -33,7 +36,8 @@ export const useUpcomingEvent = () => {
 	return useQuery({
 		queryKey: ['upcomingEvent'],
 		queryFn: () => getAllEvents({ period: 'upcoming', limit: 1, sortBy: 'eventDate' }),
-		select: (data) => data?.docs?.[0], // data is the paginated object
+		select: (data) => data?.docs?.[0],
+		staleTime: 60_000,
 	});
 };
 
@@ -47,10 +51,7 @@ export const useManageEvent = () => {
 			toast.success('Event created successfully!');
 			queryClient.invalidateQueries({ queryKey: ['events'] });
 		},
-		onError: (error) => {
-			toast.error(error.message);
-			console.error('Failed to create event:', error);
-		},
+		onError: (error) => toast.error(error.message),
 	});
 
 	const { mutate: updateEvent, isPending: isUpdating } = useMutation({
@@ -60,10 +61,7 @@ export const useManageEvent = () => {
 			queryClient.invalidateQueries({ queryKey: ['events'] });
 			queryClient.invalidateQueries({ queryKey: ['event', id] });
 		},
-		onError: (error) => {
-			toast.error(error.message);
-			console.error('Failed to update event:', error);
-		},
+		onError: (error) => toast.error(error.message),
 	});
 
 	const { mutate: removeEvent, isPending: isDeleting } = useMutation({
@@ -72,10 +70,7 @@ export const useManageEvent = () => {
 			toast.success('Event deleted.');
 			queryClient.invalidateQueries({ queryKey: ['events'] });
 		},
-		onError: (error) => {
-			toast.error(error.message);
-			console.error('Failed to delete event:', error);
-		},
+		onError: (error) => toast.error(error.message),
 	});
 
 	return { addEvent, isCreating, updateEvent, isUpdating, removeEvent, isDeleting };
