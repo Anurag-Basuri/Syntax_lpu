@@ -7,7 +7,6 @@ import ErrorBoundary from '../components/team/ErrorBoundary.jsx';
 import { Search } from 'lucide-react';
 import { isLeadershipRole } from '../constants/team.js';
 
-// Error & Empty blocks unchanged
 const ErrorBlock = ({ message, onRetry }) => (
 	<div className="py-24 text-center">
 		<div className="text-5xl mb-4">⚠️</div>
@@ -44,44 +43,41 @@ const TeamsPage = () => {
 
 	const members = data?.members || [];
 
-	// Normalize + enrich members once
-	const enrichedMembers = useMemo(
-		() =>
-			members.map((m) => {
-				const isLeader =
-					m.isLeader || isLeadershipRole(m.designation || m.primaryDesignation);
-				const primaryDept =
-					m.primaryDepartment ||
-					(Array.isArray(m.department) ? m.department[0] : m.department) ||
-					'Other';
-				const primaryRole =
-					m.primaryDesignation ||
-					(Array.isArray(m.designation) ? m.designation[0] : m.designation) ||
-					'Member';
-				return {
-					...m,
-					isLeader,
-					primaryDept,
-					primaryRole,
-					_searchHaystack: [
-						m.fullname,
-						primaryDept,
-						primaryRole,
-						Array.isArray(m.designation) ? m.designation.join(' ') : m.designation,
-						Array.isArray(m.department) ? m.department.join(' ') : m.department,
-						...(m.skills || []),
-					]
-						.filter(Boolean)
-						.join(' ')
-						.toLowerCase(),
-				};
-			}),
-		[members]
-	);
+	const enrichedMembers = useMemo(() => {
+		return members.map((m) => {
+			const designation = Array.isArray(m.designation) ? m.designation[0] : m.designation;
+			const department = Array.isArray(m.department) ? m.department[0] : m.department;
+			const primaryDept = m.primaryDepartment || department || 'Other';
+			const primaryRole = m.primaryDesignation || designation || 'Member';
+			const isLeader = !!(
+				m.isLeader || isLeadershipRole(designation || m.primaryDesignation)
+			);
+			const skills = Array.isArray(m.skills) ? m.skills : [];
+			const haystack = [
+				m.fullname,
+				primaryDept,
+				primaryRole,
+				designation,
+				department,
+				...skills,
+			]
+				.filter(Boolean)
+				.join(' ')
+				.toLowerCase();
+
+			return {
+				...m,
+				isLeader,
+				primaryDept,
+				primaryRole,
+				_searchHaystack: haystack,
+			};
+		});
+	}, [members]);
 
 	const filtered = useMemo(() => {
-		if (!query) return enrichedMembers;
-		const q = query.toLowerCase();
+		const q = query.trim().toLowerCase();
+		if (!q) return enrichedMembers;
 		return enrichedMembers.filter((m) => m._searchHaystack.includes(q));
 	}, [query, enrichedMembers]);
 
@@ -91,8 +87,9 @@ const TeamsPage = () => {
 	const departments = useMemo(() => {
 		const map = {};
 		for (const m of nonLeadership) {
-			map[m.primaryDept] ||= [];
-			map[m.primaryDept].push(m);
+			const dept = m.primaryDept || 'Other';
+			if (!map[dept]) map[dept] = [];
+			map[dept].push(m);
 		}
 		return map;
 	}, [nonLeadership]);
@@ -136,7 +133,6 @@ const TeamsPage = () => {
 				</p>
 			</header>
 
-			{/* Toolbar */}
 			<div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-8">
 				<div className="relative w-full sm:w-80">
 					<Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-gray-500" />
@@ -196,7 +192,7 @@ const TeamsPage = () => {
 							title={dept}
 							members={list}
 							onClick={openModal}
-							isExpanded={expandedDepartments[dept] || false}
+							isExpanded={!!expandedDepartments[dept]}
 							onToggle={() => toggleDepartment(dept)}
 						/>
 					))}
