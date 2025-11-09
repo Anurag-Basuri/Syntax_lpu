@@ -4,7 +4,7 @@ import { ProtectedRoute, PublicRoute, AdminRoute } from './protectedRoutes.jsx';
 
 // --- Loading Fallback Component ---
 const PageLoadingFallback = () => (
-	<div className="min-h-screen bg-gradient-to-br from-[#0a0e17] to-[#0f172a] flex items-center justify-center">
+	<div className="min-h-screen bg-linear-to-br from-[#0a0e17] to-[#0f172a] flex items-center justify-center">
 		<div className="w-12 h-12 border-4 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
 	</div>
 );
