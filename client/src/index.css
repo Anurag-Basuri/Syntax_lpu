@@ -1,92 +1,133 @@
 @import 'tailwindcss';
 
 /* ==========================================================================
-   1. THEME & GLOBAL VARIABLES (NEW & IMPROVED PALETTE)
+   1. THEME & GLOBAL VARIABLES (ENHANCED FOR PERFECT VISIBILITY)
    ========================================================================== */
 :root {
-	/* New Accents: A vibrant Indigo -> Violet gradient */
+	/* Dark Theme - Default */
+	/* Accents: Vibrant and visible */
 	--accent-1: #6366f1; /* Indigo-500 */
 	--accent-2: #8b5cf6; /* Violet-500 */
 	--accent-glow: #4f46e5; /* Indigo-600 for glows */
 
-	/* Dark Theme: Rich, deep slate blues for a modern feel */
+	/* Backgrounds: Rich, deep slate blues */
 	--bg-base: #0f172a; /* Slate-900 */
 	--bg-soft: #1e293b; /* Slate-800 */
 	--bg-softer: #334155; /* Slate-700 */
 
-	/* Glass Surfaces: Higher contrast and subtle tint */
-	--glass-bg: rgba(30, 41, 59, 0.6); /* Slate-800 @ 60% */
+	/* Glass Surfaces: Higher contrast */
+	--glass-bg: rgba(30, 41, 59, 0.75); /* Slate-800 @ 75% */
 	--glass-border: rgba(148, 163, 184, 0.2); /* Slate-400 @ 20% */
-	--glass-hover: rgba(51, 65, 85, 0.75); /* Slate-700 @ 75% */
+	--glass-hover: rgba(51, 65, 85, 0.9); /* Slate-700 @ 90% */
 
-	/* Text: Bright and clear for high readability */
+	/* Text: Bright and clear */
 	--text-primary: #f8fafc; /* Slate-50 */
 	--text-secondary: #cbd5e1; /* Slate-300 */
 	--text-muted: #94a3b8; /* Slate-400 */
 
-	/* Navigation: Cohesive with the new dark theme */
-	--nav-bg: rgba(15, 23, 42, 0.8);
+	/* Navigation: Cohesive with dark theme */
+	--nav-bg: rgba(15, 23, 42, 0.85);
 	--nav-border: rgba(148, 163, 184, 0.15);
 	--nav-shadow: 0 4px 24px rgba(0, 0, 0, 0.4);
-	--nav-bg-elevated: rgba(30, 41, 59, 0.85);
+	--nav-bg-elevated: rgba(30, 41, 59, 0.9);
 	--nav-border-elevated: rgba(148, 163, 184, 0.25);
 	--nav-shadow-elevated: 0 8px 32px rgba(0, 0, 0, 0.5);
 
-	/* Shadows: Softened for a more refined look */
+	/* Shadows: Softened for refinement */
 	--shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.3);
 	--shadow-md: 0 6px 16px rgba(0, 0, 0, 0.35);
 	--shadow-lg: 0 10px 30px rgba(0, 0, 0, 0.4);
 	--shadow-xl: 0 20px 50px rgba(0, 0, 0, 0.45);
 
-	/* Glows: Aligned with the new accent color */
+	/* Glows: Aligned with accent */
 	--glow-blue: 0 0 20px rgba(99, 102, 241, 0.4);
 
-	--focus-ring: 0 0 0 3px color-mix(in srgb, var(--accent-1) 55%, transparent);
+	/* Focus & Transitions */
+	--focus-ring: 0 0 0 3px rgba(99, 102, 241, 0.5);
 	--transition-fast: 140ms;
 	--transition-medium: 280ms;
 	--transition-slow: 480ms;
+
+	/* Input States */
+	--input-bg: rgba(30, 41, 59, 0.6);
+	--input-border: rgba(148, 163, 184, 0.3);
+	--input-border-focus: rgba(99, 102, 241, 0.6);
+	--input-text: #f8fafc;
+	--input-placeholder: #94a3b8;
+
+	/* Button States */
+	--button-primary-bg: linear-gradient(135deg, #6366f1, #8b5cf6);
+	--button-primary-hover: linear-gradient(135deg, #4f46e5, #7c3aed);
+	--button-secondary-bg: rgba(51, 65, 85, 0.8);
+	--button-secondary-border: rgba(148, 163, 184, 0.3);
+	--button-secondary-hover: rgba(71, 85, 105, 0.9);
+
+	/* Card backgrounds */
+	--card-bg: rgba(30, 41, 59, 0.6);
+	--card-border: rgba(148, 163, 184, 0.2);
+	--card-hover-bg: rgba(51, 65, 85, 0.7);
 }
 
-/* Light Theme: Crisp, clean, and professional */
+/* Light Theme: Crisp, clean, and high contrast */
 :root[data-theme='light'] {
-	/* Accents: Deeper tones for strong contrast on light backgrounds */
+	/* Accents: Deeper for strong contrast */
 	--accent-1: #4f46e5; /* Indigo-600 */
 	--accent-2: #7c3aed; /* Violet-600 */
-	--accent-glow: #4338ca; /* Indigo-700 for glows */
+	--accent-glow: #4338ca; /* Indigo-700 */
 
-	/* Backgrounds: Clean and airy */
+	/* Backgrounds: Clean and bright */
 	--bg-base: #ffffff;
 	--bg-soft: #f8fafc; /* Slate-50 */
 	--bg-softer: #f1f5f9; /* Slate-100 */
 
-	/* Glass Surfaces: Subtle and elegant */
-	--glass-bg: rgba(255, 255, 255, 0.75);
-	--glass-border: rgba(30, 41, 59, 0.1);
-	--glass-hover: rgba(248, 250, 252, 0.9);
+	/* Glass Surfaces: Subtle elegance */
+	--glass-bg: rgba(248, 250, 252, 0.85);
+	--glass-border: rgba(30, 41, 59, 0.12);
+	--glass-hover: rgba(241, 245, 249, 0.95);
 
 	/* Text: Dark and high-contrast */
-	--text-primary: #1e293b; /* Slate-800 */
+	--text-primary: #0f172a; /* Slate-900 */
 	--text-secondary: #475569; /* Slate-600 */
 	--text-muted: #64748b; /* Slate-500 */
 
 	/* Navigation: Bright and clean */
-	--nav-bg: rgba(255, 255, 255, 0.8);
-	--nav-border: rgba(30, 41, 59, 0.08);
-	--nav-shadow: 0 4px 24px rgba(30, 41, 59, 0.06);
-	--nav-bg-elevated: rgba(255, 255, 255, 0.9);
-	--nav-border-elevated: rgba(30, 41, 59, 0.12);
-	--nav-shadow-elevated: 0 8px 32px rgba(30, 41, 59, 0.1);
+	--nav-bg: rgba(255, 255, 255, 0.85);
+	--nav-border: rgba(30, 41, 59, 0.1);
+	--nav-shadow: 0 4px 24px rgba(30, 41, 59, 0.08);
+	--nav-bg-elevated: rgba(255, 255, 255, 0.95);
+	--nav-border-elevated: rgba(30, 41, 59, 0.15);
+	--nav-shadow-elevated: 0 8px 32px rgba(30, 41, 59, 0.12);
 
-	/* Shadows: More subtle for a lighter feel */
-	--shadow-sm: 0 2px 8px rgba(30, 41, 59, 0.07);
-	--shadow-md: 0 6px 16px rgba(30, 41, 59, 0.08);
-	--shadow-lg: 0 10px 30px rgba(30, 41, 59, 0.1);
-	--shadow-xl: 0 20px 50px rgba(30, 41, 59, 0.12);
+	/* Shadows: Subtle for lighter feel */
+	--shadow-sm: 0 2px 8px rgba(30, 41, 59, 0.08);
+	--shadow-md: 0 6px 16px rgba(30, 41, 59, 0.1);
+	--shadow-lg: 0 10px 30px rgba(30, 41, 59, 0.12);
+	--shadow-xl: 0 20px 50px rgba(30, 41, 59, 0.15);
 
-	/* Glows: Aligned with the new accent color */
-	--glow-blue: 0 0 20px rgba(79, 70, 229, 0.25);
+	/* Glows: Aligned with accent */
+	--glow-blue: 0 0 20px rgba(79, 70, 229, 0.3);
 
-	--focus-ring: 0 0 0 3px color-mix(in srgb, var(--accent-1) 45%, transparent);
+	/* Focus & Transitions */
+	--focus-ring: 0 0 0 3px rgba(79, 70, 229, 0.4);
+
+	/* Input States */
+	--input-bg: rgba(255, 255, 255, 0.9);
+	--input-border: rgba(30, 41, 59, 0.2);
+	--input-border-focus: rgba(79, 70, 229, 0.5);
+	--input-text: #0f172a;
+	--input-placeholder: #64748b;
+
+	/* Button States */
+	--button-primary-bg: linear-gradient(135deg, #4f46e5, #7c3aed);
+	--button-primary-hover: linear-gradient(135deg, #4338ca, #6d28d9);
+	--button-secondary-bg: rgba(248, 250, 252, 0.9);
+	--button-secondary-border: rgba(30, 41, 59, 0.2);
+	--button-secondary-hover: rgba(241, 245, 249, 1);
+
+	/* Card backgrounds */
+	--card-bg: rgba(255, 255, 255, 0.8);
+	--card-border: rgba(30, 41, 59, 0.1);
+	--card-hover-bg: rgba(248, 250, 252, 0.95);
 }
 
 /* ==========================================================================
@@ -104,6 +145,7 @@ body {
 	color: var(--text-secondary);
 	background-color: var(--bg-base);
 	line-height: 1.65;
+	transition: background-color 0.3s ease, color 0.3s ease;
 }
 h1,
 h2,
@@ -129,6 +171,7 @@ h3 {
 p {
 	font-size: clamp(0.95rem, 0.5vw + 0.8rem, 1.1rem);
 	line-height: 1.7;
+	color: var(--text-secondary);
 }
 
 /* ==========================================================================
@@ -169,19 +212,20 @@ p {
 }
 .btn-primary {
 	color: #ffffff;
-	background: linear-gradient(135deg, var(--accent-1), var(--accent-2));
+	background: var(--button-primary-bg);
 	box-shadow: var(--shadow-md);
 }
 .btn-primary:hover {
+	background: var(--button-primary-hover);
 	box-shadow: var(--shadow-lg), var(--glow-blue);
 }
 .btn-secondary {
 	color: var(--text-primary);
-	background: var(--glass-bg);
-	border: 1px solid var(--glass-border);
+	background: var(--button-secondary-bg);
+	border: 1px solid var(--button-secondary-border);
 }
 .btn-secondary:hover {
-	background: var(--glass-hover);
+	background: var(--button-secondary-hover);
 	box-shadow: var(--shadow-md);
 	border-color: var(--accent-1);
 }
