@@ -103,17 +103,25 @@ const getAllEvents = asyncHandler(async (req, res) => {
 			ticketPrice: 1,
 			posters: { $slice: ['$posters', 1] }, // Only get the first poster for list view
 			registeredUsersCount: 1,
+			isFree: 1, // Include virtuals if needed
+			spotsLeft: 1,
+			isFull: 1,
+			registrationStatus: 1,
 		},
 	});
+
+	// Add sorting stage to the pipeline
+	const sortStage = { [sortBy]: sortOrder === 'asc' ? 1 : -1 };
+	pipeline.push({ $sort: sortStage });
 
 	const aggregate = Event.aggregate(pipeline);
 	const options = {
 		page: parseInt(page, 10),
 		limit: parseInt(limit, 10),
-		sort: { [sortBy]: sortOrder === 'asc' ? 1 : 1 },
 		lean: true,
 	};
 
+	// FIX: The model now has the correct aggregatePaginate method
 	const events = await Event.aggregatePaginate(aggregate, options);
 	return ApiResponse.paginated(res, events.docs, events, 'Events retrieved successfully');
 });
@@ -138,11 +146,9 @@ const deleteEvent = asyncHandler(async (req, res) => {
 	const event = await findEventById(req.params.id);
 
 	if (event.posters && event.posters.length > 0) {
-		const mediaToDelete = event.posters.map((p) => ({
-			public_id: p.publicId,
-			resource_type: p.resource_type,
-		}));
-		await deleteFiles(mediaToDelete);
+		// FIX: Cloudinary delete only needs public_ids for images
+		const publicIdsToDelete = event.posters.map((p) => p.publicId);
+		await deleteFiles(publicIdsToDelete);
 	}
 
 	await Event.findByIdAndDelete(req.params.id);
@@ -172,10 +178,8 @@ const removeEventPoster = asyncHandler(async (req, res) => {
 	if (posterIndex === -1) throw new ApiError(404, 'Poster not found on this event.');
 
 	const [removedPoster] = event.posters.splice(posterIndex, 1);
-	await deleteFile({
-		public_id: removedPoster.publicId,
-		resource_type: removedPoster.resource_type,
-	});
+	// FIX: Cloudinary delete only needs the public_id for images
+	await deleteFile(removedPoster.publicId);
 	await event.save();
 
 	return ApiResponse.success(res, null, 'Poster removed successfully');
