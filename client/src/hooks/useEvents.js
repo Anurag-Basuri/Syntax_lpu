@@ -31,8 +31,7 @@ export const useUpcomingEvent = () => {
 	return useQuery({
 		queryKey: ['upcomingEvent'],
 		queryFn: () => getAllEvents({ period: 'upcoming', limit: 1, sortBy: 'eventDate' }),
-		// The data will be the first event in the returned array
-		select: (data) => data?.docs?.[0],
+		select: (data) => data?.docs?.[0], // data is the paginated object
 	});
 };
 
