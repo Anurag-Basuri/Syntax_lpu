@@ -1,29 +1,53 @@
 import React from 'react';
 
+const leadershipRoles = ['CEO', 'CTO', 'CFO', 'CMO', 'COO', 'Head', 'President', 'Lead'];
+
+const getAvatarUrl = (profilePicture) => {
+	if (!profilePicture) return null;
+	if (typeof profilePicture === 'string') return profilePicture;
+	if (typeof profilePicture === 'object' && profilePicture.url) return profilePicture.url;
+	return null;
+};
+
 const UnifiedTeamCard = ({ member, onClick }) => {
 	if (!member) return null;
-	const initials = member.fullname
+
+	const initials = (member.fullname || '??')
 		.split(' ')
-		.map((n) => n[0])
+		.map((n) => n?.[0] || '')
 		.join('')
 		.substring(0, 2)
 		.toUpperCase();
 
+	const isLeader =
+		member.isLeader ||
+		(Array.isArray(member.designation)
+			? member.designation.some((d) => leadershipRoles.includes(d))
+			: leadershipRoles.includes(member.designation));
+
+	const avatar = getAvatarUrl(member.profilePicture);
+
 	return (
 		<div
 			onClick={() => onClick?.(member)}
-			className="group cursor-pointer rounded-xl border border-gray-200 dark:border-gray-700 p-4 flex flex-col gap-3 hover:shadow-md transition bg-transparent"
+			className="group relative cursor-pointer rounded-xl border border-gray-200 dark:border-gray-700 p-4 flex flex-col gap-3 hover:shadow-md transition bg-transparent"
 		>
+			{/* Leader badge */}
+			{isLeader && (
+				<span className="absolute top-2 left-2 text-[10px] px-2 py-0.5 rounded-full bg-amber-500 text-white font-semibold shadow">
+					Leader
+				</span>
+			)}
+
 			<div className="w-16 h-16 rounded-full overflow-hidden mx-auto border border-gray-300 dark:border-gray-600 bg-gray-100 dark:bg-gray-800">
-				{member.profilePicture ? (
+				{avatar ? (
 					<img
-						src={member.profilePicture}
-						alt={member.fullname}
+						src={avatar}
+						alt={member.fullname || 'Member'}
 						className="w-full h-full object-cover"
 						loading="lazy"
 						onError={(e) => {
-							e.target.onerror = null;
-							e.target.src =
+							e.currentTarget.src =
 								`data:image/svg+xml;charset=UTF-8,` +
 								encodeURIComponent(
 									`<svg xmlns='http://www.w3.org/2000/svg' width='64' height='64'><rect width='100%' height='100%' fill='%23222'/><text x='50%' y='50%' dy='.35em' fill='white' font-family='Arial' font-size='20' text-anchor='middle'>${initials}</text></svg>`
@@ -36,17 +60,27 @@ const UnifiedTeamCard = ({ member, onClick }) => {
 					</div>
 				)}
 			</div>
+
 			<div className="text-center space-y-1">
 				<h3 className="font-semibold text-sm text-gray-900 dark:text-gray-100 truncate">
-					{member.fullname}
+					{member.fullname || 'Member'}
 				</h3>
 				<p className="text-xs text-blue-600 dark:text-blue-300 truncate">
-					{member.primaryDesignation || 'Member'}
+					{member.primaryDesignation ||
+						(Array.isArray(member.designation)
+							? member.designation[0]
+							: member.designation) ||
+						'Member'}
 				</p>
 				<p className="text-xs text-gray-500 dark:text-gray-400 truncate">
-					{member.primaryDepartment || 'Department'}
+					{member.primaryDepartment ||
+						(Array.isArray(member.department)
+							? member.department[0]
+							: member.department) ||
+						'Department'}
 				</p>
 			</div>
+
 			<button
 				onClick={(e) => {
 					e.stopPropagation();
