@@ -118,12 +118,12 @@ const TeamsPage = () => {
 	}
 
 	return (
-		<div className="page-container min-h-screen text-gray-900 dark:text-gray-100">
+		<div className="page-container min-h-screen">
 			<header className="mb-8">
-				<h1 className="text-4xl md:text-5xl font-bold tracking-tight mb-3 bg-gradient-to-r from-blue-600 to-purple-600 dark:from-blue-400 dark:to-purple-400 bg-clip-text text-transparent">
+				<h1 className="text-4xl md:text-5xl font-bold tracking-tight mb-3 brand-text">
 					Our Team
 				</h1>
-				<p className="text-base md:text-lg text-gray-600 dark:text-gray-400">
+				<p className="text-base md:text-lg" style={{ color: 'var(--text-secondary)' }}>
 					{isLoading
 						? 'Loading amazing people…'
 						: `${members.length} talented members across ${totalDepartments} departments`}
@@ -132,19 +132,39 @@ const TeamsPage = () => {
 
 			<div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4 mb-10">
 				<div className="relative w-full lg:w-96">
-					<Search className="w-5 h-5 absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+					<Search
+						className="w-5 h-5 absolute left-3 top-1/2 -translate-y-1/2"
+						style={{ color: 'var(--text-muted)' }}
+					/>
 					<input
 						value={query}
 						onChange={(e) => setQuery(e.target.value)}
 						placeholder="Search members, roles, departments, skills…"
-						className="w-full pl-10 pr-10 py-3 rounded-xl border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-sm md:text-base focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all"
+						className="auth-input"
+						style={{
+							width: '100%',
+							paddingLeft: '2.5rem',
+							paddingRight: '2.5rem',
+						}}
 					/>
 					{query && (
 						<button
 							type="button"
 							aria-label="Clear search"
 							onClick={() => setQuery('')}
-							className="absolute right-3 top-1/2 -translate-y-1/2 w-6 h-6 flex items-center justify-center text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700 transition-all"
+							className="absolute right-3 top-1/2 -translate-y-1/2 w-6 h-6 flex items-center justify-center rounded-full transition-all"
+							style={{
+								color: 'var(--text-muted)',
+								background: 'transparent',
+							}}
+							onMouseEnter={(e) => {
+								e.currentTarget.style.color = 'var(--text-primary)';
+								e.currentTarget.style.background = 'var(--glass-bg)';
+							}}
+							onMouseLeave={(e) => {
+								e.currentTarget.style.color = 'var(--text-muted)';
+								e.currentTarget.style.background = 'transparent';
+							}}
 						>
 							<span className="text-lg leading-none">×</span>
 						</button>
@@ -154,13 +174,21 @@ const TeamsPage = () => {
 				<div className="flex gap-3">
 					<button
 						onClick={expandAll}
-						className="px-4 py-2.5 rounded-xl border border-gray-300 dark:border-gray-600 text-sm font-medium hover:bg-gray-100 dark:hover:bg-gray-800 transition-all"
+						className="btn-secondary"
+						style={{
+							padding: '0.625rem 1rem',
+							fontSize: '0.875rem',
+						}}
 					>
 						Expand All
 					</button>
 					<button
 						onClick={collapseAll}
-						className="px-4 py-2.5 rounded-xl border border-gray-300 dark:border-gray-600 text-sm font-medium hover:bg-gray-100 dark:hover:bg-gray-800 transition-all"
+						className="btn-secondary"
+						style={{
+							padding: '0.625rem 1rem',
+							fontSize: '0.875rem',
+						}}
 					>
 						Collapse All
 					</button>
