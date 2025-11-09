@@ -8,7 +8,12 @@ import { apiClient, publicClient } from './api.js';
 export const getAllMembers = async () => {
 	try {
 		const response = await publicClient.get('/api/v1/members/getall');
-		return response.data.data;
+		// Ensure always returns { members: [], totalMembers: number }
+		const data = response.data?.data || {};
+		return {
+			members: Array.isArray(data.members) ? data.members : [],
+			totalMembers: data.totalMembers || data.members?.length || 0,
+		};
 	} catch (error) {
 		throw new Error(error.response?.data?.message || 'Failed to fetch members.');
 	}
