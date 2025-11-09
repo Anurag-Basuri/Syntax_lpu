@@ -26,25 +26,30 @@ function App() {
 	const shouldHideNavbar = hideNavbarRoutes.includes(location.pathname);
 
 	useEffect(() => {
+		let ticking = false;
 		const handleScroll = () => {
 			const currentScrollY = window.scrollY;
-			const docHeight = document.documentElement.scrollHeight - window.innerHeight;
-			const progress = docHeight > 0 ? (currentScrollY / docHeight) * 100 : 0;
+			if (!ticking) {
+				window.requestAnimationFrame(() => {
+					const docHeight = document.documentElement.scrollHeight - window.innerHeight;
+					const progress = docHeight > 0 ? (currentScrollY / docHeight) * 100 : 0;
+					setScrollProgress(Math.min(100, Math.max(0, progress)));
 
-			setScrollProgress(Math.min(100, Math.max(0, progress)));
-
-			// Navbar visibility logic
-			if (currentScrollY < 100) {
-				setIsNavbarVisible(true);
-			} else if (currentScrollY > lastScrollY.current) {
-				// Scrolling down
-				setIsNavbarVisible(false);
-			} else {
-				// Scrolling up
-				setIsNavbarVisible(true);
+					// Direction-based visibility (with small threshold for stability)
+					const delta = currentScrollY - lastScrollY.current;
+					const threshold = 6; // ignore micro scroll
+					if (Math.abs(delta) > threshold) {
+						if (delta > 0 && currentScrollY > 120) {
+							setIsNavbarVisible(false); // scrolling down
+						} else {
+							setIsNavbarVisible(true); // scrolling up
+						}
+					}
+					lastScrollY.current = currentScrollY;
+					ticking = false;
+				});
+				ticking = true;
 			}
-
-			lastScrollY.current = currentScrollY;
 		};
 
 		if (!shouldHideNavbar) {
