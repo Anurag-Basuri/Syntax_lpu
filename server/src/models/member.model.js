@@ -279,11 +279,22 @@ memberSchema.virtual('id').get(function () {
 	return this._id.toHexString();
 });
 
+// Virtuals for easier frontend consumption (handle array vs string mismatch)
+memberSchema.virtual('primaryDesignation').get(function () {
+	return Array.isArray(this.designation) ? this.designation[0] : this.designation;
+});
+memberSchema.virtual('primaryDepartment').get(function () {
+	return Array.isArray(this.department) ? this.department[0] : this.department;
+});
+
 memberSchema.set('toJSON', {
 	virtuals: true,
 	transform: function (doc, ret) {
 		delete ret.__v;
 		delete ret.password;
+		// Provide flattened fields explicitly
+		ret.designationFlat = ret.primaryDesignation;
+		ret.departmentFlat = ret.primaryDepartment;
 		return ret;
 	},
 });

@@ -15,7 +15,7 @@ import {
 	banMember,
 	removeMember,
 	unbanMember,
-	refreshAccessToken, // Import the refreshAccessToken controller
+	refreshAccessToken,
 } from '../controllers/member.controller.js';
 import { authMiddleware } from '../middlewares/auth.middleware.js';
 import { validate } from '../middlewares/validator.middleware.js';
