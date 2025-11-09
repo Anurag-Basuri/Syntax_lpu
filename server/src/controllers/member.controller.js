@@ -375,10 +375,36 @@ const sendResetPasswordEmail = asyncHandler(async (req, res) => {
 
 // Get all members
 const getAllMembers = asyncHandler(async (req, res) => {
-	const members = await Member.find().select('-password -refreshToken');
-	const totalMembers = await Member.countDocuments();
+	const members = await Member.find().select('-password -refreshToken').lean({ virtuals: true });
 
-	return ApiResponse.success(res, { members, totalMembers }, 'Members retrieved successfully');
+	const totalMembers = members.length;
+
+	// Normalize shape (flatten arrays)
+	const normalized = members.map((m) => ({
+		_id: m._id,
+		fullname: m.fullname,
+		LpuId: m.LpuId,
+		profilePicture: m.profilePicture,
+		department: Array.isArray(m.department) ? m.department : [m.department].filter(Boolean),
+		designation: Array.isArray(m.designation) ? m.designation : [m.designation].filter(Boolean),
+		primaryDepartment:
+			m.primaryDepartment || (Array.isArray(m.department) ? m.department[0] : m.department),
+		primaryDesignation:
+			m.primaryDesignation ||
+			(Array.isArray(m.designation) ? m.designation[0] : m.designation),
+		skills: m.skills || [],
+		bio: m.bio || '',
+		socialLinks: m.socialLinks || [],
+		joinedAt: m.joinedAt,
+		hosteler: m.hosteler,
+		hostel: m.hostel,
+		status: m.status,
+	}));
+	return ApiResponse.success(
+		res,
+		{ members: normalized, totalMembers },
+		'Members retrieved successfully'
+	);
 });
 
 export {
