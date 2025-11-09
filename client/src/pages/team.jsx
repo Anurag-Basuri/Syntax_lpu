@@ -133,6 +133,7 @@ const TeamsPage = () => {
 							onChange={(e) => setQuery(e.target.value)}
 							placeholder="Search by name, role, or skill…"
 							className="search-input"
+							aria-label="Search team members"
 						/>
 						{query && (
 							<button
@@ -148,19 +149,27 @@ const TeamsPage = () => {
 
 					<div className="controls-right">
 						<div className="control-field">
-							<label className="control-label">Sort</label>
+							<label htmlFor="sort-select" className="control-label">
+								Sort
+							</label>
 							<select
+								id="sort-select"
 								className="control-select"
 								value={sortBy}
 								onChange={(e) => setSortBy(e.target.value)}
+								aria-label="Sort team members"
 							>
 								<option value="name">Name</option>
 								<option value="role">Role</option>
 								<option value="dept">Department</option>
 							</select>
 						</div>
-						<div className="result-count">
-							{isLoading ? '—' : `${filteredMembers.length} results`}
+						<div className="result-count" aria-live="polite" aria-atomic="true">
+							{isLoading
+								? '—'
+								: `${filteredMembers.length} result${
+										filteredMembers.length !== 1 ? 's' : ''
+								  }`}
 						</div>
 					</div>
 				</div>
