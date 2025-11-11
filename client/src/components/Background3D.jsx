@@ -69,7 +69,7 @@ const isWebGLAvailable = () => {
 // --- R3F Scene Components ---
 
 /**
- * Ultra-Enhanced Grid Component with Advanced 3D Wave Effects
+ * Ultra-Enhanced Grid Component with Advanced 3D Wave Effects and Cloth Texture
  */
 const Grid = ({ theme, breakpoint }) => {
 	const meshRef = useRef();
@@ -95,18 +95,18 @@ const Grid = ({ theme, breakpoint }) => {
 	const uniforms = useMemo(
 		() => ({
 			uTime: { value: 0 },
-			// Increased amplitude for more visible waves
-			uWaveAmplitude: { value: breakpoint === 'mobile' ? 4.0 : 6.0 },
+			// Slightly reduced amplitude to accommodate cloth texture
+			uWaveAmplitude: { value: breakpoint === 'mobile' ? 3.5 : 5.0 },
 			uWaveFrequency: { value: 0.055 },
-			// Increased wave speed for more dynamic movement
 			uWaveSpeed: { value: prefersReduced ? 0.0 : 0.45 },
-			// Reduced depth fade to make more of the grid visible
 			uDepthFade: { value: 0.75 },
-			// Significantly increased opacity for better visibility
 			uWireOpacity: { value: theme === 'light' ? 0.85 : 1.0 },
 			uWireColor: { value: new THREE.Color(theme === 'light' ? '#94a3b8' : '#64748b') },
 			uAccent: { value: new THREE.Color(readCssVar('--accent-1')) },
-			// Removed global fade since we want it more visible
+			// Cloth texture parameters
+			uClothScale: { value: 8.0 },
+			uClothDetail: { value: 4.0 },
+			uClothStrength: { value: 0.4 },
 			uMouseX: { value: 0 },
 			uMouseY: { value: 0 },
 		}),
@@ -158,12 +158,16 @@ const Grid = ({ theme, breakpoint }) => {
         uniform float uWaveSpeed;
         uniform float uMouseX;
         uniform float uMouseY;
+        uniform float uClothScale;
+        uniform float uClothDetail;
+        uniform float uClothStrength;
 
         varying vec2 vUv;
         varying float vElevation;
         varying float vDepth;
         varying vec3 vNormal;
         varying vec3 vWorldPos;
+        varying float vClothPattern;
         
         // Enhanced noise functions for more organic movement
         float hash(vec2 p) {
@@ -191,6 +195,24 @@ const Grid = ({ theme, breakpoint }) => {
                 amplitude *= 0.5;
             }
             return value;
+        }
+
+        // Cloth-like noise pattern
+        float clothPattern(vec2 uv) {
+            float pattern = 0.0;
+            
+            // Base woven texture
+            float weave1 = sin(uv.x * uClothScale * 3.14159) * sin(uv.y * uClothScale * 3.14159);
+            float weave2 = sin(uv.x * uClothScale * 1.5 * 3.14159 + 0.5) * sin(uv.y * uClothScale * 1.5 * 3.14159 + 0.3);
+            
+            // Fine fabric details
+            float fineDetail = fbm(uv * uClothDetail) * 0.3;
+            float coarseDetail = fbm(uv * uClothDetail * 0.5) * 0.2;
+            
+            // Combine patterns
+            pattern = (weave1 * 0.4 + weave2 * 0.3 + fineDetail + coarseDetail) * uClothStrength;
+            
+            return pattern;
         }
 
         void main() {
@@ -240,6 +262,11 @@ const Grid = ({ theme, breakpoint }) => {
             depthAtten = pow(depthAtten, 1.5);
             elevation *= depthAtten;
 
+            // Add cloth texture pattern to elevation
+            float clothEffect = clothPattern(vUv * 2.0 + uTime * 0.1) * depthAtten * 0.8;
+            elevation += clothEffect;
+            vClothPattern = clothEffect;
+
             pos.z += elevation;
             vElevation = elevation;
             vWorldPos = (modelMatrix * vec4(pos, 1.0)).xyz;
@@ -272,6 +299,7 @@ const Grid = ({ theme, breakpoint }) => {
         varying float vElevation;
         varying vec3 vNormal;
         varying vec3 vWorldPos;
+        varying float vClothPattern;
         
         void main() {
             // Reduced exponential depth fade for more visible grid
@@ -296,6 +324,10 @@ const Grid = ({ theme, breakpoint }) => {
             
             float depthColor = vDepth * 0.3;
             
+            // Cloth texture influence on color and opacity
+            float clothInfluence = abs(vClothPattern) * 0.3;
+            float clothVariation = sin(vUv.x * 20.0 + uTime * 1.5) * 0.1 + 0.9;
+            
             // Increased lighting factor weights for better visibility
             float totalGlow = clamp(
                 elevationGlow * 0.8 + 
@@ -306,8 +338,10 @@ const Grid = ({ theme, breakpoint }) => {
             );
             totalGlow *= shimmer;
             
-            // Enhanced color mixing
+            // Enhanced color mixing with cloth texture influence
             vec3 baseColor = mix(uWireColor, uWireColor * 1.2, depthColor);
+            baseColor = mix(baseColor, baseColor * clothVariation, clothInfluence * 0.2);
+            
             vec3 finalColor = mix(baseColor, uAccent, totalGlow * 0.8);
             
             // More prominent peak highlighting
@@ -316,8 +350,9 @@ const Grid = ({ theme, breakpoint }) => {
                 finalColor = mix(finalColor, uAccent * 1.4, peakFactor * 0.5);
             }
             
-            // Significantly increased alpha calculation for better visibility
-            float alpha = uWireOpacity * depthFade * (0.9 + totalGlow * 0.4);
+            // Significantly increased alpha calculation for better visibility with cloth texture
+            float clothAlpha = (0.5 + clothInfluence * 0.5);
+            float alpha = uWireOpacity * depthFade * (0.9 + totalGlow * 0.4) * clothAlpha;
 
             // Increased boost for extreme peaks
             if (vElevation > 3.5) {
@@ -329,6 +364,9 @@ const Grid = ({ theme, breakpoint }) => {
             if (vDepth < 0.3) {
                 alpha = max(alpha, uWireOpacity * 0.8);
             }
+            
+            // Add subtle cloth pattern to alpha for textured appearance
+            alpha *= (0.95 + clothInfluence * 0.1);
             
             if (alpha <= 0.01) discard;
             gl_FragColor = vec4(finalColor, alpha);
