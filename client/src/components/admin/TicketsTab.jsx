@@ -24,6 +24,7 @@ import TicketStats from './TicketStats';
 const formatDate = (dateString) => {
 	if (!dateString) return 'N/A';
 	const date = new Date(dateString);
+	if (Number.isNaN(date.getTime())) return 'N/A';
 	return date.toLocaleDateString('en-US', {
 		month: 'short',
 		day: 'numeric',
@@ -35,7 +36,7 @@ const MobileFilterMenu = React.memo(
 	({
 		isOpen,
 		onClose,
-		events,
+		events = [],
 		selectedEventId,
 		setSelectedEventId,
 		sortBy,
@@ -66,7 +67,7 @@ const MobileFilterMenu = React.memo(
 								onChange={(e) => setSelectedEventId(e.target.value)}
 							>
 								<option value="">Select an event</option>
-								{events.map((event) => (
+								{(events || []).map((event) => (
 									<option key={event._id} value={event._id}>
 										{event.title}
 									</option>
@@ -192,7 +193,11 @@ const TicketCard = React.memo(
 					<h3 className="text-lg font-semibold text-white mt-1">{ticket.fullName}</h3>
 				</div>
 				<div
-					className={`text-xs px-2 py-1 rounded-full ${ticket.isUsed ? 'bg-green-900/30 text-green-400' : 'bg-gray-700 text-gray-400'}`}
+					className={`text-xs px-2 py-1 rounded-full ${
+						ticket.isUsed
+							? 'bg-green-900/30 text-green-400'
+							: 'bg-gray-700 text-gray-400'
+					}`}
 				>
 					{ticket.isUsed ? 'Used' : 'Not Used'}
 				</div>
@@ -239,7 +244,7 @@ const TicketCard = React.memo(
 					{ticket.isUsed ? 'Mark Not Used' : 'Mark Used'}
 				</button>
 				<button
-					onClick={() => onDeleteTicket(ticket._id)}
+					onClick={() => onDeleteTicket(ticket._1d)}
 					disabled={deleteLoading}
 					className="text-red-700 hover:text-red-500 disabled:opacity-50 flex items-center gap-1 text-sm"
 				>
@@ -251,7 +256,7 @@ const TicketCard = React.memo(
 	)
 );
 
-const TicketsTab = ({ token, events, setDashboardError }) => {
+const TicketsTab = ({ token, events = [], setDashboardError }) => {
 	const [selectedEventId, setSelectedEventId] = useState('');
 	const [sortBy, setSortBy] = useState('newest');
 	const [searchTerm, setSearchTerm] = useState('');
@@ -280,53 +285,79 @@ const TicketsTab = ({ token, events, setDashboardError }) => {
 	} = useDeleteTicket();
 
 	const ticketStats = useMemo(() => {
-		if (!tickets || tickets.length === 0) return null;
+		const list = tickets || [];
+		if (list.length === 0) return null;
 		return {
-			total: tickets.length,
-			cancelled: tickets.filter((t) => t.isCancelled).length,
-			used: tickets.filter((t) => t.isUsed).length,
+			total: list.length,
+			cancelled: list.filter((t) => t.isCancelled).length,
+			used: list.filter((t) => t.isUsed).length,
 		};
 	}, [tickets]);
 
+	// fetch tickets when selected event changes
 	useEffect(() => {
 		resetTicketsError();
 		resetUpdateError();
 		resetDeleteError();
-		if (selectedEventId) {
-			getTicketsByEvent(selectedEventId, token).catch(() => {
-				setDashboardError('Failed to load tickets');
-			});
-		}
-	}, [selectedEventId, token]);
 
-	const handleDeleteTicket = async (ticketId) => {
-		if (!window.confirm('Are you sure you want to delete this ticket?')) return;
-		try {
-			await deleteTicket(ticketId, token);
-			await getTicketsByEvent(selectedEventId, token);
-		} catch (err) {
-			setDashboardError('Ticket deletion failed');
-		}
-	};
+		if (!selectedEventId) return;
 
-	const handleToggleIsUsed = async (ticketId, currentIsUsed) => {
-		try {
-			await updateTicket(ticketId, { isUsed: !currentIsUsed }, token);
-			await getTicketsByEvent(selectedEventId, token);
-		} catch (err) {
-			setDashboardError('Ticket update failed');
-		}
-	};
+		// ensure getTicketsByEvent exists
+		if (typeof getTicketsByEvent !== 'function') return;
+
+		getTicketsByEvent(selectedEventId, token).catch((err) => {
+			const msg = err?.message || 'Failed to load tickets';
+			setDashboardError?.(msg);
+		});
+		// include deps used
+	}, [
+		selectedEventId,
+		token,
+		getTicketsByEvent,
+		resetTicketsError,
+		resetUpdateError,
+		resetDeleteError,
+		setDashboardError,
+	]);
+
+	const handleDeleteTicket = useCallback(
+		async (ticketId) => {
+			if (!ticketId) return;
+			if (!window.confirm('Are you sure you want to delete this ticket?')) return;
+			try {
+				await deleteTicket(ticketId, token);
+				await getTicketsByEvent(selectedEventId, token);
+			} catch (err) {
+				const msg = err?.message || 'Ticket deletion failed';
+				setDashboardError?.(msg);
+			}
+		},
+		[deleteTicket, getTicketsByEvent, selectedEventId, token, setDashboardError]
+	);
+
+	const handleToggleIsUsed = useCallback(
+		async (ticketId, currentIsUsed) => {
+			if (!ticketId) return;
+			try {
+				await updateTicket(ticketId, { isUsed: !currentIsUsed }, token);
+				await getTicketsByEvent(selectedEventId, token);
+			} catch (err) {
+				const msg = err?.message || 'Ticket update failed';
+				setDashboardError?.(msg);
+			}
+		},
+		[updateTicket, getTicketsByEvent, selectedEventId, token, setDashboardError]
+	);
 
 	const [exportLoading, setExportLoading] = useState(false);
 	const [exportError, setExportError] = useState('');
-	const handleExportTickets = async () => {
+	const handleExportTickets = useCallback(async () => {
 		setExportError('');
 		setExportLoading(true);
 		try {
-			if (!tickets || tickets.length === 0) {
+			const list = tickets || [];
+			if (list.length === 0) {
 				setExportError('No tickets to export.');
-				setExportLoading(false);
 				return;
 			}
 
@@ -350,7 +381,7 @@ const TicketsTab = ({ token, events, setDashboardError }) => {
 				'Created At',
 				'Email Failed',
 			];
-			const rows = tickets.map((t) => [
+			const rows = list.map((t) => [
 				t.ticketId || t._id || '',
 				t.fullName || '',
 				t.email || '',
@@ -387,7 +418,9 @@ const TicketsTab = ({ token, events, setDashboardError }) => {
 			const url = URL.createObjectURL(blob);
 			const a = document.createElement('a');
 			a.href = url;
-			a.download = `tickets_${selectedEventId}_${new Date().toISOString().slice(0, 10)}.csv`;
+			a.download = `tickets_${selectedEventId || 'all'}_${new Date()
+				.toISOString()
+				.slice(0, 10)}.csv`;
 			document.body.appendChild(a);
 			a.click();
 			a.remove();
@@ -397,18 +430,20 @@ const TicketsTab = ({ token, events, setDashboardError }) => {
 		} finally {
 			setExportLoading(false);
 		}
-	};
+	}, [tickets, selectedEventId]);
 
 	const filteredTickets = useMemo(() => {
-		if (!tickets) return [];
-		return tickets
+		const list = tickets || [];
+		return list
 			.filter((t) => {
 				if (!searchTerm) return true;
 				const term = searchTerm.toLowerCase();
 				return (
-					t.lpuId?.toString().toLowerCase().includes(term) ||
-					t.email?.toLowerCase().includes(term) ||
-					t.fullName?.toLowerCase().includes(term)
+					String(t.lpuId || '')
+						.toLowerCase()
+						.includes(term) ||
+					(t.email || '').toLowerCase().includes(term) ||
+					(t.fullName || '').toLowerCase().includes(term)
 				);
 			})
 			.sort((a, b) => {
@@ -430,12 +465,15 @@ const TicketsTab = ({ token, events, setDashboardError }) => {
 		setExportError('');
 	};
 
+	const selectedEvent = (events || []).find((e) => e._id === selectedEventId);
+	const selectedCount = (tickets || []).length;
+
 	return (
 		<div className="space-y-6">
 			<MobileFilterMenu
 				isOpen={isMobileMenuOpen}
 				onClose={() => setIsMobileMenuOpen(false)}
-				events={events}
+				events={events || []}
 				selectedEventId={selectedEventId}
 				setSelectedEventId={setSelectedEventId}
 				sortBy={sortBy}
@@ -454,7 +492,7 @@ const TicketsTab = ({ token, events, setDashboardError }) => {
 							onChange={(e) => setSelectedEventId(e.target.value)}
 						>
 							<option value="">Select an event</option>
-							{events.map((event) => (
+							{(events || []).map((event) => (
 								<option key={event._id} value={event._id}>
 									{event.title}
 								</option>
@@ -496,9 +534,9 @@ const TicketsTab = ({ token, events, setDashboardError }) => {
 					</div>
 					<button
 						onClick={handleExportTickets}
-						disabled={exportLoading || !selectedEventId || tickets.length === 0}
+						disabled={exportLoading || !selectedEventId || (tickets || []).length === 0}
 						className={`hidden sm:flex items-center gap-2 px-4 py-2 rounded-lg ${
-							exportLoading || !selectedEventId || tickets.length === 0
+							exportLoading || !selectedEventId || (tickets || []).length === 0
 								? 'bg-gray-600 cursor-not-allowed'
 								: 'bg-cyan-700/80 hover:bg-cyan-600'
 						} transition text-white`}
