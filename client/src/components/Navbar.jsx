@@ -77,16 +77,30 @@ const DesktopNav = ({ onNavigate }) => {
 };
 
 const AuthSection = ({ onNavigate }) => {
-	const { isAuthenticated, user, logout } = useAuth();
+	const { isAuthenticated, user, logoutMember, logoutAdmin } = useAuth();
 	const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
 	const userMenuRef = useRef(null);
 	useClickOutside(userMenuRef, () => setIsUserMenuOpen(false));
 
-	const isMember = !!user?.memberID;
+	// Prefer explicit role check (fallback to presence of memberID)
+	const isMember = user?.role === 'member' || !!user?.memberID;
+	const isAdmin = user?.role === 'admin';
 
-	const handleLogout = () => {
-		logout();
-		onNavigate('/auth/login');
+	const handleLogout = async () => {
+		try {
+			if (isAdmin && typeof logoutAdmin === 'function') {
+				await logoutAdmin();
+				onNavigate('/admin/auth');
+			} else {
+				// default to member logout
+				if (typeof logoutMember === 'function') await logoutMember();
+				onNavigate('/auth/login');
+			}
+		} catch (err) {
+			console.error('Logout failed:', err);
+			// still navigate to login to clear UI state
+			onNavigate(isAdmin ? '/admin/auth' : '/auth/login');
+		}
 	};
 
 	if (isAuthenticated) {
