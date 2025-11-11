@@ -38,12 +38,15 @@ export const useApplicationStats = () => {
 export const useManageApplication = () => {
 	const queryClient = useQueryClient();
 
-	const { mutate: updateStatus, isPending: isUpdating } = useMutation({
+	const updateStatusMutation = useMutation({
 		mutationFn: ({ id, status }) => updateApplicationStatus(id, status),
-		onSuccess: (data, { id }) => {
+		onSuccess: (data, variables) => {
 			toast.success('Application status updated!');
+			// variables contains the object passed to mutate: { id, status }
+			if (variables?.id) {
+				queryClient.invalidateQueries({ queryKey: ['application', variables.id] });
+			}
 			queryClient.invalidateQueries({ queryKey: ['applications'] });
-			queryClient.invalidateQueries({ queryKey: ['application', id] });
 			queryClient.invalidateQueries({ queryKey: ['applicationStats'] });
 		},
 		onError: (error) => {
@@ -52,12 +55,14 @@ export const useManageApplication = () => {
 		},
 	});
 
-	const { mutate: removeApplication, isPending: isDeleting } = useMutation({
-		mutationFn: deleteApplication,
-		onSuccess: () => {
+	const deleteMutation = useMutation({
+		mutationFn: (id) => deleteApplication(id),
+		onSuccess: (_data, id) => {
 			toast.success('Application deleted.');
+			// id is the variable passed to mutate
 			queryClient.invalidateQueries({ queryKey: ['applications'] });
 			queryClient.invalidateQueries({ queryKey: ['applicationStats'] });
+			if (id) queryClient.invalidateQueries({ queryKey: ['application', id] });
 		},
 		onError: (error) => {
 			toast.error(error.message);
@@ -65,5 +70,10 @@ export const useManageApplication = () => {
 		},
 	});
 
-	return { updateStatus, isUpdating, removeApplication, isDeleting };
+	return {
+		updateStatus: updateStatusMutation.mutate,
+		isUpdating: updateStatusMutation.isLoading,
+		removeApplication: deleteMutation.mutate,
+		isDeleting: deleteMutation.isLoading,
+	};
 };
