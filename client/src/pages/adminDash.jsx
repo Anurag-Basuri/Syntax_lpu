@@ -108,12 +108,6 @@ const AdminDash = () => {
 		);
 	}
 
-	// Layout notes:
-	// - Sidebar: fixed left, full height, non-collapsing (explicit per request)
-	// - Header: fixed top, spans remaining width to the right of sidebar
-	// - Main content: placed below header and to the right of sidebar
-	// Keep measurements consistent: sidebar width = 256px (w-64), header height = 64px (h-16)
-
 	return (
 		<div className="min-h-screen bg-gradient-to-br from-gray-900 to-gray-800">
 			{/* Fixed Sidebar (always visible, non-dynamic) */}
