@@ -168,14 +168,30 @@ const getAllApplications = asyncHandler(async (req, res) => {
 	const allowedSortFields = ['createdAt', 'fullName', 'status', 'LpuId'];
 	const sortField = allowedSortFields.includes(sortBy) ? sortBy : 'createdAt';
 
+	// Build aggregate pipeline and use mongoose-aggregate-paginate-v2
+	const pipeline = [];
+
+	// Only push $match if filter has keys (avoid matching empty object which is fine but clearer)
+	if (Object.keys(filter).length > 0) {
+		pipeline.push({ $match: filter });
+	}
+
+	// Add sort stage
+	pipeline.push({ $sort: { [sortField]: sortDirection } });
+
+	// You can add projections here if needed (e.g. exclude __v)
+	// pipeline.push({ $project: { __v: 0 } });
+
+	const aggregate = Apply.aggregate(pipeline);
+
 	const options = {
 		page: pageNum,
 		limit: limitNum,
-		sort: { [sortField]: sortDirection },
-		lean: true, // Return plain JavaScript objects for better performance
+		lean: true,
 	};
 
-	const applications = await Apply.paginate(filter, options);
+	// Use aggregatePaginate provided by mongoose-aggregate-paginate-v2
+	const applications = await Apply.aggregatePaginate(aggregate, options);
 
 	return ApiResponse.paginated(
 		res,
