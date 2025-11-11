@@ -5,10 +5,11 @@ import {
 	updateMemberByAdmin,
 	banMember,
 	unbanMember,
+	removeMember as removeMemberService,
 } from '../services/memberServices.js';
 import { toast } from 'react-hot-toast';
 
-// Hook to fetch all members
+// Legacy / admin-friendly hook kept for pages that expect a simple list
 export const useMembers = () => {
 	return useQuery({
 		queryKey: ['members'],
@@ -17,57 +18,140 @@ export const useMembers = () => {
 	});
 };
 
-// Hook to fetch all club leaders
+// convenience hook returning only leaders array
 export const useLeaders = () => {
 	return useQuery({
 		queryKey: ['leaders'],
 		queryFn: async () => {
 			const data = await getLeaders();
-			return data?.members || []; // Just return the array of leaders
+			return data?.members || []; // return array
 		},
 		staleTime: 60_000,
 	});
 };
 
-// Hook for admins to manage member actions
-export const useManageMember = () => {
-	const queryClient = useQueryClient();
+export const useGetAllMembers = () => {
+	const query = useQuery({
+		queryKey: ['members'],
+		queryFn: getAllMembers,
+		staleTime: 60_000,
+		refetchOnWindowFocus: false,
+	});
 
-	const { mutate: updateMember, isPending: isUpdating } = useMutation({
-		mutationFn: ({ memberId, data }) => updateMemberByAdmin(memberId, data),
+	// Provide a friendly API compatible with existing components
+	return {
+		getAllMembers: query.refetch, // async refetch function
+		members: query.data?.members ?? query.data ?? [], // support various response shapes
+		loading: query.isLoading,
+		error: query.error,
+	};
+};
+
+export const useBanMember = () => {
+	const queryClient = useQueryClient();
+	const {
+		mutateAsync: mutateBan,
+		isLoading,
+		error,
+		reset,
+	} = useMutation({
+		mutationFn: async ({ memberId, reason, reviewTime, token }) => {
+			// forward params to service; service may ignore token if not needed
+			return await banMember(memberId, { reason, reviewTime }, token);
+		},
+		onSuccess: () => {
+			toast.success('Member banned.');
+			queryClient.invalidateQueries({ queryKey: ['members'] });
+		},
+		onError: (err) => {
+			toast.error(err?.message || 'Failed to ban member');
+		},
+	});
+
+	const banMemberFn = async (id, reason, reviewTime, token) =>
+		await mutateBan({ memberId: id, reason, reviewTime, token });
+
+	return { banMember: banMemberFn, loading: isLoading, error, reset };
+};
+
+export const useUnbanMember = () => {
+	const queryClient = useQueryClient();
+	const {
+		mutateAsync: mutateUnban,
+		isLoading,
+		error,
+		reset,
+	} = useMutation({
+		mutationFn: async ({ memberId, token }) => {
+			return await unbanMember(memberId, token);
+		},
+		onSuccess: () => {
+			toast.success('Member unbanned.');
+			queryClient.invalidateQueries({ queryKey: ['members'] });
+		},
+		onError: (err) => {
+			toast.error(err?.message || 'Failed to unban member');
+		},
+	});
+
+	const unbanMemberFn = async (id, token) => await mutateUnban({ memberId: id, token });
+
+	return { unbanMember: unbanMemberFn, loading: isLoading, error, reset };
+};
+
+export const useRemoveMember = () => {
+	const queryClient = useQueryClient();
+	const {
+		mutateAsync: mutateRemove,
+		isLoading,
+		error,
+		reset,
+	} = useMutation({
+		mutationFn: async ({ memberId, reason, reviewTime, token }) => {
+			return await removeMemberService(memberId, { reason, reviewTime }, token);
+		},
+		onSuccess: () => {
+			toast.success('Member removed.');
+			queryClient.invalidateQueries({ queryKey: ['members'] });
+		},
+		onError: (err) => {
+			toast.error(err?.message || 'Failed to remove member');
+		},
+	});
+
+	const removeMember = async (id, reason, reviewTime, token) =>
+		await mutateRemove({ memberId: id, reason, reviewTime, token });
+
+	return { removeMember, loading: isLoading, error, reset };
+};
+
+export const useUpdateMemberByAdmin = () => {
+	const queryClient = useQueryClient();
+	const {
+		mutateAsync: mutateUpdate,
+		isLoading,
+		error,
+		reset,
+	} = useMutation({
+		mutationFn: async ({ memberId, data, token }) => {
+			return await updateMemberByAdmin(memberId, data, token);
+		},
 		onSuccess: () => {
 			toast.success('Member updated.');
 			queryClient.invalidateQueries({ queryKey: ['members'] });
 		},
-		onError: (error) => {
-			toast.error(error.message);
-			console.error('Failed to update member:', error);
+		onError: (err) => {
+			toast.error(err?.message || 'Failed to update member');
 		},
 	});
 
-	const { mutate: ban, isPending: isBanning } = useMutation({
-		mutationFn: ({ memberId, reason }) => banMember(memberId, { reason }),
-		onSuccess: () => {
-			toast.success('Member has been banned.');
-			queryClient.invalidateQueries({ queryKey: ['members'] });
-		},
-		onError: (error) => {
-			toast.error(error.message);
-			console.error('Failed to ban member:', error);
-		},
-	});
+	const updateMemberByAdminFn = async (id, data, token) =>
+		await mutateUpdate({ memberId: id, data, token });
 
-	const { mutate: unban, isPending: isUnbanning } = useMutation({
-		mutationFn: unbanMember,
-		onSuccess: () => {
-			toast.success('Member has been unbanned.');
-			queryClient.invalidateQueries({ queryKey: ['members'] });
-		},
-		onError: (error) => {
-			toast.error(error.message);
-			console.error('Failed to unban member:', error);
-		},
-	});
-
-	return { updateMember, isUpdating, ban, isBanning, unban, isUnbanning };
+	return {
+		updateMemberByAdmin: updateMemberByAdminFn,
+		loading: isLoading,
+		error,
+		reset,
+	};
 };
