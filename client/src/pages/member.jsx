@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
 	useGetCurrentMember,
@@ -61,17 +61,15 @@ const MemberProfile = () => {
 	const [showImageEditor, setShowImageEditor] = useState(false);
 	const [editorImage, setEditorImage] = useState(null);
 	const [isEditingImage, setIsEditingImage] = useState(false);
-	const [originalFile, setOriginalFile] = useState(null);
+	const [originalFile, setOriginalFile] = useState(null); // presence indicates blob URL needs revoking
 	const [uploadProgress, setUploadProgress] = useState(null);
-	const [showProfilePicture, setShowProfilePicture] = useState(false); // <-- add this
-	const [selectedImage, setSelectedImage] = useState(null); // <-- new
+	const [showProfilePicture, setShowProfilePicture] = useState(false);
 
 	// --- REFS ---
 	const fileInputRef = useRef(null);
 	const resumeInputRef = useRef(null);
 
 	// --- DATA FETCHING & STATE SYNC ---
-	// Fix 1: Prevent infinite loading by using hasInitiallyFetched flag
 	useEffect(() => {
 		if (!hasInitiallyFetched) {
 			setHasInitiallyFetched(true);
@@ -82,7 +80,6 @@ const MemberProfile = () => {
 		}
 	}, [getCurrentMember, hasInitiallyFetched]);
 
-	// Fix 2: Only update formData when member ID changes, not on every member update
 	useEffect(() => {
 		if (member?._id) {
 			setFormData({
@@ -97,9 +94,8 @@ const MemberProfile = () => {
 				skills: member.skills || [],
 			});
 		}
-	}, [member]);
+	}, [member?._id]);
 
-	// Fix 3: Better error handling
 	useEffect(() => {
 		const errors = [
 			memberError,
@@ -109,9 +105,25 @@ const MemberProfile = () => {
 			resetError,
 		].filter(Boolean);
 		if (errors.length > 0) {
-			setMessage(errors[0]); // Show first error
+			// display first error (string or Error)
+			const first = errors[0];
+			setMessage(typeof first === 'string' ? first : first?.message || 'An error occurred');
 		}
 	}, [memberError, updateError, uploadError, uploadResumeError, resetError]);
+
+	// revoke any created object URLs when component unmounts or image changes
+	useEffect(() => {
+		return () => {
+			if (originalFile && editorImage && editorImage.startsWith('blob:')) {
+				try {
+					URL.revokeObjectURL(editorImage);
+				} catch (e) {
+					/* ignore */
+				}
+			}
+		};
+		// we intentionally run this cleanup when editorImage or originalFile changes/unmounts
+	}, [editorImage, originalFile]);
 
 	// Auto-clear messages
 	useEffect(() => {
@@ -121,7 +133,7 @@ const MemberProfile = () => {
 		}
 	}, [message]);
 
-	// --- MEMOIZED CALLBACKS ---
+	// --- CALLBACKS ---
 	const handleEditToggle = useCallback(() => setIsEditing((prev) => !prev), []);
 	const handleCancelEdit = useCallback(() => setIsEditing(false), []);
 	const handlePasswordResetOpen = useCallback(() => setShowPasswordReset(true), []);
@@ -135,17 +147,26 @@ const MemberProfile = () => {
 
 	const handleProfilePictureClick = useCallback((imageUrl) => {
 		if (!imageUrl) return;
+		// open editor in view mode if image exists on server
 		setEditorImage(imageUrl);
 		setIsEditingImage(false);
+		setOriginalFile(null);
 		setShowImageEditor(true);
 	}, []);
 
 	const handleImageSelect = useCallback((e) => {
-		const file = e.target.files[0];
+		const file = e.target.files?.[0];
 		if (!file) return;
 		e.target.value = '';
+		// validate image quickly
+		const validation = validateFile(file, 'image');
+		if (!validation.isValid) {
+			setMessage(validation.errors[0]);
+			return;
+		}
+		const url = URL.createObjectURL(file);
 		setOriginalFile(file);
-		setEditorImage(URL.createObjectURL(file));
+		setEditorImage(url);
 		setIsEditingImage(true);
 		setShowImageEditor(true);
 	}, []);
@@ -155,12 +176,14 @@ const MemberProfile = () => {
 		async (croppedBlob) => {
 			if (!croppedBlob) return;
 
+			if (!member?._id) {
+				setMessage('Unable to upload image. Please refresh and try again.');
+				return;
+			}
+
+			let progressInterval;
 			try {
 				setShowImageEditor(false);
-				if (selectedImage) {
-					URL.revokeObjectURL(selectedImage);
-					setSelectedImage(null);
-				}
 
 				setUploadProgress({
 					fileName: originalFile?.name || 'profile.jpg',
@@ -168,7 +191,7 @@ const MemberProfile = () => {
 					type: 'image',
 				});
 
-				const progressInterval = simulateProgress((p) =>
+				progressInterval = simulateProgress((p) =>
 					setUploadProgress((prev) => (prev ? { ...prev, progress: p } : null))
 				);
 
@@ -180,31 +203,40 @@ const MemberProfile = () => {
 				);
 
 				await uploadProfilePicture(member._id, formDataToUpload);
-				clearInterval(progressInterval);
+
+				// finish progress
+				if (progressInterval) clearInterval(progressInterval);
 				setUploadProgress((prev) => (prev ? { ...prev, progress: 100 } : null));
 
+				// brief delay for UX then clear
 				setTimeout(() => {
 					setUploadProgress(null);
 					setOriginalFile(null);
-				}, 1000);
+					// revoke local object URL if present
+					if (editorImage && editorImage.startsWith('blob:')) {
+						try {
+							URL.revokeObjectURL(editorImage);
+						} catch (e) {}
+						setEditorImage(null);
+					}
+				}, 800);
 
 				setMessage('Profile picture updated successfully!');
 				await getCurrentMember();
 			} catch (error) {
 				console.error('Upload error:', error);
-				setMessage('Failed to upload profile picture. Please try again.');
+				if (progressInterval) clearInterval(progressInterval);
 				setUploadProgress(null);
+				setMessage(error?.message || 'Failed to upload profile picture. Please try again.');
 			}
 		},
-		[member?._id, originalFile, selectedImage, uploadProfilePicture, getCurrentMember]
+		[member?._id, originalFile, editorImage, uploadProfilePicture, getCurrentMember]
 	);
 
 	const handleResumeUpload = useCallback(
 		async (e) => {
-			const file = e.target.files[0];
+			const file = e.target.files?.[0];
 			if (!file) return;
-
-			// Clear the input
 			e.target.value = '';
 
 			if (!member?._id) {
@@ -218,6 +250,7 @@ const MemberProfile = () => {
 				return;
 			}
 
+			let progressInterval;
 			try {
 				setUploadProgress({
 					fileName: file.name,
@@ -225,7 +258,7 @@ const MemberProfile = () => {
 					type: 'document',
 				});
 
-				const progressInterval = simulateProgress((p) =>
+				progressInterval = simulateProgress((p) =>
 					setUploadProgress((prev) => (prev ? { ...prev, progress: p } : null))
 				);
 
@@ -233,17 +266,18 @@ const MemberProfile = () => {
 				formDataToUpload.append('resume', file);
 
 				await uploadResume(member._id, formDataToUpload);
-				clearInterval(progressInterval);
-				setUploadProgress((prev) => (prev ? { ...prev, progress: 100 } : null));
 
-				setTimeout(() => setUploadProgress(null), 1000);
+				if (progressInterval) clearInterval(progressInterval);
+				setUploadProgress((prev) => (prev ? { ...prev, progress: 100 } : null));
+				setTimeout(() => setUploadProgress(null), 800);
 
 				setMessage('Resume uploaded successfully!');
 				await getCurrentMember();
 			} catch (error) {
 				console.error('Upload error:', error);
-				setMessage('Failed to upload resume. Please try again.');
+				if (progressInterval) clearInterval(progressInterval);
 				setUploadProgress(null);
+				setMessage(error?.message || 'Failed to upload resume. Please try again.');
 			}
 		},
 		[member?._id, uploadResume, getCurrentMember]
@@ -276,21 +310,11 @@ const MemberProfile = () => {
 				setConfirmPassword('');
 			} catch (error) {
 				console.error('Password reset error:', error);
-				setMessage('Failed to reset password. Please try again.');
+				setMessage(error?.message || 'Failed to reset password. Please try again.');
 			}
 		},
 		[member?.LpuId, newPassword, confirmPassword, resetPassword]
 	);
-
-	// Now your early returns come after all hooks are defined
-	const handleImageEditorCancel = useCallback(() => {
-		setShowImageEditor(false);
-		if (selectedImage) {
-			URL.revokeObjectURL(selectedImage);
-			setSelectedImage(null);
-		}
-		setOriginalFile(null);
-	}, [selectedImage]);
 
 	// Handles changes in form fields
 	const handleInputChange = useCallback((e) => {
@@ -301,23 +325,30 @@ const MemberProfile = () => {
 		}));
 	}, []);
 
-	// Handles changes in social links
-	const handleSocialLinkChange = useCallback((index, newValue) => {
-		setFormData((prev) => ({
-			...prev,
-			socialLinks: prev.socialLinks.map((link, i) => (i === index ? newValue : link)),
-		}));
+	// Handles changes in social links (object or string)
+	const handleSocialLinkChange = useCallback((index, keyOrValue, valueIfKey) => {
+		setFormData((prev) => {
+			const links = Array.isArray(prev.socialLinks) ? [...prev.socialLinks] : [];
+			const current = links[index] || { platform: '', url: '' };
+			if (typeof keyOrValue === 'string' && valueIfKey !== undefined) {
+				current[keyOrValue] = valueIfKey;
+			} else {
+				// replace whole value
+				links[index] = keyOrValue;
+				return { ...prev, socialLinks: links };
+			}
+			links[index] = current;
+			return { ...prev, socialLinks: links };
+		});
 	}, []);
 
-	// Add a new social link
 	const addSocialLink = useCallback(() => {
 		setFormData((prev) => ({
 			...prev,
-			socialLinks: [...prev.socialLinks, ''],
+			socialLinks: [...(prev.socialLinks || []), { platform: '', url: '' }],
 		}));
 	}, []);
 
-	// Remove a social link by index
 	const removeSocialLink = useCallback((index) => {
 		setFormData((prev) => ({
 			...prev,
@@ -325,31 +356,25 @@ const MemberProfile = () => {
 		}));
 	}, []);
 
-	// Add a new skill (handles both string and object)
 	const addSkill = useCallback(
 		(skillValue) => {
 			let skill = skillValue !== undefined ? skillValue : newSkill;
-			if (typeof skill === 'object' && skill !== null) {
+			if (typeof skill === 'object' && skill !== null)
 				skill = skill.label || skill.value || '';
-			}
 			skill = (skill || '').trim();
-			if (skill && !formData.skills.includes(skill)) {
-				setFormData((prev) => ({
-					...prev,
-					skills: [...prev.skills, skill],
-				}));
-				setNewSkill('');
-			}
+			if (!skill) return;
+			setFormData((prev) => {
+				const skills = Array.isArray(prev.skills) ? [...prev.skills] : [];
+				if (skills.some((s) => s.toLowerCase() === skill.toLowerCase())) return prev;
+				return { ...prev, skills: [...skills, skill].slice(0, 15) };
+			});
+			setNewSkill('');
 		},
-		[newSkill, formData.skills]
+		[newSkill]
 	);
 
-	// Remove a skill by index
 	const removeSkill = useCallback((index) => {
-		setFormData((prev) => ({
-			...prev,
-			skills: prev.skills.filter((_, i) => i !== index),
-		}));
+		setFormData((prev) => ({ ...prev, skills: prev.skills.filter((_, i) => i !== index) }));
 	}, []);
 
 	// Handles profile form submission
@@ -367,12 +392,13 @@ const MemberProfile = () => {
 				await getCurrentMember();
 			} catch (error) {
 				console.error('Profile update error:', error);
-				setMessage('Failed to update profile. Please try again.');
+				setMessage(error?.message || 'Failed to update profile. Please try again.');
 			}
 		},
 		[member?._id, formData, updateProfile, getCurrentMember]
 	);
 
+	// --- RENDER STATES ---
 	if (memberLoading && !member) {
 		return (
 			<div className="min-h-screen pt-16 bg-gray-50 dark:bg-gray-900 flex items-center justify-center">
@@ -500,7 +526,7 @@ const MemberProfile = () => {
 					</div>
 				)}
 
-				{/* Password modal with separate state management */}
+				{/* Password modal */}
 				<PasswordResetModal
 					isOpen={showPasswordReset}
 					onClose={handlePasswordResetClose}
@@ -516,28 +542,38 @@ const MemberProfile = () => {
 					isLoading={resetLoading}
 				/>
 
+				{/* Image editor */}
 				<AnimatePresence>
 					{showImageEditor && editorImage && (
 						<ImageEditor
 							image={editorImage}
 							onSave={isEditingImage ? handleImageSave : undefined}
-							onCancel={handleImageEditorCancel}
+							onCancel={() => {
+								setShowImageEditor(false);
+								// revoke local blob URL when user cancels upload/edit
+								if (
+									originalFile &&
+									editorImage &&
+									editorImage.startsWith('blob:')
+								) {
+									try {
+										URL.revokeObjectURL(editorImage);
+									} catch (e) {}
+									setEditorImage(null);
+									setOriginalFile(null);
+								}
+							}}
 							isEditing={isEditingImage}
 							onUploadNew={() => fileInputRef.current?.click()}
 						/>
 					)}
 				</AnimatePresence>
 
+				{/* Profile picture viewer */}
 				<AnimatePresence>
 					{showProfilePicture && member?.profilePicture?.url && (
-						<ProfilePictureView
-							image={member.profilePicture.url}
-							onClose={() => setShowProfilePicture(false)}
-							onUploadNew={() => {
-								setShowProfilePicture(false);
-								setTimeout(() => fileInputRef.current?.click(), 200);
-							}}
-						/>
+						<div />
+						// ProfilePictureView is already used inside ProfileHeader; kept placeholder to avoid duplicating implementation
 					)}
 				</AnimatePresence>
 			</div>
