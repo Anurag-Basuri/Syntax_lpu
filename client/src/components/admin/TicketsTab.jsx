@@ -16,7 +16,9 @@ import {
 	Calendar,
 	Loader2,
 	AlertCircle,
-	X,
+	RefreshCw,
+	Grid,
+	List,
 } from 'lucide-react';
 import { useGetTicketsByEvent, useUpdateTicket, useDeleteTicket } from '../../hooks/useTickets';
 import TicketStats from './TicketStats';
@@ -25,11 +27,26 @@ const formatDate = (dateString) => {
 	if (!dateString) return 'N/A';
 	const date = new Date(dateString);
 	if (Number.isNaN(date.getTime())) return 'N/A';
-	return date.toLocaleDateString('en-US', {
+	return date.toLocaleDateString(undefined, {
 		month: 'short',
 		day: 'numeric',
 		year: 'numeric',
 	});
+};
+
+const StatusBadge = ({ status }) => {
+	const s = (status || '').toLowerCase();
+	const map = {
+		used: { bg: 'bg-green-900/30', text: 'text-green-300', label: 'Used' },
+		cancelled: { bg: 'bg-red-900/30', text: 'text-red-300', label: 'Cancelled' },
+		active: { bg: 'bg-blue-900/20', text: 'text-blue-200', label: 'Active' },
+	};
+	const cfg = map[s] || { bg: 'bg-gray-700', text: 'text-gray-300', label: status || 'N/A' };
+	return (
+		<span className={`px-2 py-0.5 rounded-full text-xs font-medium ${cfg.bg} ${cfg.text}`}>
+			{cfg.label}
+		</span>
+	);
 };
 
 const MobileFilterMenu = React.memo(
@@ -47,15 +64,21 @@ const MobileFilterMenu = React.memo(
 		if (!isOpen) return null;
 
 		return (
-			<div className="fixed inset-0 bg-gray-900/80 z-40 md:hidden" onClick={onClose}>
+			<div className="fixed inset-0 bg-black/50 z-40 md:hidden" onClick={onClose}>
 				<div
-					className="absolute right-0 top-0 bottom-0 w-64 bg-gray-800 p-4 shadow-xl"
+					className="absolute right-0 top-0 bottom-0 w-72 bg-gray-800 p-4 shadow-xl"
 					onClick={(e) => e.stopPropagation()}
+					role="dialog"
+					aria-modal="true"
 				>
 					<div className="flex justify-between items-center mb-6">
 						<h3 className="text-lg font-semibold text-white">Filters</h3>
-						<button onClick={onClose} className="text-gray-400 hover:text-white">
-							<X className="h-5 w-5" />
+						<button
+							onClick={onClose}
+							className="text-gray-400 hover:text-white"
+							aria-label="Close filters"
+						>
+							<CrossIcon />
 						</button>
 					</div>
 					<div className="space-y-4">
@@ -66,7 +89,7 @@ const MobileFilterMenu = React.memo(
 								value={selectedEventId}
 								onChange={(e) => setSelectedEventId(e.target.value)}
 							>
-								<option value="">Select an event</option>
+								<option value="">All events</option>
 								{(events || []).map((event) => (
 									<option key={event._id} value={event._id}>
 										{event.title}
@@ -88,7 +111,7 @@ const MobileFilterMenu = React.memo(
 						<button
 							onClick={handleExportTickets}
 							disabled={exportLoading || !selectedEventId}
-							className={`w-full flex items-center justify-center gap-2 px-4 py-2 rounded-lg ${
+							className={`w-full inline-flex items-center justify-center gap-2 px-4 py-2 rounded-lg ${
 								exportLoading || !selectedEventId
 									? 'bg-gray-600 cursor-not-allowed'
 									: 'bg-cyan-700/80 hover:bg-cyan-600'
@@ -108,152 +131,151 @@ const MobileFilterMenu = React.memo(
 	}
 );
 
+const CrossIcon = () => <X className="h-5 w-5" />;
+
 const TicketRow = React.memo(
-	({ ticket, onToggleIsUsed, onDeleteTicket, updateLoading, deleteLoading }) => (
-		<tr className="hover:bg-gray-750/50 transition">
-			<td className="px-4 py-3 whitespace-nowrap text-sm text-gray-300">
-				{ticket.lpuId || 'N/A'}
-			</td>
-			<td className="px-4 py-3 whitespace-nowrap text-sm font-medium text-white max-w-[120px] truncate">
-				{ticket.fullName || 'N/A'}
-			</td>
-			<td className="px-4 py-3 whitespace-nowrap text-sm text-gray-300 max-w-[160px] truncate">
-				{ticket.email || 'N/A'}
-			</td>
-			<td className="px-4 py-3 whitespace-nowrap text-sm text-gray-300">
-				{ticket.phone || 'N/A'}
-			</td>
-			<td className="px-4 py-3 whitespace-nowrap text-sm text-gray-300">
-				{ticket.hostel || 'N/A'}
-			</td>
-			<td className="px-4 py-3 whitespace-nowrap text-sm text-gray-300">
-				{ticket.club || 'N/A'}
-			</td>
-			<td className="px-4 py-3 whitespace-nowrap text-sm text-gray-300">
-				{ticket.isUsed ? (
-					<span className="flex items-center text-green-400">
-						<CheckCircle className="h-4 w-4 mr-1" />
-						Yes
-					</span>
-				) : (
-					<span className="flex items-center text-gray-400">
-						<XCircle className="h-4 w-4 mr-1" />
-						No
-					</span>
-				)}
-			</td>
-			<td className="px-4 py-3 whitespace-nowrap text-sm text-gray-400">
-				{ticket.createdAt ? formatDate(ticket.createdAt) : 'N/A'}
-			</td>
-			<td className="px-4 py-3 whitespace-nowrap text-sm font-medium space-x-2">
-				<button
-					onClick={() => onToggleIsUsed(ticket._id, ticket.isUsed)}
-					disabled={updateLoading}
-					className={`${
-						ticket.isUsed
-							? 'text-yellow-600 hover:text-yellow-400'
-							: 'text-green-700 hover:text-green-500'
-					} disabled:opacity-50 flex items-center gap-1`}
-					title={ticket.isUsed ? 'Mark as Not Used' : 'Mark as Used'}
-				>
-					{ticket.isUsed ? (
-						<XCircle className="h-4 w-4" />
-					) : (
-						<CheckCircle className="h-4 w-4" />
-					)}
-					<span className="hidden lg:inline">
-						{ticket.isUsed ? 'Mark Not Used' : 'Mark Used'}
-					</span>
-				</button>
-				<button
-					onClick={() => onDeleteTicket(ticket._id)}
-					disabled={deleteLoading}
-					className="text-red-700 hover:text-red-500 disabled:opacity-50 flex items-center gap-1"
-					title="Delete Ticket"
-				>
-					<Trash2 className="h-4 w-4" />
-					<span className="hidden lg:inline">Delete</span>
-				</button>
-			</td>
-		</tr>
-	)
+	({ ticket, onToggleIsUsed, onDeleteTicket, updateLoading, deleteLoading }) => {
+		// derive status (backwards compatible with isUsed/isCancelled flags)
+		const status =
+			ticket.status || (ticket.isUsed ? 'used' : ticket.isCancelled ? 'cancelled' : 'active');
+
+		return (
+			<tr className="hover:bg-gray-750/50 transition">
+				<td className="px-4 py-3 whitespace-nowrap text-sm text-gray-300">
+					{ticket.lpuId || '—'}
+				</td>
+				<td className="px-4 py-3 max-w-[180px] truncate text-sm font-medium text-white">
+					{ticket.fullName || '—'}
+				</td>
+				<td className="px-4 py-3 text-sm text-gray-300 max-w-[220px] truncate">
+					{ticket.email || '—'}
+				</td>
+				<td className="px-4 py-3 text-sm text-gray-300">{ticket.phone || '—'}</td>
+				<td className="px-4 py-3 text-sm text-gray-300">{ticket.hostel || '—'}</td>
+				<td className="px-4 py-3 text-sm text-gray-300">{ticket.club || '—'}</td>
+				<td className="px-4 py-3 text-sm">
+					<StatusBadge status={status} />
+				</td>
+				<td className="px-4 py-3 text-sm text-gray-400">
+					{ticket.createdAt ? formatDate(ticket.createdAt) : '—'}
+				</td>
+				<td className="px-4 py-3 whitespace-nowrap text-sm font-medium flex items-center gap-3">
+					<button
+						onClick={() => onToggleIsUsed(ticket._id, status === 'used')}
+						disabled={updateLoading}
+						className={`flex items-center gap-2 ${
+							updateLoading ? 'opacity-60 cursor-not-allowed' : 'hover:underline'
+						}`}
+						title={status === 'used' ? 'Mark as Not Used' : 'Mark as Used'}
+					>
+						{status === 'used' ? (
+							<XCircle className="h-4 w-4 text-yellow-400" />
+						) : (
+							<CheckCircle className="h-4 w-4 text-green-400" />
+						)}
+						<span className="hidden lg:inline text-sm">
+							{status === 'used' ? 'Mark Not Used' : 'Mark Used'}
+						</span>
+					</button>
+
+					<button
+						onClick={() => onDeleteTicket(ticket._id)}
+						disabled={deleteLoading}
+						className={`flex items-center gap-2 ${
+							deleteLoading
+								? 'opacity-60 cursor-not-allowed'
+								: 'hover:underline text-red-500'
+						}`}
+						title="Delete Ticket"
+					>
+						<Trash2 className="h-4 w-4" />
+						<span className="hidden lg:inline text-sm">Delete</span>
+					</button>
+				</td>
+			</tr>
+		);
+	}
 );
 
 const TicketCard = React.memo(
-	({ ticket, onToggleIsUsed, onDeleteTicket, updateLoading, deleteLoading }) => (
-		<div className="md:hidden bg-gray-800 rounded-lg border border-gray-700 p-4">
-			<div className="flex justify-between items-start">
-				<div>
-					<div className="flex items-center gap-2">
-						<div className="bg-blue-900/20 p-1 rounded">
-							<Ticket className="h-4 w-4 text-blue-400" />
+	({ ticket, onToggleIsUsed, onDeleteTicket, updateLoading, deleteLoading }) => {
+		const status =
+			ticket.status || (ticket.isUsed ? 'used' : ticket.isCancelled ? 'cancelled' : 'active');
+
+		return (
+			<div className="md:hidden bg-gray-800 rounded-lg border border-gray-700 p-4 shadow-sm">
+				<div className="flex justify-between items-start">
+					<div className="min-w-0">
+						<div className="flex items-center gap-3">
+							<div className="bg-blue-900/20 p-2 rounded">
+								<Ticket className="h-4 w-4 text-blue-400" />
+							</div>
+							<div className="min-w-0">
+								<div className="text-sm text-gray-300">{ticket.lpuId || '—'}</div>
+								<h3 className="text-base font-semibold text-white truncate">
+									{ticket.fullName || '—'}
+								</h3>
+							</div>
 						</div>
-						<span className="font-medium text-white">{ticket.lpuId || 'N/A'}</span>
 					</div>
-					<h3 className="text-lg font-semibold text-white mt-1">{ticket.fullName}</h3>
+
+					<div>
+						<StatusBadge status={status} />
+					</div>
 				</div>
-				<div
-					className={`text-xs px-2 py-1 rounded-full ${
-						ticket.isUsed
-							? 'bg-green-900/30 text-green-400'
-							: 'bg-gray-700 text-gray-400'
-					}`}
-				>
-					{ticket.isUsed ? 'Used' : 'Not Used'}
+
+				<div className="mt-3 grid grid-cols-2 gap-2 text-sm text-gray-300">
+					<div className="flex items-center gap-2">
+						<Mail className="h-4 w-4 text-gray-400" />
+						<span className="truncate">{ticket.email || '—'}</span>
+					</div>
+					<div className="flex items-center gap-2">
+						<Phone className="h-4 w-4 text-gray-400" />
+						<span>{ticket.phone || '—'}</span>
+					</div>
+					<div className="flex items-center gap-2">
+						<Home className="h-4 w-4 text-gray-400" />
+						<span>{ticket.hostel || '—'}</span>
+					</div>
+					<div className="flex items-center gap-2">
+						<Users className="h-4 w-4 text-gray-400" />
+						<span>{ticket.club || '—'}</span>
+					</div>
+				</div>
+
+				<div className="flex items-center justify-between mt-4 pt-3 border-t border-gray-700">
+					<button
+						onClick={() => onToggleIsUsed(ticket._id, status === 'used')}
+						disabled={updateLoading}
+						className={`flex items-center gap-2 text-sm ${
+							updateLoading
+								? 'opacity-60 cursor-not-allowed'
+								: 'text-blue-400 hover:underline'
+						}`}
+					>
+						{status === 'used' ? (
+							<XCircle className="h-4 w-4" />
+						) : (
+							<CheckCircle className="h-4 w-4" />
+						)}
+						{status === 'used' ? 'Mark Not Used' : 'Mark Used'}
+					</button>
+					<button
+						onClick={() => onDeleteTicket(ticket._id)}
+						disabled={deleteLoading}
+						className={`flex items-center gap-2 text-sm ${
+							deleteLoading
+								? 'opacity-60 cursor-not-allowed'
+								: 'text-red-400 hover:underline'
+						}`}
+					>
+						<Trash2 className="h-4 w-4" />
+						Delete
+					</button>
 				</div>
 			</div>
-			<div className="mt-4 grid grid-cols-2 gap-3">
-				<div className="flex items-center gap-2 text-sm">
-					<Mail className="h-4 w-4 text-gray-500" />
-					<span className="text-gray-300 truncate">{ticket.email || 'N/A'}</span>
-				</div>
-				<div className="flex items-center gap-2 text-sm">
-					<Phone className="h-4 w-4 text-gray-500" />
-					<span className="text-gray-300">{ticket.phone || 'N/A'}</span>
-				</div>
-				<div className="flex items-center gap-2 text-sm">
-					<Home className="h-4 w-4 text-gray-500" />
-					<span className="text-gray-300">{ticket.hostel || 'N/A'}</span>
-				</div>
-				<div className="flex items-center gap-2 text-sm">
-					<Users className="h-4 w-4 text-gray-500" />
-					<span className="text-gray-300">{ticket.club || 'N/A'}</span>
-				</div>
-				<div className="flex items-center gap-2 text-sm">
-					<Calendar className="h-4 w-4 text-gray-500" />
-					<span className="text-gray-300">
-						{ticket.createdAt ? formatDate(ticket.createdAt) : 'N/A'}
-					</span>
-				</div>
-			</div>
-			<div className="flex justify-between mt-4 pt-3 border-t border-gray-700">
-				<button
-					onClick={() => onToggleIsUsed(ticket._id, ticket.isUsed)}
-					disabled={updateLoading}
-					className={`${
-						ticket.isUsed
-							? 'text-yellow-600 hover:text-yellow-400'
-							: 'text-green-700 hover:text-green-500'
-					} disabled:opacity-50 flex items-center gap-1 text-sm`}
-				>
-					{ticket.isUsed ? (
-						<XCircle className="h-4 w-4" />
-					) : (
-						<CheckCircle className="h-4 w-4" />
-					)}
-					{ticket.isUsed ? 'Mark Not Used' : 'Mark Used'}
-				</button>
-				<button
-					onClick={() => onDeleteTicket(ticket._1d)}
-					disabled={deleteLoading}
-					className="text-red-700 hover:text-red-500 disabled:opacity-50 flex items-center gap-1 text-sm"
-				>
-					<Trash2 className="h-4 w-4" />
-					Delete
-				</button>
-			</div>
-		</div>
-	)
+		);
+	}
 );
 
 const TicketsTab = ({ token, events = [], setDashboardError }) => {
@@ -261,6 +283,7 @@ const TicketsTab = ({ token, events = [], setDashboardError }) => {
 	const [sortBy, setSortBy] = useState('newest');
 	const [searchTerm, setSearchTerm] = useState('');
 	const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+	const [compactView, setCompactView] = useState(false);
 
 	const {
 		getTicketsByEvent,
@@ -284,17 +307,25 @@ const TicketsTab = ({ token, events = [], setDashboardError }) => {
 		reset: resetDeleteError,
 	} = useDeleteTicket();
 
+	// auto-select first event for convenience
+	useEffect(() => {
+		if (!selectedEventId && events?.length) {
+			setSelectedEventId(events[0]._id);
+		}
+		// eslint-disable-next-line react-hooks/exhaustive-deps
+	}, [events]);
+
 	const ticketStats = useMemo(() => {
 		const list = tickets || [];
 		if (list.length === 0) return null;
 		return {
 			total: list.length,
-			cancelled: list.filter((t) => t.isCancelled).length,
-			used: list.filter((t) => t.isUsed).length,
+			cancelled: list.filter((t) => t.status === 'cancelled' || t.isCancelled).length,
+			used: list.filter((t) => t.status === 'used' || t.isUsed).length,
 		};
 	}, [tickets]);
 
-	// fetch tickets when selected event changes
+	// fetch tickets when selectedEventId changes
 	useEffect(() => {
 		resetTicketsError();
 		resetUpdateError();
@@ -302,14 +333,12 @@ const TicketsTab = ({ token, events = [], setDashboardError }) => {
 
 		if (!selectedEventId) return;
 
-		// ensure getTicketsByEvent exists
 		if (typeof getTicketsByEvent !== 'function') return;
 
 		getTicketsByEvent(selectedEventId, token).catch((err) => {
 			const msg = err?.message || 'Failed to load tickets';
 			setDashboardError?.(msg);
 		});
-		// include deps used
 	}, [
 		selectedEventId,
 		token,
@@ -336,10 +365,12 @@ const TicketsTab = ({ token, events = [], setDashboardError }) => {
 	);
 
 	const handleToggleIsUsed = useCallback(
-		async (ticketId, currentIsUsed) => {
+		async (ticketId, currentlyUsed) => {
 			if (!ticketId) return;
 			try {
-				await updateTicket(ticketId, { isUsed: !currentIsUsed }, token);
+				// prefer backend status field; translate from boolean to 'used'/'active'
+				const newStatus = currentlyUsed ? 'active' : 'used';
+				await updateTicket(ticketId, { status: newStatus }, token);
 				await getTicketsByEvent(selectedEventId, token);
 			} catch (err) {
 				const msg = err?.message || 'Ticket update failed';
@@ -374,12 +405,10 @@ const TicketsTab = ({ token, events = [], setDashboardError }) => {
 				'Club',
 				'Event ID',
 				'Event Name',
-				'Is Used',
+				'Status',
 				'QR Code URL',
 				'QR Code Public ID',
-				'Is Cancelled',
 				'Created At',
-				'Email Failed',
 			];
 			const rows = list.map((t) => [
 				t.ticketId || t._id || '',
@@ -392,14 +421,12 @@ const TicketsTab = ({ token, events = [], setDashboardError }) => {
 				t.hostel || '',
 				t.course || '',
 				t.club || '',
-				t.eventId || '',
+				(t.eventId && (typeof t.eventId === 'object' ? t.eventId._id : t.eventId)) || '',
 				t.eventName || '',
-				t.isUsed ? 'Yes' : 'No',
+				t.status || (t.isUsed ? 'used' : t.isCancelled ? 'cancelled' : 'active'),
 				t.qrCode?.url || '',
 				t.qrCode?.publicId || '',
-				t.isCancelled ? 'Yes' : 'No',
 				t.createdAt ? new Date(t.createdAt).toLocaleString() : '',
-				t.emailFailed ? 'Yes' : 'No',
 			]);
 
 			const csvContent = [headers, ...rows]
@@ -454,9 +481,7 @@ const TicketsTab = ({ token, events = [], setDashboardError }) => {
 			});
 	}, [tickets, sortBy, searchTerm]);
 
-	const toggleSort = () => {
-		setSortBy((prev) => (prev === 'newest' ? 'oldest' : 'newest'));
-	};
+	const toggleSort = () => setSortBy((prev) => (prev === 'newest' ? 'oldest' : 'newest'));
 
 	const clearAllErrors = () => {
 		resetTicketsError();
@@ -466,10 +491,224 @@ const TicketsTab = ({ token, events = [], setDashboardError }) => {
 	};
 
 	const selectedEvent = (events || []).find((e) => e._id === selectedEventId);
-	const selectedCount = (tickets || []).length;
 
 	return (
 		<div className="space-y-6">
+			{/* header */}
+			<div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+				<div>
+					<h2 className="text-2xl font-bold text-white flex items-center gap-3">
+						Tickets
+						<span className="text-sm text-gray-400 font-medium">
+							({tickets?.length ?? 0})
+						</span>
+					</h2>
+					<p className="text-sm text-gray-400 mt-1">
+						{selectedEvent ? (
+							<>
+								<span className="font-medium text-gray-200">
+									{selectedEvent.title}
+								</span>
+								<span className="text-gray-500 ml-2">
+									— {ticketStats?.total ?? 0} tickets
+								</span>
+							</>
+						) : (
+							'Select an event to view tickets'
+						)}
+					</p>
+				</div>
+
+				<div className="flex gap-2 w-full md:w-auto items-center">
+					<div className="relative w-full md:w-72">
+						<Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+						<input
+							type="text"
+							placeholder="Search LPU ID, name or email"
+							className="w-full pl-10 pr-4 py-2 bg-gray-700/50 border border-gray-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+							value={searchTerm}
+							onChange={(e) => setSearchTerm(e.target.value)}
+							aria-label="Search tickets"
+						/>
+					</div>
+
+					<button
+						className="hidden md:inline-flex items-center gap-2 px-3 py-2 rounded-lg bg-gray-700/40 border border-gray-600 text-white hover:bg-gray-700"
+						onClick={() => {
+							resetTicketsError();
+							if (selectedEventId)
+								getTicketsByEvent(selectedEventId, token).catch(() => {});
+						}}
+						title="Refresh"
+					>
+						<RefreshCw className="h-4 w-4" />
+					</button>
+
+					<button
+						onClick={() => setIsMobileMenuOpen(true)}
+						className="md:hidden flex items-center gap-2 px-3 py-2 rounded-lg bg-gray-700/40 border border-gray-600 text-white"
+						aria-label="Open filters"
+					>
+						<Filter className="h-4 w-4" />
+					</button>
+
+					<button
+						onClick={() => setCompactView((v) => !v)}
+						className="flex items-center gap-2 px-3 py-2 rounded-lg bg-gray-700/40 border border-gray-600 text-white"
+						title="Toggle compact view"
+					>
+						{compactView ? <Grid className="h-4 w-4" /> : <List className="h-4 w-4" />}
+					</button>
+
+					<button
+						onClick={handleExportTickets}
+						disabled={exportLoading || !selectedEventId || (tickets || []).length === 0}
+						className={`flex items-center gap-2 px-4 py-2 rounded-lg ${
+							exportLoading || !selectedEventId || (tickets || []).length === 0
+								? 'bg-gray-600 cursor-not-allowed'
+								: 'bg-cyan-700/80 hover:bg-cyan-600'
+						} transition text-white`}
+						title="Export CSV"
+					>
+						{exportLoading ? (
+							<Loader2 className="h-4 w-4 animate-spin" />
+						) : (
+							<Download className="h-5 w-5" />
+						)}
+						<span className="hidden sm:inline">
+							{exportLoading ? 'Exporting' : 'Export'}
+						</span>
+					</button>
+				</div>
+			</div>
+
+			{/* errors */}
+			{(ticketsError || updateError || deleteError || exportError) && (
+				<div className="bg-red-700/10 border border-red-500 text-red-300 px-4 py-3 rounded flex items-center justify-between">
+					<div className="flex items-center gap-3">
+						<AlertCircle className="h-5 w-5" />
+						<span className="text-sm">
+							{ticketsError || updateError || deleteError || exportError}
+						</span>
+					</div>
+					<button
+						className="text-sm text-red-200 hover:underline"
+						onClick={clearAllErrors}
+					>
+						Dismiss
+					</button>
+				</div>
+			)}
+
+			{/* stats */}
+			{selectedEventId && ticketStats && (
+				<TicketStats stats={ticketStats} tickets={filteredTickets} />
+			)}
+
+			{/* content */}
+			{ticketsLoading ? (
+				<div className="flex justify-center py-12">
+					<div className="flex flex-col items-center">
+						<Loader2 className="h-8 w-8 animate-spin text-blue-500" />
+						<p className="mt-2 text-gray-400">Loading tickets...</p>
+					</div>
+				</div>
+			) : !selectedEventId ? (
+				<div className="text-center py-12 bg-gray-700/30 rounded-xl border border-gray-600">
+					<Ticket className="h-12 w-12 mx-auto text-gray-500" />
+					<h3 className="text-xl font-bold text-gray-400 mt-4">Select an Event</h3>
+					<p className="text-gray-500 mt-2">
+						Choose an event from the dropdown to view its tickets
+					</p>
+				</div>
+			) : filteredTickets.length === 0 ? (
+				<div className="text-center py-12 bg-gray-700/30 rounded-xl border border-gray-600">
+					<Ticket className="h-12 w-12 mx-auto text-gray-500" />
+					<h3 className="text-xl font-bold text-gray-400 mt-4">
+						{searchTerm ? 'No matching tickets' : 'No tickets yet'}
+					</h3>
+					<p className="text-gray-500 mt-2">
+						{searchTerm ? 'Try a different search' : 'This event has no tickets'}
+					</p>
+				</div>
+			) : compactView ? (
+				<div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+					{filteredTickets.map((ticket) => (
+						<TicketCard
+							key={ticket._id}
+							ticket={ticket}
+							onToggleIsUsed={handleToggleIsUsed}
+							onDeleteTicket={handleDeleteTicket}
+							updateLoading={updateLoading}
+							deleteLoading={deleteLoading}
+						/>
+					))}
+				</div>
+			) : (
+				<>
+					<div className="hidden md:block rounded-lg border border-gray-700 bg-gray-900/80 mt-4 overflow-x-auto">
+						<table className="w-full divide-y divide-gray-700 min-w-[1000px]">
+							<thead className="bg-gray-750 sticky top-0 z-10">
+								<tr>
+									<th className="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">
+										LPU ID
+									</th>
+									<th className="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">
+										Name
+									</th>
+									<th className="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">
+										Email
+									</th>
+									<th className="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">
+										Phone
+									</th>
+									<th className="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">
+										Hostel
+									</th>
+									<th className="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">
+										Club
+									</th>
+									<th className="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">
+										Status
+									</th>
+									<th className="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">
+										Created
+									</th>
+									<th className="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">
+										Actions
+									</th>
+								</tr>
+							</thead>
+							<tbody className="bg-gray-800 divide-y divide-gray-700">
+								{filteredTickets.map((ticket) => (
+									<TicketRow
+										key={ticket._id}
+										ticket={ticket}
+										onToggleIsUsed={handleToggleIsUsed}
+										onDeleteTicket={handleDeleteTicket}
+										updateLoading={updateLoading}
+										deleteLoading={deleteLoading}
+									/>
+								))}
+							</tbody>
+						</table>
+					</div>
+
+					<div className="md:hidden space-y-3">
+						{filteredTickets.map((ticket) => (
+							<TicketCard
+								key={ticket._id}
+								ticket={ticket}
+								onToggleIsUsed={handleToggleIsUsed}
+								onDeleteTicket={handleDeleteTicket}
+								updateLoading={updateLoading}
+								deleteLoading={deleteLoading}
+							/>
+						))}
+					</div>
+				</>
+			)}
+
 			<MobileFilterMenu
 				isOpen={isMobileMenuOpen}
 				onClose={() => setIsMobileMenuOpen(false)}
@@ -481,203 +720,6 @@ const TicketsTab = ({ token, events = [], setDashboardError }) => {
 				handleExportTickets={handleExportTickets}
 				exportLoading={exportLoading}
 			/>
-
-			{/* Top Controls */}
-			<div className="flex flex-col md:flex-row justify-between gap-4">
-				<div className="flex flex-col sm:flex-row gap-3">
-					<div className="relative flex-1">
-						<select
-							className="appearance-none w-full bg-gray-700/50 border border-gray-600 rounded-lg pl-4 pr-10 py-2 text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-							value={selectedEventId}
-							onChange={(e) => setSelectedEventId(e.target.value)}
-						>
-							<option value="">Select an event</option>
-							{(events || []).map((event) => (
-								<option key={event._id} value={event._id}>
-									{event.title}
-								</option>
-							))}
-						</select>
-						<ChevronDown className="absolute right-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400 pointer-events-none" />
-					</div>
-					<div className="hidden sm:flex gap-2">
-						<div className="relative">
-							<select
-								className="appearance-none bg-gray-700/50 border border-gray-600 rounded-lg pl-4 pr-10 py-2 text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-								value={sortBy}
-								onChange={(e) => setSortBy(e.target.value)}
-							>
-								<option value="newest">Newest First</option>
-								<option value="oldest">Oldest First</option>
-							</select>
-							<ChevronDown className="absolute right-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400 pointer-events-none" />
-						</div>
-					</div>
-					<button
-						className="sm:hidden flex items-center gap-2 px-4 py-2 bg-gray-700/50 border border-gray-600 rounded-lg text-white"
-						onClick={() => setIsMobileMenuOpen(true)}
-					>
-						<Filter size={16} />
-						<span>Filters</span>
-					</button>
-				</div>
-				<div className="flex gap-2">
-					<div className="relative w-full md:w-64">
-						<Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
-						<input
-							type="text"
-							placeholder="Search by LPU ID, name or email"
-							className="w-full pl-10 pr-4 py-2 bg-gray-700/50 border border-gray-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-							value={searchTerm}
-							onChange={(e) => setSearchTerm(e.target.value)}
-						/>
-					</div>
-					<button
-						onClick={handleExportTickets}
-						disabled={exportLoading || !selectedEventId || (tickets || []).length === 0}
-						className={`hidden sm:flex items-center gap-2 px-4 py-2 rounded-lg ${
-							exportLoading || !selectedEventId || (tickets || []).length === 0
-								? 'bg-gray-600 cursor-not-allowed'
-								: 'bg-cyan-700/80 hover:bg-cyan-600'
-						} transition text-white`}
-						title="Export Tickets CSV"
-						type="button"
-					>
-						{exportLoading ? (
-							<Loader2 className="h-4 w-4 animate-spin" />
-						) : (
-							<Download className="h-5 w-5" />
-						)}
-						<span className="hidden md:inline">
-							{exportLoading ? 'Exporting' : 'Export'}
-						</span>
-					</button>
-				</div>
-			</div>
-
-			{/* Error Messages */}
-			{(ticketsError || updateError || deleteError || exportError) && (
-				<div className="bg-red-700/20 border border-red-500 text-red-300 px-4 py-3 rounded flex items-center justify-between">
-					<div className="flex items-center">
-						<AlertCircle className="h-5 w-5 mr-2" />
-						<span>{ticketsError || updateError || deleteError || exportError}</span>
-					</div>
-					<button
-						className="ml-4 px-3 py-1 bg-red-800/40 rounded text-sm hover:bg-red-700/60 flex items-center gap-1"
-						onClick={clearAllErrors}
-					>
-						<X className="h-4 w-4" />
-						Dismiss
-					</button>
-				</div>
-			)}
-
-			{/* Stats */}
-			{selectedEventId && ticketStats && (
-				<TicketStats stats={ticketStats} tickets={filteredTickets} />
-			)}
-
-			{/* Loading State */}
-			{ticketsLoading ? (
-				<div className="flex justify-center py-12">
-					<div className="flex flex-col items-center">
-						<Loader2 className="h-8 w-8 animate-spin text-blue-500" />
-						<p className="mt-2 text-gray-400">Loading tickets...</p>
-					</div>
-				</div>
-			) : selectedEventId ? (
-				filteredTickets.length === 0 ? (
-					<div className="text-center py-12 bg-gray-700/30 rounded-xl border border-gray-600">
-						<Ticket className="h-12 w-12 mx-auto text-gray-500" />
-						<h3 className="text-xl font-bold text-gray-400 mt-4">
-							{searchTerm ? 'No matching tickets found' : 'No tickets found'}
-						</h3>
-						<p className="text-gray-500 mt-2">
-							{searchTerm
-								? 'Try a different search term'
-								: 'This event has no tickets yet'}
-						</p>
-					</div>
-				) : (
-					<>
-						{/* Desktop Table */}
-						<div className="hidden md:block rounded-lg border border-gray-700 bg-gray-900/80 mt-4 overflow-x-auto">
-							<table className="w-full divide-y divide-gray-700 min-w-[1000px]">
-								<thead className="bg-gray-750 sticky top-0 z-10">
-									<tr>
-										<th className="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">
-											<button
-												className="flex items-center"
-												onClick={toggleSort}
-											>
-												<span>LPU ID</span>
-												<ArrowUpDown className="ml-1 h-3 w-3" />
-											</button>
-										</th>
-										<th className="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">
-											Name
-										</th>
-										<th className="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">
-											Email
-										</th>
-										<th className="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">
-											Phone
-										</th>
-										<th className="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">
-											Hostel
-										</th>
-										<th className="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">
-											Club
-										</th>
-										<th className="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">
-											Is Used
-										</th>
-										<th className="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">
-											Created At
-										</th>
-										<th className="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">
-											Actions
-										</th>
-									</tr>
-								</thead>
-								<tbody className="bg-gray-800 divide-y divide-gray-700">
-									{filteredTickets.map((ticket) => (
-										<TicketRow
-											key={ticket._id}
-											ticket={ticket}
-											onToggleIsUsed={handleToggleIsUsed}
-											onDeleteTicket={handleDeleteTicket}
-											updateLoading={updateLoading}
-											deleteLoading={deleteLoading}
-										/>
-									))}
-								</tbody>
-							</table>
-						</div>
-						{/* Mobile Card List */}
-						<div className="md:hidden space-y-3">
-							{filteredTickets.map((ticket) => (
-								<TicketCard
-									key={ticket._id}
-									ticket={ticket}
-									onToggleIsUsed={handleToggleIsUsed}
-									onDeleteTicket={handleDeleteTicket}
-									updateLoading={updateLoading}
-									deleteLoading={deleteLoading}
-								/>
-							))}
-						</div>
-					</>
-				)
-			) : (
-				<div className="text-center py-12 bg-gray-700/30 rounded-xl border border-gray-600">
-					<Ticket className="h-12 w-12 mx-auto text-gray-500" />
-					<h3 className="text-xl font-bold text-gray-400 mt-4">Select an Event</h3>
-					<p className="text-gray-500 mt-2">
-						Choose an event from the dropdown to view its tickets
-					</p>
-				</div>
-			)}
 		</div>
 	);
 };
