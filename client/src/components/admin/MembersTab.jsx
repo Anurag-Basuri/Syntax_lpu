@@ -77,7 +77,19 @@ const useErrorManager = () => {
 	return { errors, setError, clearError, clearAllErrors };
 };
 
-// Member Row Component
+// helper to safely read flattened fields (model provides departmentFlat/designationFlat)
+const getFlat = (member, key, fallbackKey) => {
+	if (!member) return '';
+	if (member[key]) return member[key];
+	if (fallbackKey && member[fallbackKey]) return member[fallbackKey];
+	// fallback to arrays or string
+	const raw = member[fallbackKey || key];
+	if (Array.isArray(raw)) return raw.join(', ');
+	if (typeof raw === 'string') return raw;
+	return '';
+};
+
+// Member Row Component (updated display fields)
 const MemberRow = React.memo(({ member, onEdit, onBan, onUnban, onRemove, actionLoading }) => (
 	<tr key={member._id} className="hover:bg-gray-750/50 transition">
 		<td className="px-6 py-4 whitespace-nowrap">
@@ -87,6 +99,7 @@ const MemberRow = React.memo(({ member, onEdit, onBan, onUnban, onRemove, action
 				</div>
 				<div className="ml-4">
 					<div className="text-sm font-medium text-white">{member.fullname}</div>
+					<div className="text-xs text-gray-400">{member.email}</div>
 				</div>
 			</div>
 		</td>
@@ -95,19 +108,18 @@ const MemberRow = React.memo(({ member, onEdit, onBan, onUnban, onRemove, action
 			{member.LpuId || 'N/A'}
 		</td>
 		<td className="px-6 py-4 whitespace-nowrap text-sm text-gray-300">
-			{member.department || '-'}
+			{getFlat(member, 'departmentFlat', 'department') || '-'}
 		</td>
 		<td className="px-6 py-4 whitespace-nowrap text-sm text-gray-300">
-			{member.designation || '-'}
+			{getFlat(member, 'designationFlat', 'designation') || '-'}
 		</td>
-		{/* Removed program column */}
 		<td className="px-6 py-4 whitespace-nowrap">
 			<div className="flex items-center gap-2">
 				<StatusBadge status={member.status} />
 				<span className="text-xs text-gray-400">{statusString(member)}</span>
 			</div>
 		</td>
-		<td className="px-6 py-4 whitespace-nowrap text-xs text-gray-400">
+		<td className="px-6 py-4 whitespace-nowrap text-xs text-gray-400 max-w-[240px]">
 			{member.restriction?.isRestricted ? (
 				<div className="flex flex-col gap-1">
 					<span>
@@ -173,7 +185,7 @@ const MemberRow = React.memo(({ member, onEdit, onBan, onUnban, onRemove, action
 	</tr>
 ));
 
-// Action Modal Component
+// Action Modal Component (guard member presence)
 const ActionModal = ({ isOpen, onClose, title, actionType, member, onSubmit, loading, error }) => {
 	const [reason, setReason] = useState('');
 	const [reviewTime, setReviewTime] = useState('');
@@ -186,6 +198,7 @@ const ActionModal = ({ isOpen, onClose, title, actionType, member, onSubmit, loa
 	}, [isOpen]);
 
 	const handleSubmit = () => {
+		if (!member) return;
 		onSubmit(member._id, reason, reviewTime);
 	};
 
@@ -256,7 +269,7 @@ const ActionModal = ({ isOpen, onClose, title, actionType, member, onSubmit, loa
 	);
 };
 
-// Edit Member Modal Component
+// Edit Member Modal Component (use flat fields and send arrays)
 const EditMemberModal = ({ isOpen, onClose, member, onSubmit, loading, error }) => {
 	const [editData, setEditData] = useState({
 		department: '',
@@ -268,8 +281,8 @@ const EditMemberModal = ({ isOpen, onClose, member, onSubmit, loading, error }) 
 	useEffect(() => {
 		if (isOpen && member) {
 			setEditData({
-				department: member.department || '',
-				designation: member.designation || 'member',
+				department: getFlat(member, 'departmentFlat', 'department') || '',
+				designation: getFlat(member, 'designationFlat', 'designation') || 'member',
 				LpuId: member.LpuId || '',
 				joinedAt: member.joinedAt
 					? new Date(member.joinedAt).toISOString().split('T')[0]
@@ -279,7 +292,14 @@ const EditMemberModal = ({ isOpen, onClose, member, onSubmit, loading, error }) 
 	}, [isOpen, member]);
 
 	const handleSubmit = () => {
-		onSubmit(member._id, editData);
+		// convert to server-expected shapes (arrays)
+		const payload = {
+			LpuId: editData.LpuId || undefined,
+			joinedAt: editData.joinedAt || undefined,
+			department: editData.department ? [editData.department] : undefined,
+			designation: editData.designation ? [editData.designation] : undefined,
+		};
+		onSubmit(member._id, payload);
 	};
 
 	if (!isOpen) return null;
@@ -369,7 +389,7 @@ const EditMemberModal = ({ isOpen, onClose, member, onSubmit, loading, error }) 
 	);
 };
 
-// Register Member Modal Component
+// Register Member Modal Component (send arrays)
 const RegisterMemberModal = ({ isOpen, onClose, onSubmit, loading, error, success }) => {
 	const [formData, setFormData] = useState({
 		fullname: '',
@@ -399,7 +419,13 @@ const RegisterMemberModal = ({ isOpen, onClose, onSubmit, loading, error, succes
 
 	const handleSubmit = (e) => {
 		e.preventDefault();
-		onSubmit(formData);
+		// normalise to arrays for backend/model
+		const payload = {
+			...formData,
+			department: formData.department ? [formData.department] : [],
+			designation: formData.designation ? [formData.designation] : ['member'],
+		};
+		onSubmit(payload);
 	};
 
 	if (!isOpen) return null;
@@ -555,6 +581,7 @@ const RegisterMemberModal = ({ isOpen, onClose, onSubmit, loading, error, succes
 	);
 };
 
+// MembersTab (main) — minor UI improvements + safer handlers
 const MembersTab = ({ token, setDashboardError }) => {
 	const [searchTerm, setSearchTerm] = useState('');
 	const [statusFilter, setStatusFilter] = useState('all');
@@ -613,13 +640,15 @@ const MembersTab = ({ token, setDashboardError }) => {
 		);
 	}, []);
 
-	// Fetch members on mount (include getAllMembers in deps)
+	// Fetch members on mount
 	useEffect(() => {
-		getAllMembers().catch((err) => {
-			const msg = formatError(err) || 'Failed to load members';
-			setDashboardError?.(msg);
-			setError('fetch', msg);
-		});
+		getAllMembers()
+			.then(() => {})
+			.catch((err) => {
+				const msg = formatError(err) || 'Failed to load members';
+				setDashboardError?.(msg);
+				setError('fetch', msg);
+			});
 	}, [getAllMembers, formatError, setDashboardError, setError]);
 
 	// Handle API errors (store readable messages)
@@ -666,11 +695,24 @@ const MembersTab = ({ token, setDashboardError }) => {
 		}
 	};
 
-	// Handle update member
+	// Handle update member (normalize arrays)
 	const handleUpdateMember = async (id, data) => {
 		clearError('update');
 		try {
-			await updateMemberByAdmin(id, data, token);
+			const payload = {
+				...data,
+				department: data.department
+					? Array.isArray(data.department)
+						? data.department
+						: [data.department]
+					: undefined,
+				designation: data.designation
+					? Array.isArray(data.designation)
+						? data.designation
+						: [data.designation]
+					: undefined,
+			};
+			await updateMemberByAdmin(id, payload, token);
 			setEditModalOpen(false);
 			await getAllMembers();
 		} catch (err) {
@@ -678,7 +720,7 @@ const MembersTab = ({ token, setDashboardError }) => {
 		}
 	};
 
-	// Handle register member
+	// Handle register member (normalize arrays)
 	const handleRegisterMember = async (formData) => {
 		clearError('register');
 		setRegisterLoading(true);
@@ -686,10 +728,10 @@ const MembersTab = ({ token, setDashboardError }) => {
 
 		try {
 			// Validate enums
-			if (!DEPARTMENT_OPTIONS.includes(formData.department)) {
+			if (!DEPARTMENT_OPTIONS.includes(formData.department?.[0] || formData.department)) {
 				throw new Error('Please select a valid department.');
 			}
-			if (!DESIGNATION_OPTIONS.includes(formData.designation)) {
+			if (!DESIGNATION_OPTIONS.includes(formData.designation?.[0] || formData.designation)) {
 				throw new Error('Please select a valid designation.');
 			}
 			if (!formData.password || formData.password.length < 8) {
@@ -701,7 +743,7 @@ const MembersTab = ({ token, setDashboardError }) => {
 			setTimeout(() => {
 				setRegisterModalOpen(false);
 				getAllMembers();
-			}, 1000);
+			}, 900);
 		} catch (err) {
 			setError('register', formatError(err));
 		} finally {
@@ -713,7 +755,6 @@ const MembersTab = ({ token, setDashboardError }) => {
 	const filteredMembers = useMemo(() => {
 		if (!Array.isArray(members)) return [];
 		return members.filter((member) => {
-			// Search filter
 			const q = searchTerm.trim().toLowerCase();
 			const matchesSearch =
 				!q ||
@@ -721,12 +762,10 @@ const MembersTab = ({ token, setDashboardError }) => {
 				(member.email && member.email.toLowerCase().includes(q)) ||
 				(member.LpuId && member.LpuId.toLowerCase().includes(q));
 
-			// Status filter
 			const matchesStatus = statusFilter === 'all' || member.status === statusFilter;
-
-			// Department filter
+			const memberDepartment = getFlat(member, 'departmentFlat', 'department');
 			const matchesDepartment =
-				departmentFilter === 'all' || member.department === departmentFilter;
+				departmentFilter === 'all' || memberDepartment === departmentFilter;
 
 			return matchesSearch && matchesStatus && matchesDepartment;
 		});
@@ -923,7 +962,7 @@ const MembersTab = ({ token, setDashboardError }) => {
 				</div>
 			)}
 
-			{/* Ban Modal */}
+			{/* Modals (unchanged usage) */}
 			<ActionModal
 				isOpen={banModalOpen}
 				onClose={closeAllModals}
@@ -935,7 +974,6 @@ const MembersTab = ({ token, setDashboardError }) => {
 				error={errors.ban}
 			/>
 
-			{/* Remove Modal */}
 			<ActionModal
 				isOpen={removeModalOpen}
 				onClose={closeAllModals}
@@ -947,7 +985,6 @@ const MembersTab = ({ token, setDashboardError }) => {
 				error={errors.remove}
 			/>
 
-			{/* Edit Modal */}
 			<EditMemberModal
 				isOpen={editModalOpen}
 				onClose={closeAllModals}
@@ -957,7 +994,6 @@ const MembersTab = ({ token, setDashboardError }) => {
 				error={errors.update}
 			/>
 
-			{/* Register Modal */}
 			<RegisterMemberModal
 				isOpen={registerModalOpen}
 				onClose={closeAllModals}
