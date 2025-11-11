@@ -45,13 +45,18 @@ const ShowContacts = () => {
 	// responsive: mobile filters toggle
 	const [showMobileFilters, setShowMobileFilters] = useState(false);
 
-	// Fetch contacts for current page
+	// Fetch contacts for current page via hook
 	const fetchContacts = async (pageNum = 1) => {
-		const data = await getAllContacts({ page: pageNum, limit });
-		const docs = data?.data?.docs || [];
-		setContacts(docs);
-		setTotalPages(data?.data?.totalPages || 1);
-		setTotalDocs(data?.data?.totalDocs || 0);
+		try {
+			const resp = await getAllContacts({ page: pageNum, limit });
+			const docs = resp?.data?.docs || [];
+			setContacts(docs);
+			setTotalPages(resp?.data?.totalPages || 1);
+			setTotalDocs(resp?.data?.totalDocs || 0);
+		} catch (e) {
+			// getAllContacts hook exposes error via `error` var; additional handling here optional
+			console.error('Failed to fetch contacts', e);
+		}
 	};
 
 	useEffect(() => {
@@ -60,7 +65,6 @@ const ShowContacts = () => {
 	}, [page]);
 
 	const handleRefresh = async () => {
-		// rely on hook's loading state; ensure fetch happens
 		await fetchContacts(page);
 	};
 
@@ -75,8 +79,14 @@ const ShowContacts = () => {
 	};
 
 	const handleResolve = async (id) => {
-		await markAsResolved(id);
-		setContacts((prev) => prev.map((c) => (c._id === id ? { ...c, status: 'resolved' } : c)));
+		try {
+			await markAsResolved(id);
+			setContacts((prev) =>
+				prev.map((c) => (c._id === id ? { ...c, status: 'resolved' } : c))
+			);
+		} catch (e) {
+			console.error('Resolve failed', e);
+		}
 	};
 
 	const handleCopyEmail = (email) => {
@@ -89,7 +99,6 @@ const ShowContacts = () => {
 		if (!window.confirm('Are you sure you want to delete this contact?')) return;
 		try {
 			await deleteContact(id);
-			// If last item on page, go to previous page if not on first
 			if (contacts.length === 1 && page > 1) {
 				setPage(page - 1);
 			} else {
@@ -145,7 +154,11 @@ const ShowContacts = () => {
 		if (exportFormat === 'csv') {
 			content += headers.join(',') + '\n';
 			dataToExport.forEach((contact) => {
-				content += `"${contact.name}","${contact.email}","${contact.phone}","${contact.lpuID}","${contact.subject || ''}","${contact.status}","${new Date(contact.createdAt).toLocaleString()}","${(contact.message || '').replace(/"/g, '""')}"\n`;
+				content += `"${contact.name}","${contact.email}","${contact.phone}","${
+					contact.lpuID
+				}","${contact.subject || ''}","${contact.status}","${new Date(
+					contact.createdAt
+				).toLocaleString()}","${(contact.message || '').replace(/"/g, '""')}"\n`;
 			});
 
 			const blob = new Blob([content], { type: 'text/csv' });
@@ -653,10 +666,18 @@ const ShowContacts = () => {
 										{filteredContacts.map((contact) => (
 											<article
 												key={contact._id}
-												className={`bg-gray-800/50 backdrop-blur-lg rounded-2xl border border-gray-700 shadow-lg overflow-hidden transition-all duration-300 hover:border-cyan-500/30 ${expandedId === contact._id ? 'ring-2 ring-cyan-500 border-cyan-500/50' : ''}`}
+												className={`bg-gray-800/50 backdrop-blur-lg rounded-2xl border border-gray-700 shadow-lg overflow-hidden transition-all duration-300 hover:border-cyan-500/30 ${
+													expandedId === contact._id
+														? 'ring-2 ring-cyan-500 border-cyan-500/50'
+														: ''
+												}`}
 											>
 												<div
-													className={`p-4 sm:p-5 cursor-pointer transition-all duration-200 ${contact.status === 'pending' ? 'bg-gradient-to-r from-cyan-900/10 to-blue-900/10 border-l-4 border-cyan-500' : ''}`}
+													className={`p-4 sm:p-5 cursor-pointer transition-all duration-200 ${
+														contact.status === 'pending'
+															? 'bg-gradient-to-r from-cyan-900/10 to-blue-900/10 border-l-4 border-cyan-500'
+															: ''
+													}`}
 													onClick={() => handleExpand(contact._id)}
 												>
 													<div className="flex items-start justify-between gap-3">
@@ -725,7 +746,9 @@ const ShowContacts = () => {
 
 														<div className="flex items-center space-x-3">
 															<div
-																className={`px-3 py-1 rounded-full text-sm font-medium ${getStatusColor(contact.status)}`}
+																className={`px-3 py-1 rounded-full text-sm font-medium ${getStatusColor(
+																	contact.status
+																)}`}
 															>
 																{contact.status}
 															</div>
@@ -905,7 +928,7 @@ const ShowContacts = () => {
 																						d="M5 13l4 4L19 7"
 																					/>
 																				</svg>
-																				Copied!
+																				Copped!
 																			</>
 																		) : (
 																			<>
@@ -991,7 +1014,9 @@ const ShowContacts = () => {
 									<button
 										onClick={() => setPage((p) => Math.max(1, p - 1))}
 										disabled={page === 1}
-										className={`px-3 py-2 md:px-4 md:py-2 rounded-l-md border border-gray-700 bg-gray-800 text-gray-300 hover:bg-cyan-700 hover:text-white transition ${page === 1 ? 'opacity-50 cursor-not-allowed' : ''}`}
+										className={`px-3 py-2 md:px-4 md:py-2 rounded-l-md border border-gray-700 bg-gray-800 text-gray-300 hover:bg-cyan-700 hover:text-white transition ${
+											page === 1 ? 'opacity-50 cursor-not-allowed' : ''
+										}`}
 										aria-label="Previous page"
 									>
 										Prev
@@ -1012,7 +1037,11 @@ const ShowContacts = () => {
 													key={p}
 													onClick={() => setPage(p)}
 													aria-current={p === page ? 'page' : undefined}
-													className={`min-w-[44px] px-3 py-2 border-t border-b border-gray-700 bg-gray-800 text-gray-300 hover:bg-cyan-700 hover:text-white transition ${page === p ? 'bg-cyan-700 text-white font-semibold ring-1 ring-cyan-400' : ''}`}
+													className={`min-w-[44px] px-3 py-2 border-t border-b border-gray-700 bg-gray-800 text-gray-300 hover:bg-cyan-700 hover:text-white transition ${
+														page === p
+															? 'bg-cyan-700 text-white font-semibold ring-1 ring-cyan-400'
+															: ''
+													}`}
 												>
 													{p}
 												</button>
@@ -1030,7 +1059,11 @@ const ShowContacts = () => {
 									<button
 										onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
 										disabled={page === totalPages}
-										className={`px-3 py-2 md:px-4 md:py-2 rounded-r-md border border-gray-700 bg-gray-800 text-gray-300 hover:bg-cyan-700 hover:text-white transition ${page === totalPages ? 'opacity-50 cursor-not-allowed' : ''}`}
+										className={`px-3 py-2 md:px-4 md:py-2 rounded-r-md border border-gray-700 bg-gray-800 text-gray-300 hover:bg-cyan-700 hover:text-white transition ${
+											page === totalPages
+												? 'opacity-50 cursor-not-allowed'
+												: ''
+										}`}
 										aria-label="Next page"
 									>
 										Next
