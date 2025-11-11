@@ -1,65 +1,141 @@
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import {
-	registerForEvent,
-	getTicketById,
-	getTicketsByEvent,
-	updateTicketStatus,
-} from '../services/ticketServices.js';
+import { useState, useCallback } from 'react';
 import { toast } from 'react-hot-toast';
+import {
+	getTicketsByEvent as getTicketsByEventService,
+	updateTicketStatus as updateTicketStatusService,
+	deleteTicket as deleteTicketService,
+} from '../services/ticketServices.js';
 
-// Hook for the public event registration form
-export const useRegisterForEvent = () => {
-	return useMutation({
-		mutationFn: registerForEvent,
-		onSuccess: () => {
-			toast.success('Successfully registered for the event!');
+// Note: This file exposes the compatibility hooks used by the admin TicketsTab:
+// - useGetTicketsByEvent -> { getTicketsByEvent(eventId, token), tickets, loading, error, reset }
+// - useUpdateTicket -> { updateTicket(ticketId, data, token), loading, error, reset }
+// - useDeleteTicket -> { deleteTicket(ticketId, token), loading, error, reset }
+
+// Hook for admins to get tickets for a specific event (imperative fetch)
+export const useGetTicketsByEvent = () => {
+	const [tickets, setTickets] = useState(null);
+	const [loading, setLoading] = useState(false);
+	const [error, setError] = useState(null);
+
+	const reset = useCallback(() => {
+		setError(null);
+	}, []);
+
+	// eventId can be a string id; token is optional and forwarded to service if needed
+	const getTicketsByEvent = useCallback(
+		async (eventId, token) => {
+			if (!eventId) {
+				setTickets([]);
+				return [];
+			}
+			setLoading(true);
+			setError(null);
+			try {
+				// service expects params object
+				const params = { eventId };
+				// some services might accept token via headers internally; we just forward token if needed
+				const data = await getTicketsByEventService(params, token);
+				// service may return different shapes; try common ones
+				const payload = data?.data ?? data?.tickets ?? data?.docs ?? data ?? [];
+				// normalize to array
+				const list = Array.isArray(payload) ? payload : payload?.results ?? [];
+				setTickets(list);
+				return list;
+			} catch (err) {
+				const msg = err?.response?.data?.message || err?.message || String(err);
+				setError(msg);
+				setTickets([]);
+				throw err;
+			} finally {
+				setLoading(false);
+			}
 		},
-		onError: (error) => {
-			toast.error(error.message);
-			console.error('Failed to register:', error);
-		},
-	});
+		[tickets]
+	);
+
+	return {
+		getTicketsByEvent,
+		tickets,
+		loading,
+		error,
+		reset,
+	};
 };
 
-// Hook to fetch a single ticket by its public ID (for ticket verification page)
-export const useTicket = (ticketId) => {
-	return useQuery({
-		queryKey: ['ticket', ticketId],
-		queryFn: () => getTicketById(ticketId),
-		enabled: !!ticketId,
-	});
+// Hook to update a ticket (admin). Exposes updateTicket(ticketId, data, token)
+export const useUpdateTicket = () => {
+	const [loading, setLoading] = useState(false);
+	const [error, setError] = useState(null);
+
+	const reset = useCallback(() => {
+		setError(null);
+	}, []);
+
+	const updateTicket = useCallback(
+		async (ticketId, data = {}, token) => {
+			if (!ticketId) {
+				throw new Error('Missing ticket id');
+			}
+			setLoading(true);
+			setError(null);
+			try {
+				// If backend expects status value, prefer sending a clear payload.
+				// When caller passes { isUsed: boolean }, forward it as { isUsed }.
+				// If caller passes { status: '...' } forward as-is.
+				if (typeof data === 'object' && 'isUsed' in data) {
+					// use updateTicketStatusService which sends { status: <value> }.
+					// Some backends accept boolean status; pass boolean directly.
+					await updateTicketStatusService(ticketId, { isUsed: !!data.isUsed }, token);
+				} else {
+					// fallback: send data as status payload
+					await updateTicketStatusService(ticketId, data, token);
+				}
+				toast.success('Ticket updated.');
+			} catch (err) {
+				const msg = err?.response?.data?.message || err?.message || String(err);
+				setError(msg);
+				toast.error(msg || 'Failed to update ticket');
+				throw err;
+			} finally {
+				setLoading(false);
+			}
+		},
+		[]
+	);
+
+	return { updateTicket, loading, error, reset };
 };
 
-// Hook for admins to get all tickets for a specific event
-export const useEventTickets = (eventId) => {
-	return useQuery({
-		queryKey: ['tickets', eventId],
-		queryFn: () => getTicketsByEvent({ eventId }),
-		enabled: !!eventId,
-	});
-};
+// Hook to delete a ticket (admin). Exposes deleteTicket(ticketId, token)
+export const useDeleteTicket = () => {
+	const [loading, setLoading] = useState(false);
+	const [error, setError] = useState(null);
 
-// Hook for admins to update a ticket's status (e.g., mark as 'used')
-export const useUpdateTicketStatus = () => {
-	const queryClient = useQueryClient();
+	const reset = useCallback(() => {
+		setError(null);
+	}, []);
 
-	return useMutation({
-		mutationFn: ({ ticketId, status }) => updateTicketStatus(ticketId, status),
-		// Optimistically update the ticket status for a snappy UI
-		onMutate: async ({ ticketId, status }) => {
-			await queryClient.cancelQueries({ queryKey: ['tickets'] });
-			const previousTickets = queryClient.getQueryData(['tickets']);
-			queryClient.setQueryData(['tickets'], (old) =>
-				old.map((ticket) => (ticket._id === ticketId ? { ...ticket, status } : ticket))
-			);
-			return { previousTickets };
+	const deleteTicket = useCallback(
+		async (ticketId, token) => {
+			if (!ticketId) {
+				throw new Error('Missing ticket id');
+			}
+			setLoading(true);
+			setError(null);
+			try {
+				await deleteTicketService(ticketId, token);
+				toast.success('Ticket deleted.');
+			} catch (err) {
+				const msg = err?.response?.data?.message || err?.message || String(err);
+				setError(msg);
+				toast.error(msg || 'Failed to delete ticket');
+				throw err;
+			} finally {
+				setLoading(false);
+			}
 		},
-		onError: (err, newStatus, context) => {
-			toast.error('Failed to update status. Reverting changes.');
-			queryClient.setQueryData(['tickets'], context.previousTickets);
-		},
-		onSettled: () => {
-			queryClient.invalidateQueries({ queryKey: ['tickets'] });
-		},
-	});
+		[]
+	);
+
+	return { deleteTicket, loading, error, reset };
 };
