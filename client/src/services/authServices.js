@@ -68,7 +68,7 @@ export const adminLogout = async () => {
 	try {
 		await apiClient.post('/api/v1/admin/logout');
 	} catch (error) {
-		console.error('Server logout failed, but logging out client-side anyway.', error);
+		console.error('Server logout failed, but clearing local session.', error);
 	} finally {
 		// Always remove the token from local storage on logout.
 		removeToken();
@@ -82,6 +82,23 @@ export const getCurrentAdmin = async () => {
 		return response.data.data;
 	} catch (error) {
 		throw getApiError(error, 'Failed to fetch admin profile.');
+	}
+};
+
+// Refresh access token (server reads httpOnly cookie)
+export const refreshAccessToken = async (role = 'admin') => {
+	try {
+		const url =
+			role === 'admin' ? '/api/v1/admin/refresh-token' : '/api/v1/members/refresh-token';
+		const response = await publicClient.post(url, {}, { withCredentials: true });
+		const accessToken = response.data?.data?.accessToken;
+		if (accessToken) {
+			setToken(accessToken);
+			return accessToken;
+		}
+		throw new Error('Refresh did not return access token');
+	} catch (error) {
+		throw getApiError(error, 'Failed to refresh access token');
 	}
 };
 
