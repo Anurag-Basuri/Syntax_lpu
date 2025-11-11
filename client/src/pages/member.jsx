@@ -1,12 +1,13 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { apiClient } from '../services/api.js';
 import {
-	useGetCurrentMember,
-	useUpdateProfile,
-	useUploadProfilePicture,
-	useUploadResume,
-	useResetPassword,
-} from '../hooks/useMembers.js';
+	updateMyProfile,
+	uploadProfilePicture as svcUploadProfilePicture,
+	uploadResume as svcUploadResume,
+	resetPassword as svcResetPassword,
+} from '../services/memberServices.js';
 import ImageEditor from '../components/member/ImageEditor.jsx';
 import UploadProgress from '../components/member/UploadProgress.jsx';
 import ProfileHeader from '../components/member/ProfileHeader.jsx';
@@ -17,25 +18,55 @@ import MessageNotification from '../components/member/MessageNotification.jsx';
 import { validateFile, simulateProgress } from '../utils/fileUtils.js';
 
 const MemberProfile = () => {
-	// --- HOOKS ---
+	// --- react-query / services setup ---
+	const queryClient = useQueryClient();
+
+	// fetch current member (not auto-run; component controls first fetch similar to prior behavior)
+	const memberQuery = useQuery(
+		['currentMember'],
+		async () => {
+			const resp = await apiClient.get('/api/v1/members/me');
+			// server should return member in data.data
+			return resp.data?.data;
+		},
+		{ enabled: false }
+	);
+
+	const getCurrentMember = memberQuery.refetch;
+	const member = memberQuery.data;
+	const memberLoading = memberQuery.isLoading;
+	const memberError = memberQuery.error;
+
+	// mutations
 	const {
-		getCurrentMember,
-		member,
-		loading: memberLoading,
-		error: memberError,
-	} = useGetCurrentMember();
-	const { updateProfile, loading: updateLoading, error: updateError } = useUpdateProfile();
+		mutateAsync: updateProfileMut,
+		isLoading: updateLoading,
+		error: updateError,
+	} = useMutation(({ memberId, data }) => updateMyProfile(memberId, data), {
+		onSuccess: () => queryClient.invalidateQueries({ queryKey: ['currentMember'] }),
+	});
+
 	const {
-		uploadProfilePicture,
-		loading: uploadLoading,
+		mutateAsync: uploadProfilePicMut,
+		isLoading: uploadLoading,
 		error: uploadError,
-	} = useUploadProfilePicture();
+	} = useMutation(({ memberId, formData }) => svcUploadProfilePicture(memberId, formData), {
+		onSuccess: () => queryClient.invalidateQueries({ queryKey: ['currentMember'] }),
+	});
+
 	const {
-		uploadResume,
-		loading: uploadResumeLoading,
+		mutateAsync: uploadResumeMut,
+		isLoading: uploadResumeLoading,
 		error: uploadResumeError,
-	} = useUploadResume();
-	const { resetPassword, loading: resetLoading, error: resetError } = useResetPassword();
+	} = useMutation(({ memberId, formData }) => svcUploadResume(memberId, formData), {
+		onSuccess: () => queryClient.invalidateQueries({ queryKey: ['currentMember'] }),
+	});
+
+	const {
+		mutateAsync: resetPasswordMut,
+		isLoading: resetLoading,
+		error: resetError,
+	} = useMutation(({ LpuId, password }) => svcResetPassword({ LpuId, password }));
 
 	// --- STATE ---
 	const [isEditing, setIsEditing] = useState(false);
@@ -202,7 +233,7 @@ const MemberProfile = () => {
 					originalFile?.name || 'profile.jpg'
 				);
 
-				await uploadProfilePicture(member._id, formDataToUpload);
+				await uploadProfilePicMut({ memberId: member._id, formData: formDataToUpload });
 
 				// finish progress
 				if (progressInterval) clearInterval(progressInterval);
@@ -230,7 +261,7 @@ const MemberProfile = () => {
 				setMessage(error?.message || 'Failed to upload profile picture. Please try again.');
 			}
 		},
-		[member?._id, originalFile, editorImage, uploadProfilePicture, getCurrentMember]
+		[member?._id, originalFile, editorImage, uploadProfilePicMut, getCurrentMember]
 	);
 
 	const handleResumeUpload = useCallback(
@@ -265,7 +296,7 @@ const MemberProfile = () => {
 				const formDataToUpload = new FormData();
 				formDataToUpload.append('resume', file);
 
-				await uploadResume(member._id, formDataToUpload);
+				await uploadResumeMut({ memberId: member._id, formData: formDataToUpload });
 
 				if (progressInterval) clearInterval(progressInterval);
 				setUploadProgress((prev) => (prev ? { ...prev, progress: 100 } : null));
@@ -280,7 +311,7 @@ const MemberProfile = () => {
 				setMessage(error?.message || 'Failed to upload resume. Please try again.');
 			}
 		},
-		[member?._id, uploadResume, getCurrentMember]
+		[member?._id, uploadResumeMut, getCurrentMember]
 	);
 
 	const handlePasswordReset = useCallback(
@@ -303,7 +334,8 @@ const MemberProfile = () => {
 			}
 
 			try {
-				await resetPassword(member.LpuId, newPassword);
+				// service expects an object payload
+				await resetPasswordMut({ LpuId: member.LpuId, password: newPassword });
 				setMessage('Password reset successfully!');
 				setShowPasswordReset(false);
 				setNewPassword('');
@@ -313,7 +345,7 @@ const MemberProfile = () => {
 				setMessage(error?.message || 'Failed to reset password. Please try again.');
 			}
 		},
-		[member?.LpuId, newPassword, confirmPassword, resetPassword]
+		[member?.LpuId, newPassword, confirmPassword, resetPasswordMut]
 	);
 
 	// Handles changes in form fields
@@ -386,7 +418,7 @@ const MemberProfile = () => {
 				return;
 			}
 			try {
-				await updateProfile(member._id, formData);
+				await updateProfileMut({ memberId: member._id, data: formData });
 				setMessage('Profile updated successfully!');
 				setIsEditing(false);
 				await getCurrentMember();
@@ -395,7 +427,7 @@ const MemberProfile = () => {
 				setMessage(error?.message || 'Failed to update profile. Please try again.');
 			}
 		},
-		[member?._id, formData, updateProfile, getCurrentMember]
+		[member?._id, formData, updateProfileMut, getCurrentMember]
 	);
 
 	// --- RENDER STATES ---
