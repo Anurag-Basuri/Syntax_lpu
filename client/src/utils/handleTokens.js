@@ -1,12 +1,14 @@
-import {jwtDecode} from 'jwt-decode';
+import jwtDecode from 'jwt-decode';
 
 const STORAGE_KEY = 'sc_auth_token';
 
+// Store only accessToken (or an object with accessToken) — keep shape simple { accessToken: string }
 export const setToken = (tokenOrObject) => {
 	if (!tokenOrObject) {
 		localStorage.removeItem(STORAGE_KEY);
 		return;
 	}
+
 	let payload;
 	if (typeof tokenOrObject === 'string') payload = { accessToken: tokenOrObject };
 	else if (typeof tokenOrObject === 'object' && tokenOrObject !== null) payload = tokenOrObject;
@@ -14,10 +16,12 @@ export const setToken = (tokenOrObject) => {
 
 	try {
 		localStorage.setItem(STORAGE_KEY, JSON.stringify(payload));
-	} catch (err) {
+	} catch {
 		try {
 			localStorage.setItem(STORAGE_KEY, String(payload.accessToken || ''));
-		} catch {}
+		} catch {
+			// intentionally ignored
+		}
 	}
 };
 
@@ -26,10 +30,12 @@ export const getToken = () => {
 	if (!raw) return null;
 	try {
 		const parsed = JSON.parse(raw);
+		// parsed might be a string in legacy cases
 		if (typeof parsed === 'string') return { accessToken: parsed };
 		if (typeof parsed === 'object' && parsed !== null) return parsed;
 		return null;
-	} catch (err) {
+	} catch {
+		// not JSON — treat as raw token string
 		return { accessToken: raw };
 	}
 };
@@ -37,14 +43,16 @@ export const getToken = () => {
 export const removeToken = () => {
 	try {
 		localStorage.removeItem(STORAGE_KEY);
-	} catch {}
+	} catch {
+		// intentionally ignored
+	}
 };
 
 export const decodeToken = (token) => {
 	if (!token || typeof token !== 'string') return null;
 	try {
 		return jwtDecode(token);
-	} catch (err) {
+	} catch {
 		return null;
 	}
 };
@@ -65,7 +73,7 @@ export const isTokenValid = () => {
 	return !isTokenExpired(accessToken);
 };
 
-// Simple boolean: do we have an access token stored locally
+// Convenience boolean: do we have an access token stored locally
 export const shouldBeAuthenticated = () => {
 	return !!getToken()?.accessToken;
 };
