@@ -186,8 +186,17 @@ const ShowApplies = () => {
 	}, [page, limit, debounced, status]);
 
 	const { data, isLoading, refetch } = useApplications(params);
-	const statsQuery = useApplicationStats ? useApplicationStats() : { data: null }; // fallback if not used
-	const { updateStatus, isUpdating, removeApplication, isDeleting } = useManageApplication();
+	// call hook directly (it's always available)
+	const statsQuery = useApplicationStats();
+	// now receives async mutate helpers too
+	const {
+		updateStatus,
+		updateStatusAsync,
+		isUpdating,
+		removeApplication,
+		removeApplicationAsync,
+		isDeleting,
+	} = useManageApplication();
 
 	const payload = data?.data ?? data ?? {};
 	const items = payload?.docs ?? [];
@@ -207,36 +216,52 @@ const ShowApplies = () => {
 
 	// keep selected consistent when items change
 	useEffect(() => {
+		// only change selection state when necessary to avoid infinite re-renders
 		if (!items || items.length === 0) {
-			setSelectedIds(new Set());
-			setSelectAllOnPage(false);
+			// clear selection only if something is selected or selectAllOnPage is true
+			if (selectedIds.size > 0 || selectAllOnPage) {
+				setSelectedIds(new Set());
+				setSelectAllOnPage(false);
+			}
 			return;
 		}
-		// if selectAllOnPage true, add all ids from current page to selected
+
+		// if "select all on page" is active, ensure every current page id exists in selectedIds
 		if (selectAllOnPage) {
-			const s = new Set(selectedIds);
-			items.forEach((it) => s.add(it._id));
-			setSelectedIds(s);
+			const pageIds = items.map((it) => it._id);
+			const missing = pageIds.some((id) => !selectedIds.has(id));
+			if (missing) {
+				const s = new Set(selectedIds);
+				pageIds.forEach((id) => s.add(id));
+				setSelectedIds(s);
+			}
 		}
-	}, [items]); // eslint-disable-line react-hooks/exhaustive-deps
+		// eslint-disable-next-line react-hooks/exhaustive-deps
+	}, [items, selectAllOnPage, selectedIds]);
 
 	const toggleSelect = (id, checked) => {
-		const s = new Set(selectedIds);
-		if (checked) s.add(id);
-		else s.delete(id);
-		setSelectedIds(s);
-		setSelectAllOnPage(items.every((it) => s.has(it._id)));
+		setSelectedIds((prev) => {
+			const s = new Set(prev);
+			if (checked) s.add(id);
+			else s.delete(id);
+			// update selectAllOnPage based on new set
+			const allOnPage = items.length > 0 && items.every((it) => s.has(it._id));
+			setSelectAllOnPage(allOnPage);
+			return s;
+		});
 	};
 
 	const toggleSelectAllOnPage = (checked) => {
 		setSelectAllOnPage(checked);
-		const s = new Set(selectedIds);
-		if (checked) {
-			items.forEach((it) => s.add(it._id));
-		} else {
-			items.forEach((it) => s.delete(it._id));
-		}
-		setSelectedIds(s);
+		setSelectedIds((prev) => {
+			const s = new Set(prev);
+			if (checked) {
+				items.forEach((it) => s.add(it._id));
+			} else {
+				items.forEach((it) => s.delete(it._id));
+			}
+			return s;
+		});
 	};
 
 	const onToggleExpand = async (id) => {
@@ -251,26 +276,56 @@ const ShowApplies = () => {
 				queryClient.invalidateQueries({ queryKey: ['application', id] });
 				queryClient.invalidateQueries({ queryKey: ['applicationStats'] });
 			} catch (err) {
-				// silently ignore or show toast
 				console.error('Mark seen failed', err);
 			}
 		}
 	};
 
-	// per-item actions
-	const handleApprove = (id) => {
+	// per-item actions (use mutateAsync so we can await and show UI feedback)
+	const handleApprove = async (id) => {
 		if (!window.confirm('Approve this application?')) return;
-		updateStatus({ id, status: 'approved' }, { onSuccess: () => {} });
+		try {
+			if (updateStatusAsync) {
+				await updateStatusAsync({ id, status: 'approved' });
+			} else {
+				// fallback to fire-and-forget
+				updateStatus({ id, status: 'approved' });
+			}
+		} catch (err) {
+			console.error('Approve failed', err);
+			toast.error('Failed to approve');
+		}
 	};
 
-	const handleReject = (id) => {
+	const handleReject = async (id) => {
 		if (!window.confirm('Reject this application?')) return;
-		updateStatus({ id, status: 'rejected' }, { onSuccess: () => {} });
+		try {
+			if (updateStatusAsync) {
+				await updateStatusAsync({ id, status: 'rejected' });
+			} else {
+				updateStatus({ id, status: 'rejected' });
+			}
+		} catch (err) {
+			console.error('Reject failed', err);
+			toast.error('Failed to reject');
+		}
 	};
 
-	const handleDelete = (id) => {
+	const handleDelete = async (id) => {
 		if (!window.confirm('Delete this application? This cannot be undone.')) return;
-		removeApplication(id);
+		try {
+			if (removeApplicationAsync) {
+				await removeApplicationAsync(id);
+			} else {
+				removeApplication(id);
+			}
+			// ensure queries are fresh
+			queryClient.invalidateQueries({ queryKey: ['applications'] });
+			queryClient.invalidateQueries({ queryKey: ['applicationStats'] });
+		} catch (err) {
+			console.error('Delete failed', err);
+			toast.error('Failed to delete');
+		}
 	};
 
 	// bulk actions
@@ -286,9 +341,18 @@ const ShowApplies = () => {
 
 		try {
 			if (action === 'delete') {
-				// perform deletes individually to reuse existing remove mutation (keeping it simple)
-				await Promise.all(idsArray.map((id) => removeApplication(id)));
+				// use mutation async helper for deletes so React Query lifecycle is respected
+				if (removeApplicationAsync) {
+					await Promise.all(idsArray.map((id) => removeApplicationAsync(id)));
+				} else {
+					// fallback: trigger deletes (not awaitable)
+					idsArray.forEach((id) => removeApplication(id));
+				}
+				toast.success('Bulk delete completed');
+				queryClient.invalidateQueries({ queryKey: ['applications'] });
+				queryClient.invalidateQueries({ queryKey: ['applicationStats'] });
 			} else {
+				// bulk status update via API
 				await bulkUpdateService(idsArray, action);
 				toast.success(`Bulk ${action} successful`);
 				queryClient.invalidateQueries({ queryKey: ['applications'] });
