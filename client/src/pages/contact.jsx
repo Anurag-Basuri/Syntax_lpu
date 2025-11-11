@@ -1,25 +1,14 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import {
-	Mail,
-	Send,
-	CheckCircle2,
-	ChevronDown,
-	ChevronUp,
-	ShieldCheck,
-	Phone,
-	AtSign,
-} from 'lucide-react';
-import { getToken, decodeToken } from '../utils/handleTokens.js';
-import {
-	sendContactMessage,
-	getAllContacts,
-	updateContactStatus,
-	deleteContact as svcDeleteContact,
-} from '../services/contactServices.js';
+import { Mail, Send, CheckCircle2, Phone, AtSign } from 'lucide-react';
+import { sendContactMessage } from '../services/contactServices.js';
 import { toast } from 'react-hot-toast';
+import { useTheme } from '../hooks/useTheme.js';
 
 const ContactPage = () => {
+	const { theme } = useTheme();
+	const isDark = theme === 'dark';
+
 	const [formData, setFormData] = useState({
 		name: '',
 		email: '',
@@ -31,64 +20,49 @@ const ContactPage = () => {
 	const [loading, setLoading] = useState(false);
 	const [success, setSuccess] = useState(false);
 	const [error, setError] = useState('');
-	const [contacts, setContacts] = useState([]);
-	const [adminLoading, setAdminLoading] = useState(false);
-	const [expandedId, setExpandedId] = useState(null);
-	const [page, setPage] = useState(1);
-	const [limit] = useState(10);
-	const [totalPages, setTotalPages] = useState(1);
 
-	// decode local access token properly (getToken() returns object { accessToken })
-	const tokens = getToken();
-	const user = tokens?.accessToken ? decodeToken(tokens.accessToken) : null;
-	const isAdmin = !!user?.adminID;
-
-	useEffect(() => {
-		if (isAdmin) fetchContacts({ page, limit });
-		// eslint-disable-next-line react-hooks/exhaustive-deps
-	}, [isAdmin, page]);
-
-	const fetchContacts = async (params = {}) => {
-		setAdminLoading(true);
-		setError('');
-		try {
-			const resp = await getAllContacts(params);
-			setContacts(resp?.docs ?? []);
-			setTotalPages(resp?.totalPages ?? 1);
-		} catch (err) {
-			console.error('fetchContacts', err);
-			setError(err.message || 'Failed to fetch contacts');
-			toast.error(err.message || 'Failed to fetch contacts');
-		} finally {
-			setAdminLoading(false);
-		}
-	};
+	const panelCls = isDark
+		? 'rounded-2xl p-8 backdrop-blur-md bg-slate-900/50 border border-white/6 text-white shadow-xl'
+		: 'rounded-2xl p-8 backdrop-blur-md bg-white/70 border border-slate-200/20 text-slate-900 shadow-xl';
 
 	const handleChange = (e) => {
 		const { name, value } = e.target;
-		setFormData((prev) => ({ ...prev, [name]: value }));
+		setFormData((s) => ({ ...s, [name]: value }));
+	};
+
+	const validate = (data) => {
+		if (!data.name.trim()) return 'Name is required';
+		if (!data.email.trim()) return 'Email is required';
+		// simple email check
+		if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(data.email)) return 'Invalid email';
+		if (!data.phone.trim()) return 'Phone is required';
+		if (!/^\+?\d{7,15}$/.test(data.phone.replace(/\s+/g, ''))) return 'Invalid phone';
+		if (!data.lpuID.trim()) return 'LPU ID is required';
+		if (!/^\d{4,12}$/.test(data.lpuID)) return 'LPU ID looks invalid';
+		if (!data.subject.trim()) return 'Subject is required';
+		if (!data.message.trim() || data.message.trim().length < 5)
+			return 'Message must be at least 5 characters';
+		return null;
 	};
 
 	const handleSubmit = async (e) => {
 		e.preventDefault();
-		setLoading(true);
 		setError('');
+		const v = validate(formData);
+		if (v) {
+			setError(v);
+			return toast.error(v);
+		}
+
+		setLoading(true);
 		try {
 			await sendContactMessage(formData);
 			setSuccess(true);
-			setFormData({
-				name: '',
-				email: '',
-				phone: '',
-				lpuID: '',
-				subject: '',
-				message: '',
-			});
-			setTimeout(() => setSuccess(false), 3000);
-			toast.success('Message sent');
+			toast.success('Message sent — thank you!');
+			setFormData({ name: '', email: '', phone: '', lpuID: '', subject: '', message: '' });
+			setTimeout(() => setSuccess(false), 3500);
 		} catch (err) {
-			console.error('sendContact', err);
-			const msg = err.message || err?.response?.data?.message || 'Failed to send message';
+			const msg = err?.message || 'Failed to send message';
 			setError(msg);
 			toast.error(msg);
 		} finally {
@@ -96,656 +70,211 @@ const ContactPage = () => {
 		}
 	};
 
-	const markAsResolved = async (id) => {
-		try {
-			await updateContactStatus(id, 'resolved');
-			setContacts((prev) => prev.map((c) => (c._id === id ? { ...c, status: 'resolved' } : c)));
-			toast.success('Marked resolved');
-		} catch (err) {
-			console.error('markAsResolved', err);
-			toast.error('Failed to mark resolved');
-		}
-	};
-
-	const handleDelete = async (id) => {
-		if (!window.confirm('Delete this contact?')) return;
-		try {
-			await svcDeleteContact(id);
-			setContacts((prev) => prev.filter((c) => c._id !== id));
-			toast.success('Deleted');
-		} catch (err) {
-			console.error('deleteContact', err);
-			toast.error('Failed to delete contact');
-		}
-	};
-
-	const toggleExpand = (id) => {
-		setExpandedId((prev) => (prev === id ? null : id));
-	};
-
-	// UI: public form or admin list
 	return (
 		<div className="min-h-screen section-padding">
-			<div className="page-container">
-				{!isAdmin ? (
-					<motion.div
-						initial={{ opacity: 0, y: 20 }}
-						animate={{ opacity: 1, y: 0 }}
-						transition={{ duration: 0.6 }}
-						className="max-w-6xl mx-auto"
-					>
-						<div
-							className="glass-card overflow-hidden"
-							style={{
-								background: 'var(--glass-bg)',
-								border: '1px solid var(--glass-border)',
-								borderRadius: '1.5rem',
-								boxShadow: 'var(--shadow-lg)',
-							}}
-						>
-							<div className="grid md:grid-cols-5 gap-0">
-								{/* Left Sidebar */}
+			<div className="max-w-5xl mx-auto">
+				<div className={panelCls}>
+					<div className="grid md:grid-cols-5 gap-6">
+						<aside className="md:col-span-2 flex flex-col gap-6">
+							<div className="flex items-start gap-4">
 								<div
-									className="md:col-span-2 p-8 md:p-12"
+									className="w-14 h-14 rounded-2xl flex items-center justify-center"
 									style={{
-										background:
-											'linear-gradient(135deg, color-mix(in srgb, var(--accent-1) 8%, transparent), color-mix(in srgb, var(--accent-2) 8%, transparent))',
-										borderRight: '1px solid var(--glass-border)',
+										background: 'linear-gradient(135deg,#06b6d4,#3b82f6)',
 									}}
 								>
-									<div className="flex flex-col h-full">
-										<div className="mb-8">
-											<div
-												className="w-16 h-16 rounded-2xl mb-6 flex items-center justify-center"
-												style={{
-													background:
-														'linear-gradient(135deg, var(--accent-1), var(--accent-2))',
-													boxShadow: '0 8px 24px rgba(14, 165, 233, 0.3)',
-												}}
-											>
-												<Mail className="w-8 h-8 text-white" />
-											</div>
-											<h2
-												className="text-3xl md:text-4xl font-bold mb-3"
-												style={{ color: 'var(--text-primary)' }}
-											>
-												Get in Touch
-											</h2>
-											<p
-												className="text-base"
-												style={{ color: 'var(--text-secondary)' }}
-											>
-												Have questions? We're here to help. Reach out to our
-												team for assistance.
-											</p>
-										</div>
+									<Mail className="w-7 h-7 text-white" />
+								</div>
+								<div>
+									<h1 className="text-2xl font-bold">Contact Us</h1>
+									<p className="mt-1 text-sm text-slate-300">
+										Questions, feedback or partnership enquiries — send us a
+										message and we'll reply shortly.
+									</p>
+								</div>
+							</div>
 
-										<div className="space-y-6 mt-auto">
-											<h3
-												className="text-sm font-semibold uppercase tracking-wider mb-4"
-												style={{ color: 'var(--text-muted)' }}
-											>
-												Contact Information
-											</h3>
-
-											{/* Phone */}
-											<a
-												href="tel:+919771072294"
-												className="group flex items-start gap-4 p-4 rounded-xl transition-all duration-300"
-												style={{
-													background: 'var(--glass-bg)',
-													border: '1px solid var(--glass-border)',
-												}}
-											>
-												<div
-													className="w-12 h-12 rounded-lg flex items-center justify-center flex-shrink-0 transition-all duration-300"
-													style={{
-														background:
-															'color-mix(in srgb, var(--accent-1) 15%, transparent)',
-														border: '1px solid color-mix(in srgb, var(--accent-1) 25%, transparent)',
-													}}
-												>
-													<Phone
-														className="w-5 h-5"
-														style={{ color: 'var(--accent-1)' }}
-													/>
-												</div>
-												<div className="flex-1 min-w-0">
-													<h4
-														className="font-semibold mb-1"
-														style={{ color: 'var(--text-primary)' }}
-													>
-														Phone Support
-													</h4>
-													<p
-														className="text-sm font-mono transition-colors duration-300"
-														style={{ color: 'var(--text-secondary)' }}
-													>
-														+91 9771072294
-													</p>
-												</div>
-											</a>
-
-											{/* Email */}
-											<a
-												href="mailto:vibranta.helpdesk@gmail.com"
-												className="group flex items-start gap-4 p-4 rounded-xl transition-all duration-300"
-												style={{
-													background: 'var(--glass-bg)',
-													border: '1px solid var(--glass-border)',
-												}}
-											>
-												<div
-													className="w-12 h-12 rounded-lg flex items-center justify-center flex-shrink-0 transition-all duration-300"
-													style={{
-														background:
-															'color-mix(in srgb, var(--accent-2) 15%, transparent)',
-														border: '1px solid color-mix(in srgb, var(--accent-2) 25%, transparent)',
-													}}
-												>
-													<AtSign
-														className="w-5 h-5"
-														style={{ color: 'var(--accent-2)' }}
-													/>
-												</div>
-												<div className="flex-1 min-w-0">
-													<h4
-														className="font-semibold mb-1"
-														style={{ color: 'var(--text-primary)' }}
-													>
-														Email Support
-													</h4>
-													<p
-														className="text-sm break-all transition-colors duration-300"
-														style={{ color: 'var(--text-secondary)' }}
-													>
-														vibranta.helpdesk@gmail.com
-													</p>
-												</div>
-											</a>
-										</div>
+							<div className="space-y-4">
+								<div className="flex items-start gap-3">
+									<div
+										className="w-12 h-12 rounded-lg flex items-center justify-center"
+										style={{ background: 'rgba(255,255,255,0.04)' }}
+									>
+										<Phone className="w-5 h-5" />
+									</div>
+									<div>
+										<h4 className="font-semibold">Phone</h4>
+										<p className="text-sm text-slate-300">+91 97710 72294</p>
 									</div>
 								</div>
 
-								{/* Right Form */}
-								<div className="md:col-span-3 p-8 md:p-12">
-									<h3
-										className="text-2xl font-bold mb-2"
-										style={{ color: 'var(--text-primary)' }}
+								<div className="flex items-start gap-3">
+									<div
+										className="w-12 h-12 rounded-lg flex items-center justify-center"
+										style={{ background: 'rgba(255,255,255,0.04)' }}
 									>
-										Send us a message
-									</h3>
-									<p className="mb-8" style={{ color: 'var(--text-secondary)' }}>
-										Fill out the form below and we'll get back to you as soon as
-										possible.
-									</p>
-
-									<AnimatePresence>
-										{success && (
-											<motion.div
-												initial={{ opacity: 0, y: -10 }}
-												animate={{ opacity: 1, y: 0 }}
-												exit={{ opacity: 0 }}
-												className="mb-6 p-4 rounded-xl flex items-center gap-3"
-												style={{
-													background:
-														'color-mix(in srgb, #10b981 15%, transparent)',
-													border: '1px solid color-mix(in srgb, #10b981 30%, transparent)',
-												}}
-											>
-												<CheckCircle2 className="w-5 h-5 text-green-400 flex-shrink-0" />
-												<p className="text-sm font-medium text-green-400">
-													Your message has been sent successfully!
-												</p>
-											</motion.div>
-										)}
-										{error && (
-											<motion.div
-												initial={{ opacity: 0, y: -10 }}
-												animate={{ opacity: 1, y: 0 }}
-												exit={{ opacity: 0 }}
-												className="mb-6 p-4 rounded-xl"
-												style={{
-													background:
-														'color-mix(in srgb, #ef4444 15%, transparent)',
-													border: '1px solid color-mix(in srgb, #ef4444 30%, transparent)',
-													color: '#fca5a5',
-												}}
-											>
-												{error}
-											</motion.div>
-										)}
-									</AnimatePresence>
-
-									<form onSubmit={handleSubmit} className="space-y-6">
-										<div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-											<div>
-												<label
-													className="block text-sm font-medium mb-2"
-													style={{ color: 'var(--text-secondary)' }}
-												>
-													Full Name
-												</label>
-												<input
-													type="text"
-													name="name"
-													value={formData.name}
-													onChange={handleChange}
-													required
-													className="auth-input"
-													placeholder="John Doe"
-													style={{
-														paddingLeft: '1rem',
-														background: 'var(--glass-bg)',
-														border: '1px solid var(--glass-border)',
-														color: 'var(--text-primary)',
-													}}
-												/>
-											</div>
-											<div>
-												<label
-													className="block text-sm font-medium mb-2"
-													style={{ color: 'var(--text-secondary)' }}
-												>
-													LPU ID
-												</label>
-												<input
-													type="text"
-													name="lpuID"
-													value={formData.lpuID}
-													onChange={handleChange}
-													required
-													className="auth-input"
-													placeholder="12345678"
-													style={{
-														paddingLeft: '1rem',
-														background: 'var(--glass-bg)',
-														border: '1px solid var(--glass-border)',
-														color: 'var(--text-primary)',
-													}}
-												/>
-											</div>
-										</div>
-
-										<div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-											<div>
-												<label
-													className="block text-sm font-medium mb-2"
-													style={{ color: 'var(--text-secondary)' }}
-												>
-													Email Address
-												</label>
-												<input
-													type="email"
-													name="email"
-													value={formData.email}
-													onChange={handleChange}
-													required
-													className="auth-input"
-													placeholder="john@example.com"
-													style={{
-														paddingLeft: '1rem',
-														background: 'var(--glass-bg)',
-														border: '1px solid var(--glass-border)',
-														color: 'var(--text-primary)',
-													}}
-												/>
-											</div>
-											<div>
-												<label
-													className="block text-sm font-medium mb-2"
-													style={{ color: 'var(--text-secondary)' }}
-												>
-													Phone Number
-												</label>
-												<input
-													type="tel"
-													name="phone"
-													value={formData.phone}
-													onChange={handleChange}
-													required
-													className="auth-input"
-													placeholder="+91 98765 43210"
-													style={{
-														paddingLeft: '1rem',
-														background: 'var(--glass-bg)',
-														border: '1px solid var(--glass-border)',
-														color: 'var(--text-primary)',
-													}}
-												/>
-											</div>
-										</div>
-
-										<div>
-											<label
-												className="block text-sm font-medium mb-2"
-												style={{ color: 'var(--text-secondary)' }}
-											>
-												Subject
-											</label>
-											<input
-												type="text"
-												name="subject"
-												value={formData.subject}
-												onChange={handleChange}
-												required
-												className="auth-input"
-												placeholder="How can we help?"
-												style={{
-													paddingLeft: '1rem',
-													background: 'var(--glass-bg)',
-													border: '1px solid var(--glass-border)',
-													color: 'var(--text-primary)',
-												}}
-											/>
-										</div>
-
-										<div>
-											<label
-												className="block text-sm font-medium mb-2"
-												style={{ color: 'var(--text-secondary)' }}
-											>
-												Message
-											</label>
-											<textarea
-												name="message"
-												value={formData.message}
-												onChange={handleChange}
-												required
-												rows={5}
-												className="auth-input resize-none"
-												placeholder="Tell us more about your inquiry..."
-												style={{
-													paddingLeft: '1rem',
-													background: 'var(--glass-bg)',
-													border: '1px solid var(--glass-border)',
-													color: 'var(--text-primary)',
-												}}
-											></textarea>
-										</div>
-
-										<motion.button
-											type="submit"
-											disabled={loading}
-											whileHover={{ scale: loading ? 1 : 1.02 }}
-											whileTap={{ scale: loading ? 1 : 0.98 }}
-											className="btn btn-primary w-full py-4 text-base"
-										>
-											{loading ? (
-												<>
-													<svg
-														className="animate-spin h-5 w-5"
-														xmlns="http://www.w3.org/2000/svg"
-														fill="none"
-														viewBox="0 0 24 24"
-													>
-														<circle
-															className="opacity-25"
-															cx="12"
-															cy="12"
-															r="10"
-															stroke="currentColor"
-															strokeWidth="4"
-														></circle>
-														<path
-															className="opacity-75"
-															fill="currentColor"
-															d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-														></path>
-													</svg>
-													Sending...
-												</>
-											) : (
-												<>
-													<Send className="w-5 h-5" />
-													Send Message
-												</>
-											)}
-										</motion.button>
-									</form>
+										<AtSign className="w-5 h-5" />
+									</div>
+									<div>
+										<h4 className="font-semibold">Email</h4>
+										<p className="text-sm text-slate-300">
+											vibranta.helpdesk@gmail.com
+										</p>
+									</div>
 								</div>
 							</div>
-						</div>
-					</motion.div>
-				) : (
-					<motion.div
-						initial={{ opacity: 0, y: 20 }}
-						animate={{ opacity: 1, y: 0 }}
-						transition={{ duration: 0.6 }}
-						className="max-w-6xl mx-auto glass-card p-8 md:p-12"
-						style={{
-							background: 'var(--glass-bg)',
-							border: '1px solid var(--glass-border)',
-							borderRadius: '1.5rem',
-							boxShadow: 'var(--shadow-lg)',
-						}}
-					>
-						<div className="flex items-center gap-4 mb-8">
-							<div
-								className="w-14 h-14 rounded-xl flex items-center justify-center"
-								style={{
-									background:
-										'linear-gradient(135deg, var(--accent-1), var(--accent-2))',
-								}}
-							>
-								<ShieldCheck className="w-7 h-7 text-white" />
-							</div>
-							<h2
-								className="text-3xl font-bold"
-								style={{ color: 'var(--text-primary)' }}
-							>
-								Contact Requests
-							</h2>
-						</div>
+						</aside>
 
-						{adminLoading ? (
-							<div className="flex justify-center py-12">
-								<div
-									className="animate-spin rounded-full h-12 w-12 border-2 border-t-transparent"
-									style={{ borderColor: 'var(--accent-1)' }}
-								></div>
-							</div>
-						) : contacts.length === 0 ? (
-							<div
-								className="text-center py-16"
-								style={{ color: 'var(--text-secondary)' }}
-							>
-								<Mail className="w-16 h-16 mx-auto mb-4 opacity-50" />
-								<p className="text-lg">No contact requests found</p>
-							</div>
-						) : (
-							<div className="space-y-4">
-								{contacts.map((contact) => (
+						<main className="md:col-span-3">
+							<AnimatePresence>
+								{success && (
 									<motion.div
-										key={contact._id}
-										initial={{ opacity: 0, y: 10 }}
+										initial={{ opacity: 0, y: -8 }}
 										animate={{ opacity: 1, y: 0 }}
-										className="rounded-xl overflow-hidden transition-all duration-300"
-										style={{
-											background:
-												contact.status === 'resolved'
-													? 'color-mix(in srgb, #10b981 8%, var(--glass-bg))'
-													: 'var(--glass-bg)',
-											border: `1px solid ${
-												contact.status === 'resolved'
-													? 'color-mix(in srgb, #10b981 25%, var(--glass-border))'
-													: 'var(--glass-border)'
-											}`,
-										}}
+										exit={{ opacity: 0 }}
+										className="mb-4 p-3 rounded-lg flex items-center gap-3"
+										style={{ background: 'rgba(16,185,129,0.08)' }}
 									>
-										<div
-											className="flex justify-between items-center p-5 cursor-pointer hover:bg-opacity-80 transition-all"
-											onClick={() => toggleExpand(contact._id)}
-										>
-											<div className="flex items-center gap-4 flex-1">
-												<div
-													className="w-3 h-3 rounded-full flex-shrink-0"
-													style={{
-														background:
-															contact.status === 'resolved'
-																? '#10b981'
-																: '#f59e0b',
-													}}
-												></div>
-												<div className="flex-1 min-w-0">
-													<h3
-														className="font-semibold mb-1"
-														style={{ color: 'var(--text-primary)' }}
-													>
-														{contact.subject}
-													</h3>
-													<p
-														className="text-sm truncate"
-														style={{ color: 'var(--text-secondary)' }}
-													>
-														{contact.name} • {contact.email}
-													</p>
-												</div>
-											</div>
-											<div className="flex items-center gap-3">
-												<span
-													className="text-xs font-mono"
-													style={{ color: 'var(--text-muted)' }}
-												>
-													{new Date(
-														contact.createdAt
-													).toLocaleDateString()}
-												</span>
-												{expandedId === contact._id ? (
-													<ChevronUp
-														className="w-5 h-5"
-														style={{ color: 'var(--text-secondary)' }}
-													/>
-												) : (
-													<ChevronDown
-														className="w-5 h-5"
-														style={{ color: 'var(--text-secondary)' }}
-													/>
-												)}
-											</div>
+										<CheckCircle2 className="text-green-400 w-5 h-5" />
+										<div className="text-sm text-green-400">
+											Thanks — your message was sent successfully.
 										</div>
-
-										<AnimatePresence>
-											{expandedId === contact._id && (
-												<motion.div
-													initial={{ height: 0, opacity: 0 }}
-													animate={{ height: 'auto', opacity: 1 }}
-													exit={{ height: 0, opacity: 0 }}
-													transition={{ duration: 0.3 }}
-													className="border-t"
-													style={{ borderColor: 'var(--glass-border)' }}
-												>
-													<div className="p-6 space-y-4">
-														<div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-															<div>
-																<p
-																	className="text-sm font-medium mb-1"
-																	style={{
-																		color: 'var(--text-muted)',
-																	}}
-																>
-																	LPU ID
-																</p>
-																<p
-																	className="font-mono"
-																	style={{
-																		color: 'var(--text-primary)',
-																	}}
-																>
-																	{contact.lpuID}
-																</p>
-															</div>
-															<div>
-																<p
-																	className="text-sm font-medium mb-1"
-																	style={{
-																		color: 'var(--text-muted)',
-																	}}
-																>
-																	Phone
-																</p>
-																<p
-																	className="font-mono"
-																	style={{
-																		color: 'var(--text-primary)',
-																	}}
-																>
-																	{contact.phone}
-																</p>
-															</div>
-														</div>
-														<div>
-															<p
-																className="text-sm font-medium mb-2"
-																style={{
-																	color: 'var(--text-muted)',
-																}}
-															>
-																Message
-															</p>
-															<p
-																className="whitespace-pre-line leading-relaxed"
-																style={{
-																	color: 'var(--text-primary)',
-																}}
-															>
-																{contact.message}
-															</p>
-														</div>
-
-														<div className="flex gap-3">
-															{contact.status !== 'resolved' && (
-																<motion.button
-																	whileHover={{ scale: 1.02 }}
-																	whileTap={{ scale: 0.98 }}
-																	onClick={() => markAsResolved(contact._id)}
-																	className="btn btn-primary px-6 py-3 text-sm"
-																	style={{
-																		background:
-																			'linear-gradient(135deg, #10b981, #059669)',
-																	}}
-																>
-																	<CheckCircle2 className="w-4 h-4" /> Mark as Resolved
-																</motion.button>
-															)}
-															<button
-																onClick={() => handleDelete(contact._id)}
-																className="px-4 py-2 rounded bg-rose-600 text-white text-sm"
-															>
-																Delete
-															</button>
-														</div>
-													</div>
-												</motion.div>
-											)}
-										</AnimatePresence>
 									</motion.div>
-								))}
-							</div>
-						)}
+								)}
+							</AnimatePresence>
 
-						{/* simple pagination for admin list */}
-						{totalPages > 1 && (
-							<div className="mt-6 flex justify-center gap-3 items-center">
-								<button
-									onClick={() => setPage((p) => Math.max(1, p - 1))}
-									className="px-3 py-1 rounded bg-white/6"
+							{error && (
+								<div
+									role="alert"
+									className="mb-4 p-3 rounded-lg"
+									style={{
+										background: 'rgba(239,68,68,0.06)',
+										color: 'var(--text-danger)',
+									}}
 								>
-									Prev
-								</button>
-								<span className="px-3 py-1 bg-white/5 rounded text-sm">
-									{page} / {totalPages}
-								</span>
+									{error}
+								</div>
+							)}
+
+							<form onSubmit={handleSubmit} className="space-y-4" aria-live="polite">
+								<div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+									<label className="flex flex-col">
+										<span className="text-sm mb-2">Full name</span>
+										<input
+											name="name"
+											value={formData.name}
+											onChange={handleChange}
+											required
+											className="px-4 py-3 rounded-lg bg-transparent border border-white/10 focus:outline-none"
+											placeholder="John Doe"
+										/>
+									</label>
+
+									<label className="flex flex-col">
+										<span className="text-sm mb-2">LPU ID</span>
+										<input
+											name="lpuID"
+											value={formData.lpuID}
+											onChange={handleChange}
+											required
+											pattern="\d{4,12}"
+											className="px-4 py-3 rounded-lg bg-transparent border border-white/10 focus:outline-none"
+											placeholder="12345678"
+										/>
+									</label>
+								</div>
+
+								<div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+									<label className="flex flex-col">
+										<span className="text-sm mb-2">Email</span>
+										<input
+											name="email"
+											type="email"
+											value={formData.email}
+											onChange={handleChange}
+											required
+											className="px-4 py-3 rounded-lg bg-transparent border border-white/10 focus:outline-none"
+											placeholder="you@example.com"
+										/>
+									</label>
+
+									<label className="flex flex-col">
+										<span className="text-sm mb-2">Phone</span>
+										<input
+											name="phone"
+											value={formData.phone}
+											onChange={handleChange}
+											required
+											className="px-4 py-3 rounded-lg bg-transparent border border-white/10 focus:outline-none"
+											placeholder="+91 98765 43210"
+										/>
+									</label>
+								</div>
+
+								<label className="flex flex-col">
+									<span className="text-sm mb-2">Subject</span>
+									<input
+										name="subject"
+										value={formData.subject}
+										onChange={handleChange}
+										required
+										className="px-4 py-3 rounded-lg bg-transparent border border-white/10 focus:outline-none"
+										placeholder="How can we help?"
+									/>
+								</label>
+
+								<label className="flex flex-col">
+									<span className="text-sm mb-2">Message</span>
+									<textarea
+										name="message"
+										value={formData.message}
+										onChange={handleChange}
+										required
+										rows={6}
+										className="px-4 py-3 rounded-lg bg-transparent border border-white/10 focus:outline-none resize-none"
+										placeholder="Tell us more..."
+									/>
+								</label>
+
 								<button
-									onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-									className="px-3 py-1 rounded bg-white/6"
+									type="submit"
+									disabled={loading}
+									className="w-full inline-flex items-center justify-center gap-3 py-3 rounded-lg font-semibold"
+									style={{
+										background: 'linear-gradient(90deg,#06b6d4,#3b82f6)',
+										color: '#fff',
+									}}
 								>
-									Next
+									{loading ? (
+										<svg
+											className="animate-spin h-5 w-5"
+											viewBox="0 0 24 24"
+											aria-hidden
+										>
+											<circle
+												className="opacity-25"
+												cx="12"
+												cy="12"
+												r="10"
+												stroke="currentColor"
+												strokeWidth="4"
+												fill="none"
+											/>
+											<path
+												className="opacity-75"
+												fill="currentColor"
+												d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"
+											/>
+										</svg>
+									) : (
+										<Send className="w-4 h-4" />
+									)}
+									<span>{loading ? 'Sending...' : 'Send Message'}</span>
 								</button>
-							</div>
-						)}
-					</motion.div>
-				)}
+							</form>
+						</main>
+					</div>
+				</div>
 			</div>
 		</div>
 	);
