@@ -6,10 +6,10 @@ import mongoose from 'mongoose';
 
 // Create a new contact message
 const sendContact = asyncHandler(async (req, res) => {
-	const { name, email, phone, lpuID, subject, message } = req.body;
+	const { name, email, phone, subject, message } = req.body;
 
-	// Detailed validation
-	const requiredFields = { name, email, phone, lpuID, subject, message };
+	// Detailed validation (lpuID removed because model no longer includes it)
+	const requiredFields = { name, email, phone, subject, message };
 	const missingFields = Object.entries(requiredFields)
 		.filter(([_, value]) => !value)
 		.map(([key]) => key);
@@ -25,7 +25,6 @@ const sendContact = asyncHandler(async (req, res) => {
 			name: name.trim(),
 			email: email.toLowerCase().trim(),
 			phone,
-			lpuID: lpuID.trim(),
 			subject: subject.trim(),
 			message: message.trim(),
 		});
@@ -37,12 +36,11 @@ const sendContact = asyncHandler(async (req, res) => {
 			201
 		);
 	} catch (error) {
-		// Handle Mongoose validation errors specifically
 		if (error.name === 'ValidationError') {
 			const validationErrors = Object.values(error.errors).map((err) => err.message);
 			throw ApiError.UnprocessableEntity('Validation failed', validationErrors);
 		}
-		throw error; // Re-throw other errors
+		throw error;
 	}
 });
 
@@ -63,7 +61,6 @@ const getAllContacts = asyncHandler(async (req, res) => {
 		filter.status = status;
 	}
 
-	// Use text index for searching
 	if (search && search.trim()) {
 		filter.$text = { $search: search.trim() };
 	}
@@ -76,7 +73,8 @@ const getAllContacts = asyncHandler(async (req, res) => {
 	}
 
 	const sortDirection = sortOrder === 'asc' ? 1 : -1;
-	const allowedSortFields = ['createdAt', 'name', 'status', 'lpuID'];
+	// removed 'lpuID' from allowed sort fields since model no longer has it
+	const allowedSortFields = ['createdAt', 'name', 'status'];
 	const sortField = allowedSortFields.includes(sortBy) ? sortBy : 'createdAt';
 
 	const options = {
@@ -86,7 +84,6 @@ const getAllContacts = asyncHandler(async (req, res) => {
 		lean: true,
 	};
 
-	// The model uses mongoose-aggregate-paginate-v2, so we build an aggregate pipeline
 	const aggregate = Contact.aggregate(Object.keys(filter).length > 0 ? [{ $match: filter }] : []);
 	const contacts = await Contact.aggregatePaginate(aggregate, options);
 

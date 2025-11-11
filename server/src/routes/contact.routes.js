@@ -17,13 +17,12 @@ const { protect, authorize } = authMiddleware;
 
 // --- Public Route ---
 
-// Apply rate limiter to contact form submission
+// Remove lpuID validator (model no longer includes lpuID)
 router.post(
 	'/send',
 	validate([
 		body('name').notEmpty().trim().withMessage('Name is required'),
 		body('phone').notEmpty().trim().withMessage('Phone number is required'),
-		body('lpuID').notEmpty().trim().withMessage('LPU ID is required'),
 		body('email').isEmail().withMessage('Invalid email format'),
 		body('subject').notEmpty().trim().withMessage('Subject is required'),
 		body('message').notEmpty().trim().withMessage('Message is required'),
@@ -33,7 +32,6 @@ router.post(
 
 // --- Admin-Only Routes ---
 
-// All routes below are protected and restricted to admins
 router.use(protect, authorize('admin'));
 
 // Get statistics about contacts

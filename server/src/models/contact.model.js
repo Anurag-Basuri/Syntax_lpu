@@ -31,16 +31,6 @@ const contactSchema = new mongoose.Schema(
 				message: 'Phone number must be 10 digits',
 			},
 		},
-		lpuID: {
-			type: String,
-			required: [true, 'LPU ID is required'],
-			validate: {
-				validator: function (v) {
-					return /^\d{8}$/.test(v);
-				},
-				message: 'LPU ID must be 8 digits',
-			},
-		},
 
 		subject: {
 			type: String,
@@ -68,8 +58,6 @@ const contactSchema = new mongoose.Schema(
 		timestamps: true,
 	}
 );
-
-contactSchema.index({ name: 'text', email: 'text', subject: 'text', message: 'text' });
 
 contactSchema.plugin(mongooseAggregatePaginate);
 
