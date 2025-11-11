@@ -1,5 +1,4 @@
 import { useState, useEffect } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
 import {
 	ShieldCheck,
 	Ticket,
@@ -7,8 +6,6 @@ import {
 	Users,
 	CalendarDays,
 	LayoutDashboard,
-	Menu,
-	X,
 	Sparkles,
 } from 'lucide-react';
 import { useAuth } from '../hooks/useAuth.js';
@@ -58,7 +55,6 @@ const AdminDash = () => {
 	const [activeTab, setActiveTab] = useState('dashboard');
 	const [dashboardError, setDashboardError] = useState('');
 	const [showCreateTicketModal, setShowCreateTicketModal] = useState(false);
-	const [sidebarOpen, setSidebarOpen] = useState(false);
 
 	// Events
 	const { getAllEvents, events, loading: eventsLoading, error: eventsError } = useGetAllEvents();
@@ -95,7 +91,7 @@ const AdminDash = () => {
 	const handleLogout = async () => {
 		try {
 			await logoutAdmin();
-			navigate('/admin/auth', { replace: true });
+			navigate('/admin/secret/auth', { replace: true });
 		} catch (error) {
 			setDashboardError('Logout failed');
 		}
@@ -112,42 +108,42 @@ const AdminDash = () => {
 		);
 	}
 
+	// Layout notes:
+	// - Sidebar: fixed left, full height, non-collapsing (explicit per request)
+	// - Header: fixed top, spans remaining width to the right of sidebar
+	// - Main content: placed below header and to the right of sidebar
+	// Keep measurements consistent: sidebar width = 256px (w-64), header height = 64px (h-16)
+
 	return (
-		<div className="min-h-screen bg-gradient-to-br from-gray-900 to-gray-800 flex">
-			{/* Sidebar */}
-			<aside
-				className={`fixed z-30 inset-y-0 left-0 w-64 bg-gray-900 border-r border-gray-800 flex flex-col transition-transform duration-300
-                ${
-					sidebarOpen ? 'translate-x-0' : '-translate-x-full'
-				} md:translate-x-0 md:static md:block`}
-			>
+		<div className="min-h-screen bg-gradient-to-br from-gray-900 to-gray-800">
+			{/* Fixed Sidebar (always visible, non-dynamic) */}
+			<aside className="fixed left-0 top-0 bottom-0 w-64 bg-gray-900 border-r border-gray-800 z-40 flex flex-col">
 				<div className="flex items-center gap-3 px-6 py-6 border-b border-gray-800">
 					<ShieldCheck className="h-8 w-8 text-blue-400" />
 					<span className="text-2xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-blue-400 to-cyan-400">
 						Admin
 					</span>
 				</div>
-				<nav className="flex-1 py-4">
+
+				<nav className="flex-1 py-4 overflow-y-auto">
 					{TABS.map((tab) => (
 						<button
 							key={tab.key}
-							className={`w-full flex items-center gap-3 px-6 py-3 text-lg font-medium transition
+							className={`w-full flex items-center gap-3 px-6 py-3 text-lg font-medium transition text-left
                                 ${
 									activeTab === tab.key
 										? 'bg-blue-900/30 text-blue-400'
 										: 'text-gray-300 hover:bg-gray-800 hover:text-white'
 								}`}
-							onClick={() => {
-								setActiveTab(tab.key);
-								setSidebarOpen(false);
-							}}
+							onClick={() => setActiveTab(tab.key)}
 						>
 							{tab.icon}
 							{tab.label}
 						</button>
 					))}
 				</nav>
-				<div className="mt-auto px-6 py-4 border-t border-gray-800">
+
+				<div className="px-6 py-4 border-t border-gray-800">
 					<button
 						onClick={handleLogout}
 						className="w-full flex items-center gap-2 px-4 py-2 rounded-lg bg-red-700/80 text-white hover:bg-red-600 transition"
@@ -158,132 +154,75 @@ const AdminDash = () => {
 				</div>
 			</aside>
 
-			{/* Overlay for mobile sidebar */}
-			<div
-				className={`fixed inset-0 z-20 bg-black/40 transition-opacity duration-300 md:hidden ${
-					sidebarOpen ? 'opacity-100' : 'opacity-0 pointer-events-none'
-				}`}
-				onClick={() => setSidebarOpen(false)}
-				aria-hidden={!sidebarOpen}
-			/>
+			{/* Fixed Header (always visible). Header sits to the right of the sidebar. */}
+			<header className="fixed left-64 right-0 top-0 z-30 bg-gray-900/90 backdrop-blur border-b border-gray-800 h-16 flex items-center justify-between px-6">
+				<div className="flex items-center gap-3">
+					<span className="text-xl font-bold text-white">
+						{TABS.find((t) => t.key === activeTab)?.label || 'Dashboard'}
+					</span>
+				</div>
 
-			{/* Main Content */}
-			<div className="flex-1 flex flex-col min-h-screen">
-				{/* Sticky Header */}
-				<header className="sticky top-0 z-10 bg-gray-900/80 backdrop-blur border-b border-gray-800 flex items-center justify-between px-6 py-4">
-					<div className="flex items-center gap-3">
-						<button
-							className="md:hidden text-gray-400 hover:text-white"
-							onClick={() => setSidebarOpen((v) => !v)}
-							aria-label="Open sidebar"
-						>
-							{sidebarOpen ? <X className="h-7 w-7" /> : <Menu className="h-7 w-7" />}
-						</button>
-						<span className="text-xl font-bold text-white hidden md:inline">
-							{TABS.find((t) => t.key === activeTab)?.label || 'Dashboard'}
+				<div className="flex items-center gap-4">
+					<div className="flex items-center gap-2 bg-gray-700/50 rounded-lg px-4 py-2">
+						<span className="text-white font-medium">
+							{user?.fullname || user?.name || 'Admin'}
 						</span>
 					</div>
-					<div className="flex items-center gap-4">
-						<div className="flex items-center gap-2 bg-gray-700/50 rounded-lg px-4 py-2">
-							<span className="text-white font-medium">
-								{user?.fullname || user?.name || 'Admin'}
-							</span>
+
+					{activeTab === 'tickets' && (
+						<button
+							onClick={() => setShowCreateTicketModal(true)}
+							className="flex items-center gap-2 px-4 py-2 rounded-lg bg-blue-700/80 text-white hover:bg-blue-600 transition"
+						>
+							<Ticket className="h-5 w-5" />
+							Create Ticket
+						</button>
+					)}
+				</div>
+			</header>
+
+			{/* Content area: offset by sidebar width and header height */}
+			<main className="pt-16 pl-64">
+				<div className="min-h-screen p-4 md:p-8 bg-gradient-to-br from-gray-900/80 to-gray-800/80">
+					{dashboardError && (
+						<div className="mb-4">
+							<ErrorMessage error={dashboardError} />
 						</div>
-						{activeTab === 'tickets' && (
-							<button
-								onClick={() => setShowCreateTicketModal(true)}
-								className="flex items-center gap-2 px-4 py-2 rounded-lg bg-blue-700/80 text-white hover:bg-blue-600 transition"
-							>
-								<Ticket className="h-5 w-5" />
-								Create Ticket
-							</button>
-						)}
-					</div>
-				</header>
+					)}
 
-				{/* Error Message */}
-				{dashboardError && (
-					<div className="px-6 pt-4">
-						<ErrorMessage error={dashboardError} />
-					</div>
-				)}
-
-				{/* Main Tab Content */}
-				<main className="flex-1 p-4 md:p-8 bg-gradient-to-br from-gray-900/80 to-gray-800/80">
-					<AnimatePresence mode="wait">
-						{activeTab === 'dashboard' && (
-							<motion.div
-								key="dashboard"
-								initial={{ opacity: 0, y: 20 }}
-								animate={{ opacity: 1, y: 0 }}
-								exit={{ opacity: 0, y: 20 }}
-								transition={{ duration: 0.3 }}
-							>
-								<DashboardTab
-									events={events}
-									eventsLoading={eventsLoading}
-									setActiveTab={setActiveTab}
-								/>
-							</motion.div>
-						)}
-						{activeTab === 'members' && (
-							<motion.div
-								key="members"
-								initial={{ opacity: 0, y: 20 }}
-								animate={{ opacity: 1, y: 0 }}
-								exit={{ opacity: 0, y: 20 }}
-								transition={{ duration: 0.3 }}
-							>
-								<MembersTab token={token} setDashboardError={setDashboardError} />
-							</motion.div>
-						)}
-						{activeTab === 'events' && (
-							<motion.div
-								key="events"
-								initial={{ opacity: 0, y: 20 }}
-								animate={{ opacity: 1, y: 0 }}
-								exit={{ opacity: 0, y: 20 }}
-								transition={{ duration: 0.3 }}
-							>
-								<EventsTab
-									events={events}
-									eventsLoading={eventsLoading}
-									eventsError={eventsError}
-									token={token}
-									setDashboardError={setDashboardError}
-									getAllEvents={getAllEvents}
-								/>
-							</motion.div>
-						)}
-						{activeTab === 'tickets' && (
-							<motion.div
-								key="tickets"
-								initial={{ opacity: 0, y: 20 }}
-								animate={{ opacity: 1, y: 0 }}
-								exit={{ opacity: 0, y: 20 }}
-								transition={{ duration: 0.3 }}
-							>
-								<TicketsTab
-									token={token}
-									events={events}
-									setDashboardError={setDashboardError}
-								/>
-							</motion.div>
-						)}
-						{activeTab === 'arvantis' && (
-							<motion.div
-								key="arvantis"
-								initial={{ opacity: 0, y: 20 }}
-								animate={{ opacity: 1, y: 0 }}
-								exit={{ opacity: 0, y: 20 }}
-								transition={{ duration: 0.3 }}
-							>
-								<ArvantisTab token={token} setDashboardError={setDashboardError} />
-							</motion.div>
-						)}
-					</AnimatePresence>
-				</main>
-			</div>
+					{/* Main Tab Content */}
+					{activeTab === 'dashboard' && (
+						<DashboardTab
+							events={events}
+							eventsLoading={eventsLoading}
+							setActiveTab={setActiveTab}
+						/>
+					)}
+					{activeTab === 'members' && (
+						<MembersTab token={token} setDashboardError={setDashboardError} />
+					)}
+					{activeTab === 'events' && (
+						<EventsTab
+							events={events}
+							eventsLoading={eventsLoading}
+							eventsError={eventsError}
+							token={token}
+							setDashboardError={setDashboardError}
+							getAllEvents={getAllEvents}
+						/>
+					)}
+					{activeTab === 'tickets' && (
+						<TicketsTab
+							token={token}
+							events={events}
+							setDashboardError={setDashboardError}
+						/>
+					)}
+					{activeTab === 'arvantis' && (
+						<ArvantisTab token={token} setDashboardError={setDashboardError} />
+					)}
+				</div>
+			</main>
 
 			{/* Create Ticket Modal */}
 			{showCreateTicketModal && (
