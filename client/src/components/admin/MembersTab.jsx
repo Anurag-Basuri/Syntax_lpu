@@ -602,21 +602,34 @@ const MembersTab = ({ token, setDashboardError }) => {
 		reset: resetUpdate,
 	} = useUpdateMemberByAdmin();
 
-	// Fetch members on mount
-	useEffect(() => {
-		getAllMembers().catch(() => {
-			setDashboardError('Failed to load members');
-		});
+	// helper to extract message
+	const formatError = useCallback((err) => {
+		if (!err) return '';
+		return (
+			err?.message ||
+			err?.response?.data?.message ||
+			err?.response?.data?.error ||
+			(typeof err === 'string' ? err : String(err))
+		);
 	}, []);
 
-	// Handle API errors
+	// Fetch members on mount (include getAllMembers in deps)
 	useEffect(() => {
-		if (membersError) setError('fetch', membersError);
-		if (banError) setError('ban', banError);
-		if (unbanError) setError('unban', unbanError);
-		if (removeError) setError('remove', removeError);
-		if (updateError) setError('update', updateError);
-	}, [membersError, banError, unbanError, removeError, updateError, setError]);
+		getAllMembers().catch((err) => {
+			const msg = formatError(err) || 'Failed to load members';
+			setDashboardError?.(msg);
+			setError('fetch', msg);
+		});
+	}, [getAllMembers, formatError, setDashboardError, setError]);
+
+	// Handle API errors (store readable messages)
+	useEffect(() => {
+		if (membersError) setError('fetch', formatError(membersError));
+		if (banError) setError('ban', formatError(banError));
+		if (unbanError) setError('unban', formatError(unbanError));
+		if (removeError) setError('remove', formatError(removeError));
+		if (updateError) setError('update', formatError(updateError));
+	}, [membersError, banError, unbanError, removeError, updateError, formatError, setError]);
 
 	// Handle ban member
 	const handleBanMember = async (id, reason, reviewTime) => {
@@ -626,7 +639,7 @@ const MembersTab = ({ token, setDashboardError }) => {
 			setBanModalOpen(false);
 			await getAllMembers();
 		} catch (err) {
-			// Error handled by useEffect above
+			setError('ban', formatError(err));
 		}
 	};
 
@@ -637,7 +650,7 @@ const MembersTab = ({ token, setDashboardError }) => {
 			await unbanMember(member._id, token);
 			await getAllMembers();
 		} catch (err) {
-			// Error handled by useEffect above
+			setError('unban', formatError(err));
 		}
 	};
 
@@ -649,7 +662,7 @@ const MembersTab = ({ token, setDashboardError }) => {
 			setRemoveModalOpen(false);
 			await getAllMembers();
 		} catch (err) {
-			// Error handled by useEffect above
+			setError('remove', formatError(err));
 		}
 	};
 
@@ -661,7 +674,7 @@ const MembersTab = ({ token, setDashboardError }) => {
 			setEditModalOpen(false);
 			await getAllMembers();
 		} catch (err) {
-			// Error handled by useEffect above
+			setError('update', formatError(err));
 		}
 	};
 
@@ -679,7 +692,7 @@ const MembersTab = ({ token, setDashboardError }) => {
 			if (!DESIGNATION_OPTIONS.includes(formData.designation)) {
 				throw new Error('Please select a valid designation.');
 			}
-			if (formData.password.length < 8) {
+			if (!formData.password || formData.password.length < 8) {
 				throw new Error('Password must be at least 8 characters.');
 			}
 
@@ -688,15 +701,9 @@ const MembersTab = ({ token, setDashboardError }) => {
 			setTimeout(() => {
 				setRegisterModalOpen(false);
 				getAllMembers();
-			}, 1500);
+			}, 1000);
 		} catch (err) {
-			setError(
-				'register',
-				err?.response?.data?.message ||
-					err?.response?.data?.error ||
-					err?.message ||
-					'Registration failed'
-			);
+			setError('register', formatError(err));
 		} finally {
 			setRegisterLoading(false);
 		}
@@ -704,12 +711,15 @@ const MembersTab = ({ token, setDashboardError }) => {
 
 	// Memoized filtered members for performance
 	const filteredMembers = useMemo(() => {
+		if (!Array.isArray(members)) return [];
 		return members.filter((member) => {
 			// Search filter
+			const q = searchTerm.trim().toLowerCase();
 			const matchesSearch =
-				member.fullname?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-				member.email?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-				member.LpuId?.toLowerCase().includes(searchTerm.toLowerCase());
+				!q ||
+				(member.fullname && member.fullname.toLowerCase().includes(q)) ||
+				(member.email && member.email.toLowerCase().includes(q)) ||
+				(member.LpuId && member.LpuId.toLowerCase().includes(q));
 
 			// Status filter
 			const matchesStatus = statusFilter === 'all' || member.status === statusFilter;
@@ -759,14 +769,19 @@ const MembersTab = ({ token, setDashboardError }) => {
 
 	return (
 		<div className="space-y-6">
-			<div className="flex flex-col md:flex-row justify-between gap-4">
-				<h2 className="text-xl font-bold text-white">Member Management</h2>
-				<div className="flex gap-2">
+			<div className="flex flex-col md:flex-row justify-between gap-4 items-start md:items-center">
+				<h2 className="text-xl font-bold text-white flex items-center gap-3">
+					Member Management
+					<span className="text-sm text-gray-400 font-medium">
+						({members?.length ?? 0})
+					</span>
+				</h2>
+				<div className="flex gap-2 w-full md:w-auto">
 					<div className="relative w-full md:w-64">
 						<Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
 						<input
 							type="text"
-							placeholder="Search members..."
+							placeholder="Search members by name, email or LPU ID"
 							className="w-full pl-10 pr-4 py-2 bg-gray-700/50 border border-gray-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
 							value={searchTerm}
 							onChange={(e) => setSearchTerm(e.target.value)}
@@ -776,11 +791,14 @@ const MembersTab = ({ token, setDashboardError }) => {
 					<button
 						className="flex items-center gap-2 px-4 py-2 rounded-lg bg-gray-700 text-white hover:bg-gray-600 transition"
 						onClick={() => setShowFilters(!showFilters)}
+						aria-expanded={showFilters}
 					>
 						<Filter className="h-5 w-5" />
 						Filters
 						<ChevronDown
-							className={`h-4 w-4 transition-transform ${showFilters ? 'rotate-180' : ''}`}
+							className={`h-4 w-4 transition-transform ${
+								showFilters ? 'rotate-180' : ''
+							}`}
 						/>
 					</button>
 					<button
@@ -858,7 +876,7 @@ const MembersTab = ({ token, setDashboardError }) => {
 			) : (
 				<div className="overflow-x-auto rounded-lg border border-gray-700">
 					<table className="min-w-full divide-y divide-gray-700">
-						<thead className="bg-gray-750">
+						<thead className="bg-gray-750 sticky top-0">
 							<tr>
 								<th className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">
 									Name
