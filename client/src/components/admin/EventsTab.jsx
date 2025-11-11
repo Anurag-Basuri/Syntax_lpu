@@ -1,5 +1,5 @@
-import { useState, useMemo } from 'react';
-import { CalendarDays, Plus, Search, ChevronDown } from 'lucide-react';
+import { useState, useMemo, useEffect } from 'react';
+import { CalendarDays, Plus, Search, ChevronDown, AlertCircle } from 'lucide-react';
 import { useCreateEvent, useUpdateEvent, useDeleteEvent } from '../../hooks/useEvents.js';
 import LoadingSpinner from './LoadingSpinner.jsx';
 import ErrorMessage from './ErrorMessage.jsx';
@@ -13,11 +13,18 @@ const statusOptions = [
 	{ value: 'completed', label: 'Completed' },
 ];
 
+const formatApiError = (err) => {
+	if (!err) return 'Unknown error';
+	return (
+		err?.response?.data?.message || err?.response?.data?.error || err?.message || String(err)
+	);
+};
+
 const EventsTab = ({
-	events,
-	eventsLoading,
-	eventsError,
-	token,
+	events = [],
+	eventsLoading = false,
+	eventsError = null,
+	token, // kept for API hooks that may need it later
 	setDashboardError,
 	getAllEvents,
 }) => {
@@ -33,63 +40,120 @@ const EventsTab = ({
 	const [editEventId, setEditEventId] = useState(null);
 	const [searchTerm, setSearchTerm] = useState('');
 	const [statusFilter, setStatusFilter] = useState('all');
+	const [formError, setFormError] = useState('');
+	const [actionError, setActionError] = useState('');
 
 	const { createEvent, loading: createLoading } = useCreateEvent();
 	const { updateEvent, loading: updateLoading } = useUpdateEvent();
 	const { deleteEvent, loading: deleteLoading } = useDeleteEvent();
 
+	// keep dashboard-level error in sync
+	useEffect(() => {
+		if (eventsError) {
+			const msg = formatApiError(eventsError);
+			setDashboardError?.(msg);
+			setActionError(msg);
+		}
+	}, [eventsError, setDashboardError]);
+
+	const totalCount = (events || []).length;
+	const upcomingCount = (events || []).filter((e) => e.status === 'upcoming').length;
+
 	const filteredEvents = useMemo(() => {
-		return events
-			.filter(
-				(event) =>
-					event.title?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-					event.location?.toLowerCase().includes(searchTerm.toLowerCase())
-			)
+		const q = (searchTerm || '').trim().toLowerCase();
+		return (events || [])
+			.filter((event) => {
+				if (!q) return true;
+				return (
+					(event.title || '').toLowerCase().includes(q) ||
+					(event.location || '').toLowerCase().includes(q) ||
+					(event.description || '').toLowerCase().includes(q)
+				);
+			})
 			.filter((event) => (statusFilter === 'all' ? true : event.status === statusFilter));
 	}, [events, searchTerm, statusFilter]);
 
+	const resetForm = () =>
+		setEventFields({
+			title: '',
+			date: '',
+			location: '',
+			description: '',
+			status: 'upcoming',
+		});
+
+	const validateFields = (fields) => {
+		if (!fields.title || fields.title.trim().length < 3) {
+			return 'Title is required (min 3 characters).';
+		}
+		if (!fields.date) {
+			return 'Date & time are required.';
+		}
+		// basic datetime check
+		const dt = new Date(fields.date);
+		if (Number.isNaN(dt.getTime())) return 'Please provide a valid date & time.';
+		if (!fields.location || fields.location.trim().length < 2) {
+			return 'Location is required.';
+		}
+		return '';
+	};
+
 	const handleCreateEvent = async () => {
+		setFormError('');
+		setActionError('');
+		const validation = validateFields(eventFields);
+		if (validation) {
+			setFormError(validation);
+			return;
+		}
 		try {
 			await createEvent(eventFields);
+			resetForm();
 			setShowCreateEvent(false);
-			setEventFields({
-				title: '',
-				date: '',
-				location: '',
-				description: '',
-				status: 'upcoming',
-			});
-			await getAllEvents();
+			await getAllEvents?.();
 		} catch (err) {
-			setDashboardError('Create event failed');
+			const msg = formatApiError(err);
+			setActionError(msg);
+			setDashboardError?.(msg);
 		}
 	};
 
 	const handleEditEvent = async () => {
+		setFormError('');
+		setActionError('');
+		const validation = validateFields(eventFields);
+		if (validation) {
+			setFormError(validation);
+			return;
+		}
+		if (!editEventId) {
+			setActionError('Missing event id to update.');
+			return;
+		}
 		try {
 			await updateEvent(editEventId, eventFields);
+			resetForm();
 			setShowEditEvent(false);
 			setEditEventId(null);
-			setEventFields({
-				title: '',
-				date: '',
-				location: '',
-				description: '',
-				status: 'upcoming',
-			});
-			await getAllEvents();
+			await getAllEvents?.();
 		} catch (err) {
-			setDashboardError('Update event failed');
+			const msg = formatApiError(err);
+			setActionError(msg);
+			setDashboardError?.(msg);
 		}
 	};
 
 	const handleDeleteEvent = async (id) => {
-		if (!window.confirm('Are you sure you want to delete this event?')) return;
+		setActionError('');
+		// simple confirm dialog - replace with modal if needed
+		if (!window.confirm('Delete this event? This action cannot be undone.')) return;
 		try {
 			await deleteEvent(id);
-			await getAllEvents();
+			await getAllEvents?.();
 		} catch (err) {
-			setDashboardError('Delete event failed');
+			const msg = formatApiError(err);
+			setActionError(msg);
+			setDashboardError?.(msg);
 		}
 	};
 
@@ -97,34 +161,55 @@ const EventsTab = ({
 		setEditEventId(event._id);
 		setEventFields({
 			title: event.title || '',
+			// convert to local datetime-local input format (yyyy-mm-ddThh:mm)
 			date: event.date ? new Date(event.date).toISOString().slice(0, 16) : '',
 			location: event.location || '',
 			description: event.description || '',
 			status: event.status || 'upcoming',
 		});
+		setFormError('');
+		setActionError('');
 		setShowEditEvent(true);
 	};
 
 	return (
 		<div className="space-y-6">
-			<div className="flex flex-col md:flex-row justify-between gap-4">
-				<h2 className="text-xl font-bold text-white">Event Management</h2>
-				<div className="flex gap-2">
+			{/* Header */}
+			<div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+				<div className="flex items-start gap-4">
+					<h2 className="text-2xl font-bold text-white flex items-center gap-3">
+						Event Management
+						<span className="text-sm text-gray-400 font-medium">({totalCount})</span>
+					</h2>
+					<div className="hidden md:flex items-center gap-3 text-sm text-gray-300">
+						<span className="px-2 py-1 bg-blue-700/20 text-blue-300 rounded-full">
+							{upcomingCount} upcoming
+						</span>
+						<span className="px-2 py-1 bg-gray-700/20 text-gray-300 rounded-full">
+							{totalCount} total
+						</span>
+					</div>
+				</div>
+
+				<div className="flex gap-2 w-full md:w-auto">
 					<div className="relative w-full md:w-64">
 						<Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
 						<input
 							type="text"
-							placeholder="Search events..."
+							placeholder="Search events by title, location or description..."
 							className="w-full pl-10 pr-4 py-2 bg-gray-700/50 border border-gray-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
 							value={searchTerm}
 							onChange={(e) => setSearchTerm(e.target.value)}
+							aria-label="Search events"
 						/>
 					</div>
+
 					<div className="relative">
 						<select
 							className="appearance-none bg-gray-700/50 border border-gray-600 rounded-lg pl-4 pr-10 py-2 text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
 							value={statusFilter}
 							onChange={(e) => setStatusFilter(e.target.value)}
+							aria-label="Filter by status"
 						>
 							{statusOptions.map((opt) => (
 								<option key={opt.value} value={opt.value}>
@@ -134,9 +219,17 @@ const EventsTab = ({
 						</select>
 						<ChevronDown className="absolute right-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400 pointer-events-none" />
 					</div>
+
 					<button
-						className="flex items-center gap-2 px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-500 transition"
-						onClick={() => setShowCreateEvent(true)}
+						className="flex items-center gap-2 px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-500 transition disabled:opacity-60"
+						onClick={() => {
+							resetForm();
+							setFormError('');
+							setActionError('');
+							setShowCreateEvent(true);
+						}}
+						disabled={createLoading || updateLoading}
+						title="Create event"
 					>
 						<Plus className="h-5 w-5" />
 						Create Event
@@ -144,18 +237,38 @@ const EventsTab = ({
 				</div>
 			</div>
 
-			<ErrorMessage error={eventsError} />
+			{/* action-level errors */}
+			{(formError || actionError) && (
+				<div className="bg-red-900/10 border border-red-700 rounded-lg p-3 flex items-center gap-3">
+					<AlertCircle className="h-5 w-5 text-red-400" />
+					<div className="text-sm text-red-300">{formError || actionError}</div>
+				</div>
+			)}
 
+			{/* server error component */}
+			<ErrorMessage error={eventsError ? formatApiError(eventsError) : null} />
+
+			{/* content */}
 			{eventsLoading ? (
 				<LoadingSpinner />
 			) : filteredEvents.length === 0 ? (
 				<div className="text-center py-12 bg-gray-700/30 rounded-xl border border-gray-600">
 					<CalendarDays className="h-12 w-12 mx-auto text-gray-500" />
-					<h3 className="text-xl font-bold text-gray-400 mt-4">No events found</h3>
-					<p className="text-gray-500 mt-2">Create your first event to get started</p>
+					<h3 className="text-xl font-bold text-gray-300 mt-4">No events found</h3>
+					<p className="text-gray-500 mt-2">Create your first event to get started.</p>
+					<button
+						className="mt-6 inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-500 text-white"
+						onClick={() => {
+							resetForm();
+							setShowCreateEvent(true);
+						}}
+					>
+						<Plus className="h-4 w-4" />
+						Create event
+					</button>
 				</div>
 			) : (
-				<div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+				<div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
 					{filteredEvents.map((event) => (
 						<EventCard
 							key={event._id}
