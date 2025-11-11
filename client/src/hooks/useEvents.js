@@ -2,13 +2,13 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
 	getAllEvents,
 	getEventById,
-	createEvent,
-	deleteEvent,
-	updateEventDetails,
+	createEvent as createEventService,
+	deleteEvent as deleteEventService,
+	updateEventDetails as updateEventService,
 } from '../services/eventServices.js';
 import { toast } from 'react-hot-toast';
 
-// Hook to fetch a paginated list of all events
+// Hook to fetch a paginated list of all events (kept for callers that need params)
 export const useEvents = (params = {}) => {
 	const defaultParams = { page: 1, limit: 9, sortBy: 'eventDate', sortOrder: 'desc' };
 	const merged = { ...defaultParams, ...params };
@@ -19,6 +19,25 @@ export const useEvents = (params = {}) => {
 		staleTime: 60_000,
 		refetchOnWindowFocus: false,
 	});
+};
+
+// Compatibility helper: simple fetch-all hook used by admin dash & components
+export const useGetAllEvents = () => {
+	const query = useQuery({
+		queryKey: ['events', 'all'],
+		queryFn: () => getAllEvents({ limit: 1000, page: 1 }),
+		staleTime: 60_000,
+		refetchOnWindowFocus: false,
+	});
+
+	return {
+		getAllEvents: query.refetch,
+		events: Array.isArray(query.data?.docs)
+			? query.data.docs
+			: query.data?.events ?? query.data ?? [],
+		loading: query.isLoading,
+		error: query.error,
+	};
 };
 
 // Hook to fetch a single event's details
@@ -41,37 +60,74 @@ export const useUpcomingEvent = () => {
 	});
 };
 
-// Hook to manage event mutations (create, update, delete)
-export const useManageEvent = () => {
+// Manage event mutations (create / update / delete) with promise-based APIs
+export const useCreateEvent = () => {
 	const queryClient = useQueryClient();
-
-	const { mutate: addEvent, isPending: isCreating } = useMutation({
-		mutationFn: createEvent,
+	const { mutateAsync, isLoading } = useMutation({
+		mutationFn: (data) => createEventService(data),
 		onSuccess: () => {
 			toast.success('Event created successfully!');
 			queryClient.invalidateQueries({ queryKey: ['events'] });
 		},
-		onError: (error) => toast.error(error.message),
+		onError: (err) => {
+			toast.error(err?.message || 'Failed to create event');
+			throw err;
+		},
 	});
 
-	const { mutate: updateEvent, isPending: isUpdating } = useMutation({
-		mutationFn: ({ id, data }) => updateEventDetails(id, data),
-		onSuccess: (data, { id }) => {
+	return { createEvent: mutateAsync, loading: isLoading };
+};
+
+export const useUpdateEvent = () => {
+	const queryClient = useQueryClient();
+	const { mutateAsync, isLoading } = useMutation({
+		mutationFn: ({ id, data }) => updateEventService(id, data),
+		onSuccess: (_data, variables) => {
 			toast.success('Event updated successfully!');
 			queryClient.invalidateQueries({ queryKey: ['events'] });
-			queryClient.invalidateQueries({ queryKey: ['event', id] });
+			if (variables?.id) queryClient.invalidateQueries({ queryKey: ['event', variables.id] });
 		},
-		onError: (error) => toast.error(error.message),
+		onError: (err) => {
+			toast.error(err?.message || 'Failed to update event');
+			throw err;
+		},
 	});
 
-	const { mutate: removeEvent, isPending: isDeleting } = useMutation({
-		mutationFn: deleteEvent,
+	// wrapper to match existing component usage: updateEvent(id, data)
+	const updateEvent = (id, data) => mutateAsync({ id, data });
+
+	return { updateEvent, loading: isLoading };
+};
+
+export const useDeleteEvent = () => {
+	const queryClient = useQueryClient();
+	const { mutateAsync, isLoading } = useMutation({
+		mutationFn: (id) => deleteEventService(id),
 		onSuccess: () => {
 			toast.success('Event deleted.');
 			queryClient.invalidateQueries({ queryKey: ['events'] });
 		},
-		onError: (error) => toast.error(error.message),
+		onError: (err) => {
+			toast.error(err?.message || 'Failed to delete event');
+			throw err;
+		},
 	});
 
-	return { addEvent, isCreating, updateEvent, isUpdating, removeEvent, isDeleting };
+	return { deleteEvent: mutateAsync, loading: isLoading };
+};
+
+// Backwards-compatible grouping (if some code imports useManageEvent)
+export const useManageEvent = () => {
+	const create = useCreateEvent();
+	const update = useUpdateEvent();
+	const remove = useDeleteEvent();
+
+	return {
+		addEvent: create.createEvent,
+		isCreating: create.loading,
+		updateEvent: update.updateEvent,
+		isUpdating: update.loading,
+		removeEvent: remove.deleteEvent,
+		isDeleting: remove.loading,
+	};
 };
