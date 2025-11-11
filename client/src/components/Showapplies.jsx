@@ -11,6 +11,7 @@ import {
 	bulkUpdateApplicationStatus as bulkUpdateService,
 } from '../services/applyServices.js';
 import { toast } from 'react-hot-toast';
+import useTheme from '../hooks/useTheme.js'; // added
 
 const Toolbar = ({
 	search,
@@ -231,7 +232,14 @@ const ShowApplies = () => {
 	const [selectedIds, setSelectedIds] = useState(new Set());
 	const [selectAllOnPage, setSelectAllOnPage] = useState(false);
 
+	const { theme } = useTheme();
+	const isDark = theme === 'dark';
 	const queryClient = useQueryClient();
+
+	// panel classes for content area
+	const contentPanelCls = isDark
+		? 'rounded-2xl p-6 backdrop-blur-md bg-slate-900/40 border border-white/6 text-white'
+		: 'rounded-2xl p-6 backdrop-blur-md bg-white/70 border border-slate-200/20 text-slate-900';
 
 	useEffect(() => {
 		const t = setTimeout(() => setDebounced(search.trim()), 300);
@@ -442,97 +450,100 @@ const ShowApplies = () => {
 
 	return (
 		<section className="max-w-6xl mx-auto p-6">
-			<div className="mb-6 flex items-center justify-between">
-				<div>
-					<h1 className="text-3xl font-bold tracking-tight">Applications</h1>
-					<div className="text-sm text-slate-400 mt-1">
-						{statsQuery?.data
-							? `Total: ${statsQuery.data.total || '-'} • Unseen: ${
-									statsQuery.data.unseen || '-'
-							  }`
-							: ''}
+			{/* glass content wrapper */}
+			<div className={contentPanelCls}>
+				<div className="mb-6 flex items-center justify-between">
+					<div>
+						<h1 className="text-3xl font-bold tracking-tight">Applications</h1>
+						<div className="text-sm text-slate-400 mt-1">
+							{statsQuery?.data
+								? `Total: ${statsQuery.data.total || '-'} • Unseen: ${
+										statsQuery.data.unseen || '-'
+								  }`
+								: ''}
+						</div>
+					</div>
+
+					<div className="flex items-center gap-3">
+						<select
+							value={status}
+							onChange={(e) => setStatus(e.target.value)}
+							className="bg-white/6 text-white rounded-xl px-3 py-2 border border-white/8"
+						>
+							<option value="all">All</option>
+							<option value="pending">Pending</option>
+							<option value="approved">Approved</option>
+							<option value="rejected">Rejected</option>
+						</select>
 					</div>
 				</div>
 
-				<div className="flex items-center gap-3">
-					<select
-						value={status}
-						onChange={(e) => setStatus(e.target.value)}
-						className="bg-white/6 text-white rounded-xl px-3 py-2 border border-white/8"
-					>
-						<option value="all">All</option>
-						<option value="pending">Pending</option>
-						<option value="approved">Approved</option>
-						<option value="rejected">Rejected</option>
-					</select>
-				</div>
-			</div>
+				<Toolbar
+					search={search}
+					setSearch={setSearch}
+					onRefresh={() => refetch()}
+					onExportPage={exportPageCsv}
+					onExportAll={exportAllCsv}
+					anySelected={selectedIds.size > 0}
+					onBulkApprove={() => performBulkUpdate(Array.from(selectedIds), 'approved')}
+					onBulkReject={() => performBulkUpdate(Array.from(selectedIds), 'rejected')}
+					onBulkDelete={() => performBulkUpdate(Array.from(selectedIds), 'delete')}
+				/>
 
-			<Toolbar
-				search={search}
-				setSearch={setSearch}
-				onRefresh={() => refetch()}
-				onExportPage={exportPageCsv}
-				onExportAll={exportAllCsv}
-				anySelected={selectedIds.size > 0}
-				onBulkApprove={() => performBulkUpdate(Array.from(selectedIds), 'approved')}
-				onBulkReject={() => performBulkUpdate(Array.from(selectedIds), 'rejected')}
-				onBulkDelete={() => performBulkUpdate(Array.from(selectedIds), 'delete')}
-			/>
-
-			{isLoading ? (
-				<div className="grid gap-4">
-					{Array.from({ length: 6 }).map((_, i) => (
-						<div
-							key={i}
-							className="h-28 bg-gradient-to-br from-white/3 to-white/2 rounded-2xl animate-pulse"
-						/>
-					))}
-				</div>
-			) : items.length === 0 ? (
-				<div className="text-center py-12 text-slate-400">
-					<p className="text-lg">No applications found</p>
-				</div>
-			) : (
-				<>
+				{isLoading ? (
 					<div className="grid gap-4">
-						<div className="flex items-center justify-between">
-							<label className="flex items-center gap-2 text-sm text-slate-300">
-								<input
-									type="checkbox"
-									checked={selectAllOnPage}
-									onChange={(e) => toggleSelectAllOnPage(e.target.checked)}
-									className="accent-cyan-400"
-								/>
-								Select all on page
-							</label>
-							<div className="text-sm text-slate-400">
-								Selected: {selectedIds.size}
-							</div>
-						</div>
-
-						{items.map((item) => (
-							<Card
-								key={item._id}
-								item={item}
-								expanded={expandedId === item._id}
-								selected={selectedIds.has(item._id)}
-								onSelect={toggleSelect}
-								onToggle={onToggleExpand}
-								onApprove={handleApprove}
-								onReject={handleReject}
-								onDelete={handleDelete}
+						{Array.from({ length: 6 }).map((_, i) => (
+							<div
+								key={i}
+								className="h-28 bg-gradient-to-br from-white/3 to-white/2 rounded-2xl animate-pulse"
 							/>
 						))}
 					</div>
+				) : items.length === 0 ? (
+					<div className="text-center py-12 text-slate-400">
+						<p className="text-lg">No applications found</p>
+					</div>
+				) : (
+					<>
+						<div className="grid gap-4">
+							<div className="flex items-center justify-between">
+								<label className="flex items-center gap-2 text-sm text-slate-300">
+									<input
+										type="checkbox"
+										checked={selectAllOnPage}
+										onChange={(e) => toggleSelectAllOnPage(e.target.checked)}
+										className="accent-cyan-400"
+									/>
+									Select all on page
+								</label>
+								<div className="text-sm text-slate-400">
+									Selected: {selectedIds.size}
+								</div>
+							</div>
 
-					<Pagination
-						page={page}
-						totalPages={totalPages}
-						onPageChange={(p) => setPage(p)}
-					/>
-				</>
-			)}
+							{items.map((item) => (
+								<Card
+									key={item._id}
+									item={item}
+									expanded={expandedId === item._id}
+									selected={selectedIds.has(item._id)}
+									onSelect={toggleSelect}
+									onToggle={onToggleExpand}
+									onApprove={handleApprove}
+									onReject={handleReject}
+									onDelete={handleDelete}
+								/>
+							))}
+						</div>
+
+						<Pagination
+							page={page}
+							totalPages={totalPages}
+							onPageChange={(p) => setPage(p)}
+						/>
+					</>
+				)}
+			</div>
 		</section>
 	);
 };
