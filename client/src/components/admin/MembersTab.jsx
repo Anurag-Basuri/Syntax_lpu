@@ -495,10 +495,12 @@ const RegisterMemberModal = ({ isOpen, onClose, onSubmit, loading, error, succes
 		email: '',
 		password: '',
 		department: '',
-		designation: '',
+		designation: 'member',
 		joinedAt: '',
 	});
 	const [showPassword, setShowPassword] = useState(false);
+	const [fieldErrors, setFieldErrors] = useState({});
+	const firstInputRef = React.useRef(null);
 
 	useEffect(() => {
 		if (isOpen) {
@@ -508,16 +510,55 @@ const RegisterMemberModal = ({ isOpen, onClose, onSubmit, loading, error, succes
 				email: '',
 				password: '',
 				department: '',
-				designation: '',
+				designation: 'member',
 				joinedAt: '',
 			});
 			setShowPassword(false);
+			setFieldErrors({});
+			setTimeout(() => firstInputRef.current?.focus(), 80);
 		}
 	}, [isOpen]);
 
+	const validate = () => {
+		const errs = {};
+		if (!formData.fullname || formData.fullname.trim().length < 2) {
+			errs.fullname = 'Full name is required (min 2 chars).';
+		}
+		if (!/^\d{8}$/.test(formData.LpuId || '')) {
+			errs.LpuId = 'LPU ID must be exactly 8 digits.';
+		}
+		if (formData.email && !/^\S+@\S+\.\S+$/.test(formData.email)) {
+			errs.email = 'Enter a valid email address.';
+		}
+		if (!formData.password || formData.password.length < 8) {
+			errs.password = 'Password must be at least 8 characters.';
+		}
+		if (!formData.department) {
+			errs.department = 'Please select a department.';
+		}
+		if (!formData.designation) {
+			errs.designation = 'Please select a designation.';
+		}
+		setFieldErrors(errs);
+		return Object.keys(errs).length === 0;
+	};
+
+	const passwordStrength = useMemo(() => {
+		const p = formData.password || '';
+		let score = 0;
+		if (p.length >= 8) score += 1;
+		if (/[A-Z]/.test(p)) score += 1;
+		if (/[0-9]/.test(p)) score += 1;
+		if (/[^A-Za-z0-9]/.test(p)) score += 1;
+		return {
+			score,
+			label: ['Very weak', 'Weak', 'Fair', 'Good', 'Strong'][Math.min(score, 4)],
+		};
+	}, [formData.password]);
+
 	const handleSubmit = (e) => {
-		e.preventDefault();
-		// normalise to arrays for backend/model
+		e?.preventDefault();
+		if (!validate()) return;
 		const payload = {
 			...formData,
 			department: formData.department ? [formData.department] : [],
@@ -529,149 +570,223 @@ const RegisterMemberModal = ({ isOpen, onClose, onSubmit, loading, error, succes
 	if (!isOpen) return null;
 
 	return (
-		<Modal title="Register New Member" onClose={onClose}>
-			<form className="space-y-4" onSubmit={handleSubmit}>
-				{error && (
-					<div className="bg-red-700/20 border border-red-500 text-red-300 px-4 py-2 rounded flex items-center">
-						<AlertCircle className="h-5 w-5 mr-2" />
-						{error}
+		<Modal title="Register New Member" onClose={onClose} size="md">
+			<form className="space-y-4" onSubmit={handleSubmit} noValidate>
+				{/* server/global error */}
+				{(error || success) && (
+					<div
+						className={`px-4 py-2 rounded flex items-center gap-2 ${
+							error
+								? 'bg-red-700/20 border border-red-500 text-red-300'
+								: 'bg-green-700/20 border border-green-500 text-green-300'
+						}`}
+					>
+						{error ? (
+							<AlertCircle className="h-5 w-5" />
+						) : (
+							<CheckCircle className="h-5 w-5" />
+						)}
+						<span>{error ? error : success}</span>
 					</div>
 				)}
 
-				{success && (
-					<div className="bg-green-700/20 border border-green-500 text-green-300 px-4 py-2 rounded flex items-center">
-						<CheckCircle className="h-5 w-5 mr-2" />
-						{success}
-					</div>
-				)}
-
-				<div>
-					<label className="block text-gray-300 mb-1">
-						Full Name <span className="text-red-400">*</span>
-					</label>
-					<input
-						type="text"
-						className="w-full px-3 py-2 bg-gray-700/50 border border-gray-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-						value={formData.fullname}
-						onChange={(e) => setFormData({ ...formData, fullname: e.target.value })}
-						required
-					/>
-				</div>
-
-				<div>
-					<label className="block text-gray-300 mb-1">
-						LPU ID <span className="text-red-400">*</span>
-					</label>
-					<input
-						type="text"
-						className="w-full px-3 py-2 bg-gray-700/50 border border-gray-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-						value={formData.LpuId}
-						onChange={(e) => setFormData({ ...formData, LpuId: e.target.value })}
-						required
-					/>
-				</div>
-
-				<div>
-					<label className="block text-gray-300 mb-1">Email</label>
-					<input
-						type="email"
-						className="w-full px-3 py-2 bg-gray-700/50 border border-gray-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-						value={formData.email}
-						onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-					/>
-				</div>
-
-				<div>
-					<label className="block text-gray-300 mb-1">
-						Password <span className="text-red-400">*</span>
-					</label>
-					<div className="relative">
-						<input
-							type={showPassword ? 'text' : 'password'}
-							className="w-full px-3 py-2 bg-gray-700/50 border border-gray-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-blue-500 pr-10"
-							value={formData.password}
-							onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-							required
-							minLength={8}
-						/>
-						<button
-							type="button"
-							className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-200"
-							onClick={() => setShowPassword(!showPassword)}
-						>
-							{showPassword ? (
-								<EyeOff className="h-4 w-4" />
-							) : (
-								<Eye className="h-4 w-4" />
+				<div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+					{/* Left column */}
+					<div className="space-y-3">
+						<div>
+							<label className="block text-gray-300 mb-1">Full Name *</label>
+							<input
+								ref={firstInputRef}
+								value={formData.fullname}
+								onChange={(e) =>
+									setFormData({ ...formData, fullname: e.target.value })
+								}
+								type="text"
+								required
+								className="w-full px-3 py-2 bg-gray-700/50 border border-gray-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+								aria-invalid={!!fieldErrors.fullname}
+							/>
+							{fieldErrors.fullname && (
+								<div className="text-xs text-red-400 mt-1">
+									{fieldErrors.fullname}
+								</div>
 							)}
-						</button>
+						</div>
+
+						<div>
+							<label className="block text-gray-300 mb-1">LPU ID *</label>
+							<input
+								value={formData.LpuId}
+								onChange={(e) =>
+									setFormData({
+										...formData,
+										LpuId: e.target.value.replace(/\D/g, ''),
+									})
+								}
+								type="text"
+								inputMode="numeric"
+								maxLength={8}
+								required
+								className="w-full px-3 py-2 bg-gray-700/50 border border-gray-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+								aria-invalid={!!fieldErrors.LpuId}
+							/>
+							{fieldErrors.LpuId && (
+								<div className="text-xs text-red-400 mt-1">{fieldErrors.LpuId}</div>
+							)}
+						</div>
+
+						<div>
+							<label className="block text-gray-300 mb-1">Email</label>
+							<input
+								value={formData.email}
+								onChange={(e) =>
+									setFormData({ ...formData, email: e.target.value })
+								}
+								type="email"
+								className="w-full px-3 py-2 bg-gray-700/50 border border-gray-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+								aria-invalid={!!fieldErrors.email}
+							/>
+							{fieldErrors.email && (
+								<div className="text-xs text-red-400 mt-1">{fieldErrors.email}</div>
+							)}
+						</div>
 					</div>
-					<p className="text-xs text-gray-400 mt-1">Must be at least 8 characters</p>
+
+					{/* Right column */}
+					<div className="space-y-3">
+						<div>
+							<label className="block text-gray-300 mb-1">Password *</label>
+							<div className="relative">
+								<input
+									value={formData.password}
+									onChange={(e) =>
+										setFormData({ ...formData, password: e.target.value })
+									}
+									type={showPassword ? 'text' : 'password'}
+									required
+									minLength={8}
+									className="w-full px-3 py-2 bg-gray-700/50 border border-gray-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-blue-500 pr-10"
+									aria-invalid={!!fieldErrors.password}
+								/>
+								<button
+									type="button"
+									aria-label={showPassword ? 'Hide password' : 'Show password'}
+									onClick={() => setShowPassword((s) => !s)}
+									className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-200"
+								>
+									{showPassword ? (
+										<EyeOff className="h-4 w-4" />
+									) : (
+										<Eye className="h-4 w-4" />
+									)}
+								</button>
+							</div>
+							{fieldErrors.password && (
+								<div className="text-xs text-red-400 mt-1">
+									{fieldErrors.password}
+								</div>
+							)}
+							{/* Password strength */}
+							<div className="flex items-center justify-between mt-2 text-xs text-gray-400">
+								<div className="flex-1 mr-3">
+									<div className="h-2 bg-gray-700 rounded overflow-hidden">
+										<div
+											style={{
+												width: `${(passwordStrength.score / 4) * 100}%`,
+											}}
+											className={`h-full ${
+												passwordStrength.score >= 3
+													? 'bg-green-400'
+													: passwordStrength.score === 2
+													? 'bg-yellow-400'
+													: 'bg-red-400'
+											}`}
+										/>
+									</div>
+								</div>
+								<div className="whitespace-nowrap">{passwordStrength.label}</div>
+							</div>
+						</div>
+
+						<div>
+							<label className="block text-gray-300 mb-1">Department *</label>
+							<select
+								value={formData.department}
+								onChange={(e) =>
+									setFormData({ ...formData, department: e.target.value })
+								}
+								required
+								className="w-full px-3 py-2 bg-gray-700/50 border border-gray-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+								aria-invalid={!!fieldErrors.department}
+							>
+								<option value="">Select Department</option>
+								{DEPARTMENT_OPTIONS.map((dep) => (
+									<option key={dep} value={dep}>
+										{dep}
+									</option>
+								))}
+							</select>
+							{fieldErrors.department && (
+								<div className="text-xs text-red-400 mt-1">
+									{fieldErrors.department}
+								</div>
+							)}
+						</div>
+
+						<div>
+							<label className="block text-gray-300 mb-1">Designation *</label>
+							<select
+								value={formData.designation}
+								onChange={(e) =>
+									setFormData({ ...formData, designation: e.target.value })
+								}
+								required
+								className="w-full px-3 py-2 bg-gray-700/50 border border-gray-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+								aria-invalid={!!fieldErrors.designation}
+							>
+								<option value="">Select Designation</option>
+								{DESIGNATION_OPTIONS.map((des) => (
+									<option key={des} value={des}>
+										{des}
+									</option>
+								))}
+							</select>
+							{fieldErrors.designation && (
+								<div className="text-xs text-red-400 mt-1">
+									{fieldErrors.designation}
+								</div>
+							)}
+						</div>
+					</div>
 				</div>
 
-				<div>
-					<label className="block text-gray-300 mb-1">
-						Department <span className="text-red-400">*</span>
-					</label>
-					<select
-						className="w-full px-3 py-2 bg-gray-700/50 border border-gray-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-						value={formData.department}
-						onChange={(e) => setFormData({ ...formData, department: e.target.value })}
-						required
-					>
-						<option value="">Select Department</option>
-						{DEPARTMENT_OPTIONS.map((dep) => (
-							<option key={dep} value={dep}>
-								{dep}
-							</option>
-						))}
-					</select>
-				</div>
-
-				<div>
-					<label className="block text-gray-300 mb-1">
-						Designation <span className="text-red-400">*</span>
-					</label>
-					<select
-						className="w-full px-3 py-2 bg-gray-700/50 border border-gray-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-						value={formData.designation}
-						onChange={(e) => setFormData({ ...formData, designation: e.target.value })}
-						required
-					>
-						<option value="">Select Designation</option>
-						{DESIGNATION_OPTIONS.map((des) => (
-							<option key={des} value={des}>
-								{des}
-							</option>
-						))}
-					</select>
-				</div>
-
+				{/* Joined date full width */}
 				<div>
 					<label className="block text-gray-300 mb-1">Joined Date</label>
 					<input
 						type="date"
-						className="w-full px-3 py-2 bg-gray-700/50 border border-gray-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
 						value={formData.joinedAt}
 						onChange={(e) => setFormData({ ...formData, joinedAt: e.target.value })}
+						className="w-full px-3 py-2 bg-gray-700/50 border border-gray-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
 					/>
 				</div>
 
-				<div className="flex justify-end gap-3 pt-4">
+				{/* Actions */}
+				<div className="flex justify-end gap-3 pt-2">
 					<button
-						className="px-4 py-2 bg-gray-600 hover:bg-gray-500 rounded-lg transition"
-						onClick={onClose}
 						type="button"
+						onClick={onClose}
+						className="px-4 py-2 bg-gray-600 hover:bg-gray-500 rounded-lg transition"
 						disabled={loading}
 					>
 						Cancel
 					</button>
 					<button
-						className="px-4 py-2 bg-blue-600 hover:bg-blue-500 rounded-lg transition"
 						type="submit"
+						className="px-4 py-2 bg-blue-600 hover:bg-blue-500 rounded-lg transition inline-flex items-center gap-2"
 						disabled={loading}
 					>
-						{loading ? <Loader2 className="h-4 w-4 animate-spin mx-2" /> : 'Register'}
+						{loading ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Register'}
 					</button>
 				</div>
 			</form>
