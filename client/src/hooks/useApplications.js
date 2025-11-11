@@ -9,10 +9,16 @@ import {
 import { toast } from 'react-hot-toast';
 
 // Hook to fetch a paginated list of all applications
-export const useApplications = (params) => {
+export const useApplications = (params = {}) => {
+	// serialize params into the key so react-query can reliably match/prefetch/invalidate
+	const key = ['applications', JSON.stringify(params)];
 	return useQuery({
-		queryKey: ['applications', params],
-		queryFn: () => getAllApplications(params),
+		queryKey: key,
+		// derive params from queryKey so the queryFn is always in sync with the cache key
+		queryFn: ({ queryKey }) => {
+			const parsed = JSON.parse(queryKey[1] || '{}');
+			return getAllApplications(parsed);
+		},
 		keepPreviousData: true,
 	});
 };
