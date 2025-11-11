@@ -139,16 +139,44 @@ const getTicketsByEvent = asyncHandler(async (req, res) => {
 	return ApiResponse.paginated(res, tickets.docs, tickets, 'Tickets retrieved successfully.');
 });
 
+// Helper: find ticket by either ticketId (business id) or _id (mongo)
+const findTicketByIdentifier = async (identifier) => {
+	if (!identifier) return null;
+	// try as ObjectId first
+	if (mongoose.isValidObjectId(identifier)) {
+		const byId = await Ticket.findById(identifier);
+		if (byId) return byId;
+	}
+	// fallback to business ticketId
+	return await Ticket.findOne({ ticketId: identifier });
+};
+
 // Update ticket status
 const updateTicketStatus = asyncHandler(async (req, res) => {
-	const { ticketId } = req.params;
+	const { ticketId: identifier } = req.params;
 	const { status } = req.body; // Expecting 'active', 'used', or 'cancelled'
 
-	const ticket = await Ticket.findOneAndUpdate(
-		{ ticketId },
-		{ status },
-		{ new: true, runValidators: true }
-	);
+	// Validate status server-side as extra safety
+	if (!['active', 'used', 'cancelled'].includes(status)) {
+		throw ApiError.BadRequest("Status must be one of: 'active', 'used', 'cancelled'");
+	}
+
+	// Find ticket by _id or ticketId and update
+	let ticket = null;
+	if (mongoose.isValidObjectId(identifier)) {
+		ticket = await Ticket.findOneAndUpdate(
+			{ _id: identifier },
+			{ status },
+			{ new: true, runValidators: true }
+		);
+	}
+	if (!ticket) {
+		ticket = await Ticket.findOneAndUpdate(
+			{ ticketId: identifier },
+			{ status },
+			{ new: true, runValidators: true }
+		);
+	}
 
 	if (!ticket) {
 		throw ApiError.NotFound('Ticket not found.');
@@ -159,8 +187,16 @@ const updateTicketStatus = asyncHandler(async (req, res) => {
 
 // Delete a ticket
 const deleteTicket = asyncHandler(async (req, res) => {
-	const { ticketId } = req.params;
-	const ticket = await Ticket.findOneAndDelete({ ticketId });
+	const { ticketId: identifier } = req.params;
+
+	// Try delete by _id first, then by ticketId
+	let ticket = null;
+	if (mongoose.isValidObjectId(identifier)) {
+		ticket = await Ticket.findByIdAndDelete(identifier);
+	}
+	if (!ticket) {
+		ticket = await Ticket.findOneAndDelete({ ticketId: identifier });
+	}
 
 	if (!ticket) {
 		throw ApiError.NotFound('Ticket not found.');
