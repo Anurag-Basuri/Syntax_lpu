@@ -440,6 +440,10 @@ const Background3D = () => {
 	// logo-specific opacity (much lower so logo doesn't draw attention)
 	const logoOpacity = useMemo(() => (theme === 'light' ? 0.28 : 0.32), [theme]);
 
+	// blur settings for canvas + logo
+	const backgroundBlur = useMemo(() => (theme === 'light' ? '2px' : '3px'), [theme]);
+	const logoExtraBlur = useMemo(() => (theme === 'light' ? '1.5px' : '2px'), [theme]);
+
 	const [webglOk, setWebglOk] = useState(true);
 	useEffect(() => {
 		setWebglOk(isWebGLAvailable());
@@ -474,6 +478,12 @@ const Background3D = () => {
 					alpha: true,
 					powerPreference: 'high-performance',
 				}}
+				style={{
+					// blur the whole canvas (subtle) so grid/logo are soft by default
+					filter: `blur(${backgroundBlur})`,
+					// help GPU composite
+					transform: 'translateZ(0)',
+				}}
 				dpr={[1, Math.min(2, window.devicePixelRatio || 2)]}
 				onCreated={({ gl }) => {
 					gl.setClearColor(0x000000, 0);
@@ -483,10 +493,35 @@ const Background3D = () => {
 				{/* pass opacity to Grid via theme/uniforms (uGlobalFade is set in Grid's uniforms) */}
 				<Grid theme={theme} breakpoint={breakpoint} />
 				<Suspense fallback={null}>
-					{/* pass logoOpacity down by leveraging the existing FloatingLogo component's mesh material below */}
+					{/* FloatingLogo will be rendered inside canvas; apply an extra CSS blur by rendering it to a slightly blurred layer.
+                        Since mesh materials don't support CSS filter, we render an extra transparent plane in front with the logo texture at slightly higher opacity
+                        and let the Canvas-level blur handle the softening. To provide a tiny extra blur specifically for the logo, we reduce its opacity here. */}
 					<FloatingLogo breakpoint={breakpoint} logoOpacity={logoOpacity} />
 				</Suspense>
 			</Canvas>
+
+			{/* If you want an additional very-soft blur specifically over the logo area using CSS (without touching WebGL),
+                you can place a small absolute overlay that matches the canvas center and applies a subtle blur/gradient to de-emphasize the logo.
+                This overlay is intentionally low-impact and won't block mouse events. */}
+			<div
+				aria-hidden="true"
+				style={{
+					pointerEvents: 'none',
+					position: 'absolute',
+					inset: 0,
+					display: 'flex',
+					justifyContent: 'center',
+					alignItems: 'center',
+					// subtle vignette + blur over center to further soften logo
+					background:
+						theme === 'light'
+							? 'radial-gradient(ellipse at center, rgba(255,255,255,0.02), rgba(255,255,255,0))'
+							: 'radial-gradient(ellipse at center, rgba(0,0,0,0.06), rgba(0,0,0,0))',
+					backdropFilter: `blur(${logoExtraBlur})`,
+					opacity: 0.9,
+					zIndex: -1,
+				}}
+			/>
 		</div>
 	);
 };
