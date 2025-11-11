@@ -95,17 +95,18 @@ const Grid = ({ theme, breakpoint }) => {
 	const uniforms = useMemo(
 		() => ({
 			uTime: { value: 0 },
-			uWaveAmplitude: { value: breakpoint === 'mobile' ? 3.5 : 5.0 },
+			// Increased amplitude for more visible waves
+			uWaveAmplitude: { value: breakpoint === 'mobile' ? 4.0 : 6.0 },
 			uWaveFrequency: { value: 0.055 },
-			// wave speed kept elevated but respects reduced motion
-			uWaveSpeed: { value: prefersReduced ? 0.0 : 0.38 },
-			uDepthFade: { value: 0.92 }, // slightly increased so distant grid fades more
-			// lowered opacity because this should be a subtle background
-			uWireOpacity: { value: theme === 'light' ? 0.45 : 0.55 }, // lowered from 1.0 / 1.2
+			// Increased wave speed for more dynamic movement
+			uWaveSpeed: { value: prefersReduced ? 0.0 : 0.45 },
+			// Reduced depth fade to make more of the grid visible
+			uDepthFade: { value: 0.75 },
+			// Significantly increased opacity for better visibility
+			uWireOpacity: { value: theme === 'light' ? 0.85 : 1.0 },
 			uWireColor: { value: new THREE.Color(theme === 'light' ? '#94a3b8' : '#64748b') },
 			uAccent: { value: new THREE.Color(readCssVar('--accent-1')) },
-			// global fade to control overall visibility (easier tweak)
-			uGlobalFade: { value: theme === 'light' ? 0.7 : 0.75 },
+			// Removed global fade since we want it more visible
 			uMouseX: { value: 0 },
 			uMouseY: { value: 0 },
 		}),
@@ -234,9 +235,9 @@ const Grid = ({ theme, breakpoint }) => {
             // Enhanced depth calculation
             vDepth = (pos.y + ${gridParams.height / 2}.0) / ${gridParams.height}.0;
             
-            // Improved depth-based attenuation for stronger perspective
-            float depthAtten = smoothstep(0.0, 0.95, 1.0 - vDepth);
-            depthAtten = pow(depthAtten, 1.8);
+            // Reduced depth-based attenuation for more visible grid
+            float depthAtten = smoothstep(0.0, 0.85, 1.0 - vDepth);
+            depthAtten = pow(depthAtten, 1.5);
             elevation *= depthAtten;
 
             pos.z += elevation;
@@ -265,8 +266,7 @@ const Grid = ({ theme, breakpoint }) => {
         uniform float uDepthFade;
         uniform vec3 uAccent;
         uniform float uTime;
-        uniform float uGlobalFade; // added
-       
+        
         varying vec2 vUv;
         varying float vDepth;
         varying float vElevation;
@@ -274,66 +274,64 @@ const Grid = ({ theme, breakpoint }) => {
         varying vec3 vWorldPos;
         
         void main() {
-            // Enhanced exponential depth fade but more aggressive to push grid back
+            // Reduced exponential depth fade for more visible grid
             float depthFade = smoothstep(0.0, uDepthFade, 1.0 - vDepth);
-            depthFade = pow(depthFade, 2.2);
+            depthFade = pow(depthFade, 1.8);
 
-            // Reduce glow strengths so peaks don't become too prominent
-            float elevationGlow = smoothstep(1.0, 3.5, abs(vElevation)) * 0.9;
-            float peakGlow = smoothstep(3.5, 5.5, abs(vElevation)) * 1.0;
+            // Increased glow strengths for better visibility
+            float elevationGlow = smoothstep(1.0, 3.5, abs(vElevation)) * 1.2;
+            float peakGlow = smoothstep(3.5, 5.5, abs(vElevation)) * 1.5;
             
-            // Softer shimmer (lower amplitude)
-            float shimmer1 = sin(uTime * 2.2 + vUv.x * 8.0 + vUv.y * 6.0) * 0.08 + 0.92;
-            float shimmer2 = cos(uTime * 2.6 + vUv.y * 10.0 + vWorldPos.z * 1.2) * 0.06 + 0.94;
+            // More prominent shimmer
+            float shimmer1 = sin(uTime * 2.8 + vUv.x * 12.0 + vUv.y * 9.0) * 0.15 + 0.85;
+            float shimmer2 = cos(uTime * 3.5 + vUv.y * 15.0 + vWorldPos.z * 2.0) * 0.1 + 0.9;
             float shimmer = shimmer1 * shimmer2;
             
-            // Fresnel-based edge highlight (kept subtle)
+            // Enhanced fresnel for better edge visibility
             vec3 viewDir = normalize(vec3(0.0, 0.0, 1.0));
             float fresnel = pow(1.0 - abs(dot(vNormal, viewDir)), 3.0);
-            float edgeGlow = fresnel * 0.9;
+            float edgeGlow = fresnel * 1.2;
             
-            float rimLight = smoothstep(2.0, 4.5, vElevation) * fresnel * 0.6;
+            float rimLight = smoothstep(2.0, 4.5, vElevation) * fresnel * 0.8;
             
-            float depthColor = vDepth * 0.2;
+            float depthColor = vDepth * 0.3;
             
-            // Combine lighting factors with reduced weights
+            // Increased lighting factor weights for better visibility
             float totalGlow = clamp(
-                elevationGlow * 0.5 + 
-                peakGlow * 0.35 +
-                edgeGlow * 0.5 + 
-                rimLight * 0.4, 
+                elevationGlow * 0.8 + 
+                peakGlow * 0.6 +
+                edgeGlow * 0.8 + 
+                rimLight * 0.6, 
                 0.0, 1.0
             );
             totalGlow *= shimmer;
             
-            // Subtle color mixing
-            vec3 baseColor = mix(uWireColor, uWireColor * 1.08, depthColor);
-            vec3 finalColor = mix(baseColor, uAccent * 0.6, totalGlow * 0.6);
+            // Enhanced color mixing
+            vec3 baseColor = mix(uWireColor, uWireColor * 1.2, depthColor);
+            vec3 finalColor = mix(baseColor, uAccent, totalGlow * 0.8);
             
-            // Peak highlight softened
+            // More prominent peak highlighting
             if (vElevation > 2.5) {
                 float peakFactor = smoothstep(2.5, 4.5, vElevation);
-                finalColor = mix(finalColor, uAccent * 1.1, peakFactor * 0.35);
+                finalColor = mix(finalColor, uAccent * 1.4, peakFactor * 0.5);
             }
             
-            // Make alpha more muted for background use:
-            // apply global fade and reduce multiplier so grid is less prominent
-            float alpha = uWireOpacity * uGlobalFade * depthFade * (0.60 + totalGlow * 0.25); // reduced base
+            // Significantly increased alpha calculation for better visibility
+            float alpha = uWireOpacity * depthFade * (0.9 + totalGlow * 0.4);
 
-            // Moderate extra boost for extreme peaks (reduced)
+            // Increased boost for extreme peaks
             if (vElevation > 3.5) {
-                alpha += 0.35; // reduced from 0.6
-                finalColor += uAccent * 0.25;
+                alpha += 0.5;
+                finalColor += uAccent * 0.35;
             }
             
-            // Lower minimum visibility for near grid to keep it unobtrusive
+            // Higher minimum visibility for near grid
             if (vDepth < 0.3) {
-                alpha = max(alpha, uWireOpacity * 0.6); // reduced minimum
+                alpha = max(alpha, uWireOpacity * 0.8);
             }
             
-            // Discard very faint fragments
             if (alpha <= 0.01) discard;
-            gl_FragColor = vec4(finalColor, clamp(alpha, 0.0, 0.9));
+            gl_FragColor = vec4(finalColor, alpha);
         }
     `;
 
@@ -357,8 +355,7 @@ const Grid = ({ theme, breakpoint }) => {
 					uniforms={uniforms}
 					transparent={true}
 					depthWrite={false}
-					// ensure not tone-mapped and blending stays subtle
-					toneMapped={false}
+					wireframe={true}
 					side={THREE.DoubleSide}
 					vertexShader={vertexShader}
 					fragmentShader={fragmentShader}
@@ -369,7 +366,7 @@ const Grid = ({ theme, breakpoint }) => {
 };
 
 // Floating Logo Component
-const FloatingLogo = ({ breakpoint, logoOpacity = 0.32 }) => {
+const FloatingLogo = ({ breakpoint, logoOpacity = 0.4 }) => {
 	const base = useRef();
 	const texture = useTexture(logo);
 
@@ -418,7 +415,6 @@ const FloatingLogo = ({ breakpoint, logoOpacity = 0.32 }) => {
 		<group ref={base} position={[0, 0, -10]} renderOrder={1}>
 			<mesh>
 				<planeGeometry args={[1, 1]} />
-				{/* lowered opacity so logo is unobtrusive */}
 				<meshBasicMaterial
 					map={texture}
 					transparent
@@ -434,15 +430,6 @@ const FloatingLogo = ({ breakpoint, logoOpacity = 0.32 }) => {
 const Background3D = () => {
 	const theme = useTheme();
 	const { breakpoint } = useResponsive();
-
-	// reduce overall background prominence (tweak values to taste)
-	const backgroundOpacity = useMemo(() => (theme === 'light' ? 0.55 : 0.6), [theme]);
-	// logo-specific opacity (much lower so logo doesn't draw attention)
-	const logoOpacity = useMemo(() => (theme === 'light' ? 0.28 : 0.32), [theme]);
-
-	// blur settings for canvas + logo
-	const backgroundBlur = useMemo(() => (theme === 'light' ? '2px' : '3px'), [theme]);
-	const logoExtraBlur = useMemo(() => (theme === 'light' ? '1.5px' : '2px'), [theme]);
 
 	const [webglOk, setWebglOk] = useState(true);
 	useEffect(() => {
@@ -465,12 +452,7 @@ const Background3D = () => {
 	}
 
 	return (
-		<div
-			className="fixed inset-0 -z-10 overflow-hidden"
-			aria-hidden="true"
-			// apply a wrapper opacity so entire background (grid + logo) is visually muted
-			style={{ opacity: backgroundOpacity }}
-		>
+		<div className="fixed inset-0 -z-10 overflow-hidden" aria-hidden="true">
 			<Canvas
 				camera={cameraConfig}
 				gl={{
@@ -478,50 +460,17 @@ const Background3D = () => {
 					alpha: true,
 					powerPreference: 'high-performance',
 				}}
-				style={{
-					// blur the whole canvas (subtle) so grid/logo are soft by default
-					filter: `blur(${backgroundBlur})`,
-					// help GPU composite
-					transform: 'translateZ(0)',
-				}}
 				dpr={[1, Math.min(2, window.devicePixelRatio || 2)]}
 				onCreated={({ gl }) => {
 					gl.setClearColor(0x000000, 0);
 					gl.outputColorSpace = THREE.SRGBColorSpace;
 				}}
 			>
-				{/* pass opacity to Grid via theme/uniforms (uGlobalFade is set in Grid's uniforms) */}
 				<Grid theme={theme} breakpoint={breakpoint} />
 				<Suspense fallback={null}>
-					{/* FloatingLogo will be rendered inside canvas; apply an extra CSS blur by rendering it to a slightly blurred layer.
-                        Since mesh materials don't support CSS filter, we render an extra transparent plane in front with the logo texture at slightly higher opacity
-                        and let the Canvas-level blur handle the softening. To provide a tiny extra blur specifically for the logo, we reduce its opacity here. */}
-					<FloatingLogo breakpoint={breakpoint} logoOpacity={logoOpacity} />
+					<FloatingLogo breakpoint={breakpoint} />
 				</Suspense>
 			</Canvas>
-
-			{/* If you want an additional very-soft blur specifically over the logo area using CSS (without touching WebGL),
-                you can place a small absolute overlay that matches the canvas center and applies a subtle blur/gradient to de-emphasize the logo.
-                This overlay is intentionally low-impact and won't block mouse events. */}
-			<div
-				aria-hidden="true"
-				style={{
-					pointerEvents: 'none',
-					position: 'absolute',
-					inset: 0,
-					display: 'flex',
-					justifyContent: 'center',
-					alignItems: 'center',
-					// subtle vignette + blur over center to further soften logo
-					background:
-						theme === 'light'
-							? 'radial-gradient(ellipse at center, rgba(255,255,255,0.02), rgba(255,255,255,0))'
-							: 'radial-gradient(ellipse at center, rgba(0,0,0,0.06), rgba(0,0,0,0))',
-					backdropFilter: `blur(${logoExtraBlur})`,
-					opacity: 0.9,
-					zIndex: -1,
-				}}
-			/>
 		</div>
 	);
 };
