@@ -27,7 +27,7 @@ export const getApplicationStats = async () => {
 export const getAllApplications = async (params) => {
 	try {
 		const response = await apiClient.get('/api/v1/apply', { params });
-		// Normalise to return response.data.data if present (ApiResponse wrapper) otherwise full response
+		console.log('Fetched applications:', response.data);
 		return response.data?.data ?? response.data;
 	} catch (error) {
 		throw new Error(error.message || 'Failed to fetch applications.');
