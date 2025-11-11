@@ -9,6 +9,7 @@ import {
 	LayoutDashboard,
 	Menu,
 	X,
+	Sparkles,
 } from 'lucide-react';
 import { useAuth } from '../hooks/useAuth.js';
 import { useGetAllEvents } from '../hooks/useEvents.js';
@@ -18,6 +19,7 @@ import EventsTab from '../components/admin/EventsTab.jsx';
 import TicketsTab from '../components/admin/TicketsTab.jsx';
 import CreateTicket from '../components/admin/CreateTicket.jsx';
 import ErrorMessage from '../components/admin/ErrorMessage.jsx';
+import ArvantisTab from '../components/admin/ArvantisTab.jsx';
 import Modal from '../components/admin/Modal.jsx';
 
 const TABS = [
@@ -40,6 +42,11 @@ const TABS = [
 		key: 'tickets',
 		label: 'Tickets',
 		icon: <Ticket className="h-5 w-5" />,
+	},
+	{
+		key: 'arvantis',
+		label: 'Arvantis',
+		icon: <Sparkles className="h-5 w-5" />,
 	},
 ];
 
@@ -89,7 +96,9 @@ const AdminDash = () => {
 			{/* Sidebar */}
 			<aside
 				className={`fixed z-30 inset-y-0 left-0 w-64 bg-gray-900 border-r border-gray-800 flex flex-col transition-transform duration-300
-                ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'} md:translate-x-0 md:static md:block`}
+                ${
+					sidebarOpen ? 'translate-x-0' : '-translate-x-full'
+				} md:translate-x-0 md:static md:block`}
 			>
 				<div className="flex items-center gap-3 px-6 py-6 border-b border-gray-800">
 					<ShieldCheck className="h-8 w-8 text-blue-400" />
@@ -130,7 +139,9 @@ const AdminDash = () => {
 
 			{/* Overlay for mobile sidebar */}
 			<div
-				className={`fixed inset-0 z-20 bg-black/40 transition-opacity duration-300 md:hidden ${sidebarOpen ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}
+				className={`fixed inset-0 z-20 bg-black/40 transition-opacity duration-300 md:hidden ${
+					sidebarOpen ? 'opacity-100' : 'opacity-0 pointer-events-none'
+				}`}
 				onClick={() => setSidebarOpen(false)}
 				aria-hidden={!sidebarOpen}
 			/>
@@ -236,6 +247,17 @@ const AdminDash = () => {
 									events={events}
 									setDashboardError={setDashboardError}
 								/>
+							</motion.div>
+						)}
+						{activeTab === 'arvantis' && (
+							<motion.div
+								key="arvantis"
+								initial={{ opacity: 0, y: 20 }}
+								animate={{ opacity: 1, y: 0 }}
+								exit={{ opacity: 0, y: 20 }}
+								transition={{ duration: 0.3 }}
+							>
+								<ArvantisTab token={token} setDashboardError={setDashboardError} />
 							</motion.div>
 						)}
 					</AnimatePresence>
