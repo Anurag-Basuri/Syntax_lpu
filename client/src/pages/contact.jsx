@@ -10,8 +10,14 @@ import {
 	Phone,
 	AtSign,
 } from 'lucide-react';
-import { apiClient, publicClient } from '../services/api.js';
 import { getToken, decodeToken } from '../utils/handleTokens.js';
+import {
+	sendContactMessage,
+	getAllContacts,
+	updateContactStatus,
+	deleteContact as svcDeleteContact,
+} from '../services/contactServices.js';
+import { toast } from 'react-hot-toast';
 
 const ContactPage = () => {
 	const [formData, setFormData] = useState({
@@ -28,23 +34,31 @@ const ContactPage = () => {
 	const [contacts, setContacts] = useState([]);
 	const [adminLoading, setAdminLoading] = useState(false);
 	const [expandedId, setExpandedId] = useState(null);
-	const token = getToken();
-	const user = token ? decodeToken(token) : null;
+	const [page, setPage] = useState(1);
+	const [limit] = useState(10);
+	const [totalPages, setTotalPages] = useState(1);
+
+	// decode local access token properly (getToken() returns object { accessToken })
+	const tokens = getToken();
+	const user = tokens?.accessToken ? decodeToken(tokens.accessToken) : null;
+	const isAdmin = !!user?.adminID;
 
 	useEffect(() => {
-		if (user?.adminID) {
-			fetchContacts();
-		}
-	}, [user]);
+		if (isAdmin) fetchContacts({ page, limit });
+		// eslint-disable-next-line react-hooks/exhaustive-deps
+	}, [isAdmin, page]);
 
-	const fetchContacts = async () => {
+	const fetchContacts = async (params = {}) => {
 		setAdminLoading(true);
+		setError('');
 		try {
-			const response = await apiClient.get('/api/contacts/getall');
-			const contactsArr = response.data.contacts?.docs || response.data.contacts || [];
-			setContacts(contactsArr);
-		} catch (error) {
-			setError('Failed to fetch contacts');
+			const resp = await getAllContacts(params);
+			setContacts(resp?.docs ?? []);
+			setTotalPages(resp?.totalPages ?? 1);
+		} catch (err) {
+			console.error('fetchContacts', err);
+			setError(err.message || 'Failed to fetch contacts');
+			toast.error(err.message || 'Failed to fetch contacts');
 		} finally {
 			setAdminLoading(false);
 		}
@@ -60,7 +74,7 @@ const ContactPage = () => {
 		setLoading(true);
 		setError('');
 		try {
-			await publicClient.post('/api/contact/send', formData);
+			await sendContactMessage(formData);
 			setSuccess(true);
 			setFormData({
 				name: '',
@@ -71,8 +85,12 @@ const ContactPage = () => {
 				message: '',
 			});
 			setTimeout(() => setSuccess(false), 3000);
+			toast.success('Message sent');
 		} catch (err) {
-			setError(err.response?.data?.message || 'Failed to send message');
+			console.error('sendContact', err);
+			const msg = err.message || err?.response?.data?.message || 'Failed to send message';
+			setError(msg);
+			toast.error(msg);
 		} finally {
 			setLoading(false);
 		}
@@ -80,25 +98,36 @@ const ContactPage = () => {
 
 	const markAsResolved = async (id) => {
 		try {
-			await apiClient.patch(`/api/contacts/${id}/resolve`);
-			setContacts(
-				contacts.map((contact) =>
-					contact._id === id ? { ...contact, status: 'resolved' } : contact
-				)
-			);
-		} catch (error) {
-			setError('Failed to mark as resolved');
+			await updateContactStatus(id, 'resolved');
+			setContacts((prev) => prev.map((c) => (c._id === id ? { ...c, status: 'resolved' } : c)));
+			toast.success('Marked resolved');
+		} catch (err) {
+			console.error('markAsResolved', err);
+			toast.error('Failed to mark resolved');
+		}
+	};
+
+	const handleDelete = async (id) => {
+		if (!window.confirm('Delete this contact?')) return;
+		try {
+			await svcDeleteContact(id);
+			setContacts((prev) => prev.filter((c) => c._id !== id));
+			toast.success('Deleted');
+		} catch (err) {
+			console.error('deleteContact', err);
+			toast.error('Failed to delete contact');
 		}
 	};
 
 	const toggleExpand = (id) => {
-		setExpandedId(expandedId === id ? null : id);
+		setExpandedId((prev) => (prev === id ? null : id));
 	};
 
+	// UI: public form or admin list
 	return (
 		<div className="min-h-screen section-padding">
 			<div className="page-container">
-				{!user?.adminID ? (
+				{!isAdmin ? (
 					<motion.div
 						initial={{ opacity: 0, y: 20 }}
 						animate={{ opacity: 1, y: 0 }}
@@ -663,29 +692,56 @@ const ContactPage = () => {
 																{contact.message}
 															</p>
 														</div>
-														{contact.status !== 'resolved' && (
-															<motion.button
-																whileHover={{ scale: 1.02 }}
-																whileTap={{ scale: 0.98 }}
-																onClick={() =>
-																	markAsResolved(contact._id)
-																}
-																className="btn btn-primary px-6 py-3 text-sm"
-																style={{
-																	background:
-																		'linear-gradient(135deg, #10b981, #059669)',
-																}}
+
+														<div className="flex gap-3">
+															{contact.status !== 'resolved' && (
+																<motion.button
+																	whileHover={{ scale: 1.02 }}
+																	whileTap={{ scale: 0.98 }}
+																	onClick={() => markAsResolved(contact._id)}
+																	className="btn btn-primary px-6 py-3 text-sm"
+																	style={{
+																		background:
+																			'linear-gradient(135deg, #10b981, #059669)',
+																	}}
+																>
+																	<CheckCircle2 className="w-4 h-4" /> Mark as Resolved
+																</motion.button>
+															)}
+															<button
+																onClick={() => handleDelete(contact._id)}
+																className="px-4 py-2 rounded bg-rose-600 text-white text-sm"
 															>
-																<CheckCircle2 className="w-4 h-4" />
-																Mark as Resolved
-															</motion.button>
-														)}
+																Delete
+															</button>
+														</div>
 													</div>
 												</motion.div>
 											)}
 										</AnimatePresence>
 									</motion.div>
 								))}
+							</div>
+						)}
+
+						{/* simple pagination for admin list */}
+						{totalPages > 1 && (
+							<div className="mt-6 flex justify-center gap-3 items-center">
+								<button
+									onClick={() => setPage((p) => Math.max(1, p - 1))}
+									className="px-3 py-1 rounded bg-white/6"
+								>
+									Prev
+								</button>
+								<span className="px-3 py-1 bg-white/5 rounded text-sm">
+									{page} / {totalPages}
+								</span>
+								<button
+									onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+									className="px-3 py-1 rounded bg-white/6"
+								>
+									Next
+								</button>
 							</div>
 						)}
 					</motion.div>
