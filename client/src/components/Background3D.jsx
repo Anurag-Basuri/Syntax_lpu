@@ -396,26 +396,26 @@ const Grid = ({ theme, breakpoint }) => {
 	);
 };
 
-// Blurry Floating Logo Component (refined position + reduced blur)
+// Centered Blurry Floating Logo Component
 const FloatingLogo = ({ breakpoint, logoOpacity = 0.34 }) => {
 	const base = useRef();
 	const texture = useTexture(logo);
 
-	// smaller blur on mobile, a touch larger on desktop — tweak values as needed
+	// Increased blur amounts for more pronounced blur effect
 	const blurAmount = useMemo(() => {
 		switch (breakpoint) {
 			case 'mobile':
-				return 0.8;
+				return 5.5;
 			case 'tablet-sm':
-				return 1.0;
+				return 5.8;
 			case 'tablet':
-				return 1.2;
+				return 5.2;
 			case 'desktop':
-				return 1.4;
+				return 5.5;
 			case 'desktop-lg':
-				return 1.6;
+				return 5.0;
 			default:
-				return 1.2;
+				return 2.0;
 		}
 	}, [breakpoint]);
 
@@ -437,33 +437,33 @@ const FloatingLogo = ({ breakpoint, logoOpacity = 0.34 }) => {
 
 	const { camera } = useThree();
 
-	// Slightly larger default scales so logo is more visible
+	// Responsive logo scales - slightly smaller to account for center positioning
 	const logoScales = {
-		mobile: 0.28,
-		'tablet-sm': 0.32,
-		tablet: 0.36,
-		desktop: 0.44,
-		'desktop-lg': 0.52,
+		mobile: 0.22,
+		'tablet-sm': 0.26,
+		tablet: 0.3,
+		desktop: 0.36,
+		'desktop-lg': 0.42,
 	};
 
-	const frac = logoScales[breakpoint] || 0.36;
+	const frac = logoScales[breakpoint] || 0.3;
 
 	const clamp = (v, min, max) => Math.min(max, Math.max(min, v));
 	const scaleXY = useMemo(() => {
-		const dist = Math.abs(-8 - (camera?.position?.z ?? 5)); // move logo closer (z = -8)
+		const dist = Math.abs(-8 - (camera?.position?.z ?? 5));
 		const worldH = 2 * Math.tan(THREE.MathUtils.degToRad((camera?.fov ?? 60) / 2)) * dist;
-		const h = clamp(worldH * frac, 7, 28); // larger limits
+		const h = clamp(worldH * frac, 5, 22);
 		return [h * aspect, h];
 	}, [camera?.fov, camera?.position?.z, aspect, frac]);
 
 	useEffect(() => {
 		if (base.current) {
 			base.current.scale.set(scaleXY[0], scaleXY[1], 1);
-			base.current.renderOrder = 999; // ensure logo draws above grid
+			base.current.renderOrder = 999;
 		}
 	}, [scaleXY]);
 
-	// Blur shader (kept simple and efficient)
+	// Enhanced blur shader with more samples for better blur quality
 	const blurVertexShader = `
         varying vec2 vUv;
         void main() {
@@ -478,25 +478,20 @@ const FloatingLogo = ({ breakpoint, logoOpacity = 0.34 }) => {
         uniform float blurAmount;
         varying vec2 vUv;
 
-        // 9-sample box blur (fast, lower cost than wide gaussian)
+        // Enhanced 13-sample blur for better quality
         void main() {
             vec2 texel = vec2(1.0) / vec2(textureSize(map, 0));
             vec4 c = vec4(0.0);
-            float w = blurAmount * 0.6;
+            float w = blurAmount * 0.8;
 
-            c += texture2D(map, vUv + texel * vec2(-w, -w));
-            c += texture2D(map, vUv + texel * vec2( 0.0, -w));
-            c += texture2D(map, vUv + texel * vec2( w, -w));
-
-            c += texture2D(map, vUv + texel * vec2(-w, 0.0));
-            c += texture2D(map, vUv);
-            c += texture2D(map, vUv + texel * vec2( w, 0.0));
-
-            c += texture2D(map, vUv + texel * vec2(-w, w));
-            c += texture2D(map, vUv + texel * vec2( 0.0, w));
-            c += texture2D(map, vUv + texel * vec2( w, w));
-
-            c /= 9.0;
+            // Sample more points for better blur quality
+            for(int i = -2; i <= 2; i++) {
+                for(int j = -2; j <= 2; j++) {
+                    c += texture2D(map, vUv + texel * vec2(float(i), float(j)) * w);
+                }
+            }
+            
+            c /= 25.0;
             c.a *= opacity;
             gl_FragColor = c;
         }
@@ -512,7 +507,7 @@ const FloatingLogo = ({ breakpoint, logoOpacity = 0.34 }) => {
 	);
 
 	return (
-		<group ref={base} position={[0, -1.8, -8]} renderOrder={999}>
+		<group ref={base} position={[0, 0, -8]} renderOrder={999}>
 			<mesh>
 				<planeGeometry args={[1, 1]} />
 				<shaderMaterial
@@ -521,7 +516,7 @@ const FloatingLogo = ({ breakpoint, logoOpacity = 0.34 }) => {
 					fragmentShader={blurFragmentShader}
 					transparent={true}
 					depthWrite={false}
-					depthTest={false} // ensure it renders above the grid
+					depthTest={false}
 				/>
 			</mesh>
 		</group>
@@ -565,13 +560,12 @@ const Background3D = () => {
 				gl={{
 					antialias: true,
 					alpha: true,
-					powerPreference: 'default', // Better browser compatibility
+					powerPreference: 'default',
 				}}
-				dpr={Math.min(1.5, window.devicePixelRatio || 1)} // Lower DPR for better performance
+				dpr={Math.min(1.5, window.devicePixelRatio || 1)}
 				onCreated={({ gl }) => {
 					gl.setClearColor(0x000000, 0);
 					gl.outputColorSpace = THREE.SRGBColorSpace;
-					// Cross-browser context handling
 					try {
 						gl.getContext().getShaderPrecisionFormat(gl.FRAGMENT_SHADER, gl.HIGH_FLOAT);
 					} catch (e) {
