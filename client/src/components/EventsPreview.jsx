@@ -53,6 +53,12 @@ const UpcomingEventShowcase = () => {
 	const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
 	const navigate = useNavigate();
 
+	// helper to navigate to event detail (fall back to listing if id missing)
+	const goToEvent = (id) => {
+		const target = id ? `/event/${id}` : '/event';
+		navigate(target);
+	};
+
 	useEffect(() => {
 		const handleResize = () => {
 			setIsMobile(window.innerWidth < 768);
@@ -238,9 +244,16 @@ const UpcomingEventShowcase = () => {
 					>
 						<motion.div
 							variants={itemVariants}
-							className="glass-card border-white/20 rounded-3xl overflow-hidden shadow-2xl relative"
+							className="glass-card border-white/20 rounded-3xl overflow-hidden shadow-2xl relative cursor-pointer"
 							whileHover={{ scale: 1.02 }}
 							transition={{ type: 'spring', stiffness: 300 }}
+							onClick={() => goToEvent(event?._id || event?.id)}
+							role="button"
+							tabIndex={0}
+							onKeyDown={(e) => {
+								if (e.key === 'Enter' || e.key === ' ')
+									goToEvent(event?._id || event?.id);
+							}}
 						>
 							{/* Poster */}
 							{poster && poster.url && (
@@ -373,7 +386,7 @@ const UpcomingEventShowcase = () => {
 									}}
 									whileTap={{ scale: 0.95 }}
 									className="w-full flex items-center justify-center gap-3 px-5 py-3 btn-primary rounded-2xl"
-									onClick={() => navigate(`/event`)}
+									onClick={() => goToEvent(event?._id || event?.id)}
 								>
 									<span>Discover More</span>
 									<ArrowRight className="w-5 h-5" />
@@ -420,7 +433,16 @@ const UpcomingEventShowcase = () => {
 				>
 					{/* Event Card */}
 					<motion.div variants={itemVariants} className="relative group">
-						<div className="glass-card p-6 md:p-8 overflow-hidden hover-lift">
+						<div
+							className="glass-card p-6 md:p-8 overflow-hidden hover-lift cursor-pointer"
+							onClick={() => goToEvent(event?._id || event?.id)}
+							role="button"
+							tabIndex={0}
+							onKeyDown={(e) => {
+								if (e.key === 'Enter' || e.key === ' ')
+									goToEvent(event?._id || event?.id);
+							}}
+						>
 							{/* Decorative elements */}
 							<div className="absolute top-0 right-0 w-32 h-32 bg-indigo-600/10 rounded-bl-full backdrop-blur-sm transition-all duration-300 group-hover:scale-125" />
 							<div className="absolute bottom-0 left-0 w-24 h-24 bg-purple-600/10 rounded-tr-full backdrop-blur-sm transition-all duration-300 group-hover:scale-125" />
@@ -461,7 +483,7 @@ const UpcomingEventShowcase = () => {
 									whileHover={{ scale: 1.05 }}
 									whileTap={{ scale: 0.95 }}
 									className="w-full sm:w-auto px-6 py-3 btn-primary rounded-xl"
-									onClick={() => navigate('/event')}
+									onClick={() => goToEvent(event?._id || event?.id)}
 								>
 									Learn More
 								</motion.button>
