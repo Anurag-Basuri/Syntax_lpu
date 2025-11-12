@@ -60,7 +60,10 @@ const isWebGLAvailable = () => {
 	if (typeof document === 'undefined') return false;
 	try {
 		const canvas = document.createElement('canvas');
-		return !!(canvas.getContext('webgl2') || canvas.getContext('webgl'));
+		return (
+			!!(window.WebGL2RenderingContext && canvas.getContext('webgl2')) ||
+			!!(canvas.getContext('webgl') || canvas.getContext('experimental-webgl'))
+		);
 	} catch {
 		return false;
 	}
@@ -69,7 +72,7 @@ const isWebGLAvailable = () => {
 // --- R3F Scene Components ---
 
 /**
- * Ultra-Enhanced Grid Component with Advanced 3D Wave Effects and Cloth Texture
+ * Enhanced Grid Component with Improved Cloth Texture
  */
 const Grid = ({ theme, breakpoint }) => {
 	const meshRef = useRef();
@@ -80,7 +83,7 @@ const Grid = ({ theme, breakpoint }) => {
 		return window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 	}, []);
 
-	// Enhanced responsive grid dimensions with higher segment count
+	// Responsive grid dimensions
 	const gridParams = useMemo(() => {
 		const configs = {
 			mobile: { width: 100, height: 60, segs: 80 },
@@ -95,7 +98,6 @@ const Grid = ({ theme, breakpoint }) => {
 	const uniforms = useMemo(
 		() => ({
 			uTime: { value: 0 },
-			// Slightly reduced amplitude to accommodate cloth texture
 			uWaveAmplitude: { value: breakpoint === 'mobile' ? 3.5 : 5.0 },
 			uWaveFrequency: { value: 0.055 },
 			uWaveSpeed: { value: prefersReduced ? 0.0 : 0.45 },
@@ -103,10 +105,12 @@ const Grid = ({ theme, breakpoint }) => {
 			uWireOpacity: { value: theme === 'light' ? 0.85 : 1.0 },
 			uWireColor: { value: new THREE.Color(theme === 'light' ? '#94a3b8' : '#64748b') },
 			uAccent: { value: new THREE.Color(readCssVar('--accent-1')) },
-			// Cloth texture parameters
-			uClothScale: { value: 8.0 },
-			uClothDetail: { value: 4.0 },
-			uClothStrength: { value: 0.4 },
+			// Enhanced cloth texture parameters
+			uClothScale: { value: 6.0 },
+			uClothDetail: { value: 6.0 },
+			uClothStrength: { value: 0.6 },
+			uWeaveDensity: { value: 2.5 },
+			uFabricSoftness: { value: 0.8 },
 			uMouseX: { value: 0 },
 			uMouseY: { value: 0 },
 		}),
@@ -121,7 +125,7 @@ const Grid = ({ theme, breakpoint }) => {
 			if (!prefersReduced && meshRef.current) {
 				const { pointer } = state;
 
-				// Smooth mouse tracking with enhanced influence
+				// Smooth mouse tracking
 				wireMatRef.current.uniforms.uMouseX.value = THREE.MathUtils.lerp(
 					wireMatRef.current.uniforms.uMouseX.value,
 					pointer.x * 0.6,
@@ -133,7 +137,7 @@ const Grid = ({ theme, breakpoint }) => {
 					0.05
 				);
 
-				// Enhanced 3D tilt with more dramatic angles
+				// 3D tilt
 				const targetRotX = THREE.MathUtils.degToRad(-22 + pointer.y * 8);
 				const targetRotY = THREE.MathUtils.degToRad(pointer.x * 9);
 
@@ -161,6 +165,8 @@ const Grid = ({ theme, breakpoint }) => {
         uniform float uClothScale;
         uniform float uClothDetail;
         uniform float uClothStrength;
+        uniform float uWeaveDensity;
+        uniform float uFabricSoftness;
 
         varying vec2 vUv;
         varying float vElevation;
@@ -169,7 +175,7 @@ const Grid = ({ theme, breakpoint }) => {
         varying vec3 vWorldPos;
         varying float vClothPattern;
         
-        // Enhanced noise functions for more organic movement
+        // Cross-browser compatible noise functions
         float hash(vec2 p) {
             return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453123);
         }
@@ -189,7 +195,7 @@ const Grid = ({ theme, breakpoint }) => {
             float value = 0.0;
             float amplitude = 0.5;
             float frequency = 1.0;
-            for(int i = 0; i < 6; i++) {
+            for(int i = 0; i < 4; i++) {
                 value += amplitude * noise(p * frequency);
                 frequency *= 2.0;
                 amplitude *= 0.5;
@@ -197,20 +203,30 @@ const Grid = ({ theme, breakpoint }) => {
             return value;
         }
 
-        // Cloth-like noise pattern
+        // Enhanced cloth pattern with realistic weave
         float clothPattern(vec2 uv) {
             float pattern = 0.0;
             
-            // Base woven texture
-            float weave1 = sin(uv.x * uClothScale * 3.14159) * sin(uv.y * uClothScale * 3.14159);
-            float weave2 = sin(uv.x * uClothScale * 1.5 * 3.14159 + 0.5) * sin(uv.y * uClothScale * 1.5 * 3.14159 + 0.3);
+            // Base woven texture - cross-hatch pattern
+            float warp = sin(uv.x * uClothScale * uWeaveDensity) * 
+                         sin(uv.y * uClothScale * uWeaveDensity * 0.8);
             
-            // Fine fabric details
-            float fineDetail = fbm(uv * uClothDetail) * 0.3;
-            float coarseDetail = fbm(uv * uClothDetail * 0.5) * 0.2;
+            float weft = sin(uv.x * uClothScale * uWeaveDensity * 0.7 + 1.57) * 
+                         sin(uv.y * uClothScale * uWeaveDensity * 1.2);
             
-            // Combine patterns
-            pattern = (weave1 * 0.4 + weave2 * 0.3 + fineDetail + coarseDetail) * uClothStrength;
+            // Twill-like pattern for more realistic fabric
+            float twill = sin((uv.x + uv.y) * uClothScale * uWeaveDensity * 0.5) * 
+                          sin((uv.x - uv.y) * uClothScale * uWeaveDensity * 0.3);
+            
+            // Fine fabric micro-details
+            float microDetail = fbm(uv * uClothDetail) * 0.4;
+            float macroDetail = fbm(uv * uClothDetail * 0.3) * 0.3;
+            
+            // Combine patterns with realistic fabric weighting
+            pattern = (warp * 0.35 + weft * 0.35 + twill * 0.2 + microDetail + macroDetail) * uClothStrength;
+            
+            // Add softness to the fabric pattern
+            pattern *= uFabricSoftness;
             
             return pattern;
         }
@@ -219,7 +235,7 @@ const Grid = ({ theme, breakpoint }) => {
             vUv = uv;
             vec3 pos = position;
 
-            // Complex multi-layered wave system
+            // Multi-layered wave system
             float wave1 = sin(pos.x * uWaveFrequency * 0.7 + uTime * uWaveSpeed * 0.9) *
                           cos(pos.y * uWaveFrequency * 0.5 + uTime * uWaveSpeed * 0.7);
             
@@ -229,57 +245,40 @@ const Grid = ({ theme, breakpoint }) => {
             float wave3 = sin(pos.x * uWaveFrequency * 2.1 + uTime * uWaveSpeed * 1.6) *
                           sin(pos.y * uWaveFrequency * 1.8 + uTime * uWaveSpeed * 1.35);
             
-            float wave4 = cos(pos.x * uWaveFrequency * 3.2 + uTime * uWaveSpeed * 2.0) *
-                          sin(pos.y * uWaveFrequency * 2.5 + uTime * uWaveSpeed * 1.7);
+            // Combine wave layers
+            float baseElevation = (wave1 * 1.0 + wave2 * 0.75 + wave3 * 0.5) * uWaveAmplitude;
             
-            // Fine ripple details
-            float ripple = sin(pos.x * uWaveFrequency * 6.0 + uTime * uWaveSpeed * 3.2) *
-                           sin(pos.y * uWaveFrequency * 5.2 + uTime * uWaveSpeed * 2.8) * 0.15;
-            
-            // Organic turbulence with more octaves
-            float organic = (fbm(pos.xy * 0.04 + uTime * 0.015) - 0.5) * 0.8;
-            
-            // Directional waves for more dynamic movement
-            float diagonal1 = sin((pos.x + pos.y) * uWaveFrequency * 0.8 + uTime * uWaveSpeed * 1.1) * 0.3;
-            float diagonal2 = cos((pos.x - pos.y) * uWaveFrequency * 0.9 + uTime * uWaveSpeed * 1.2) * 0.25;
-            
-            // Combine all wave layers with varying weights
-            float elevation = (wave1 * 1.0 + wave2 * 0.75 + wave3 * 0.5 + wave4 * 0.3) * uWaveAmplitude + 
-                              ripple + organic + diagonal1 + diagonal2;
-            
-            // Enhanced mouse interaction with radial influence
-            vec2 mousePos = vec2(uMouseX, uMouseY) * 30.0;
+            // Add cloth texture to the base elevation
+            float clothEffect = clothPattern(vUv * 2.0 + uTime * 0.05) * 1.2;
+            float combinedElevation = baseElevation + clothEffect;
+
+            // Mouse interaction
+            vec2 mousePos = vec2(uMouseX, uMouseY) * 25.0;
             float mouseDist = length(pos.xy - mousePos);
-            float mouseInfluence = sin(mouseDist * 0.15 - uTime * 2.0) * 
-                                   exp(-mouseDist * 0.05) * 1.2;
-            elevation += mouseInfluence;
+            float mouseInfluence = sin(mouseDist * 0.2 - uTime * 1.5) * 
+                                   exp(-mouseDist * 0.08) * 1.5;
+            combinedElevation += mouseInfluence;
 
-            // Enhanced depth calculation
+            // Depth calculation and attenuation
             vDepth = (pos.y + ${gridParams.height / 2}.0) / ${gridParams.height}.0;
-            
-            // Reduced depth-based attenuation for more visible grid
-            float depthAtten = smoothstep(0.0, 0.85, 1.0 - vDepth);
-            depthAtten = pow(depthAtten, 1.5);
-            elevation *= depthAtten;
+            float depthAtten = smoothstep(0.0, 0.8, 1.0 - vDepth);
+            depthAtten = pow(depthAtten, 1.3);
+            combinedElevation *= depthAtten;
 
-            // Add cloth texture pattern to elevation
-            float clothEffect = clothPattern(vUv * 2.0 + uTime * 0.1) * depthAtten * 0.8;
-            elevation += clothEffect;
+            pos.z += combinedElevation;
+            vElevation = combinedElevation;
             vClothPattern = clothEffect;
-
-            pos.z += elevation;
-            vElevation = elevation;
             vWorldPos = (modelMatrix * vec4(pos, 1.0)).xyz;
             
-            // Calculate surface normal for advanced lighting
-            float delta = 0.08;
+            // Calculate normal for lighting
+            float delta = 0.1;
             float elevX = (sin((pos.x + delta) * uWaveFrequency * 0.7 + uTime * uWaveSpeed * 0.9) *
                           cos(pos.y * uWaveFrequency * 0.5 + uTime * uWaveSpeed * 0.7) * uWaveAmplitude * depthAtten);
             float elevY = (sin(pos.x * uWaveFrequency * 0.7 + uTime * uWaveSpeed * 0.9) *
                           cos((pos.y + delta) * uWaveFrequency * 0.5 + uTime * uWaveSpeed * 0.7) * uWaveAmplitude * depthAtten);
             
-            vec3 tangentX = vec3(delta, 0.0, elevX - elevation);
-            vec3 tangentY = vec3(0.0, delta, elevY - elevation);
+            vec3 tangentX = vec3(delta, 0.0, elevX - combinedElevation);
+            vec3 tangentY = vec3(0.0, delta, elevY - combinedElevation);
             
             vNormal = normalize(cross(tangentX, tangentY));
 
@@ -302,71 +301,64 @@ const Grid = ({ theme, breakpoint }) => {
         varying float vClothPattern;
         
         void main() {
-            // Reduced exponential depth fade for more visible grid
+            // Depth-based fade
             float depthFade = smoothstep(0.0, uDepthFade, 1.0 - vDepth);
-            depthFade = pow(depthFade, 1.8);
+            depthFade = pow(depthFade, 1.5);
 
-            // Increased glow strengths for better visibility
-            float elevationGlow = smoothstep(1.0, 3.5, abs(vElevation)) * 1.2;
-            float peakGlow = smoothstep(3.5, 5.5, abs(vElevation)) * 1.5;
+            // Glow effects based on elevation
+            float elevationGlow = smoothstep(1.0, 3.0, abs(vElevation)) * 0.8;
+            float peakGlow = smoothstep(3.0, 5.0, abs(vElevation)) * 1.2;
             
-            // More prominent shimmer
-            float shimmer1 = sin(uTime * 2.8 + vUv.x * 12.0 + vUv.y * 9.0) * 0.15 + 0.85;
-            float shimmer2 = cos(uTime * 3.5 + vUv.y * 15.0 + vWorldPos.z * 2.0) * 0.1 + 0.9;
-            float shimmer = shimmer1 * shimmer2;
+            // Subtle shimmer
+            float shimmer = sin(uTime * 2.5 + vUv.x * 10.0 + vUv.y * 8.0) * 0.1 + 0.9;
             
-            // Enhanced fresnel for better edge visibility
+            // Fresnel effect for edges
             vec3 viewDir = normalize(vec3(0.0, 0.0, 1.0));
-            float fresnel = pow(1.0 - abs(dot(vNormal, viewDir)), 3.0);
-            float edgeGlow = fresnel * 1.2;
+            float fresnel = pow(1.0 - abs(dot(vNormal, viewDir)), 2.5);
+            float edgeGlow = fresnel * 0.6;
             
-            float rimLight = smoothstep(2.0, 4.5, vElevation) * fresnel * 0.8;
+            // Cloth texture influence
+            float clothIntensity = abs(vClothPattern) * 0.4;
+            float weavePattern = sin(vUv.x * 25.0 + uTime * 2.0) * 0.08 + 0.92;
             
-            float depthColor = vDepth * 0.3;
-            
-            // Cloth texture influence on color and opacity
-            float clothInfluence = abs(vClothPattern) * 0.3;
-            float clothVariation = sin(vUv.x * 20.0 + uTime * 1.5) * 0.1 + 0.9;
-            
-            // Increased lighting factor weights for better visibility
+            // Combine lighting factors
             float totalGlow = clamp(
-                elevationGlow * 0.8 + 
-                peakGlow * 0.6 +
-                edgeGlow * 0.8 + 
-                rimLight * 0.6, 
+                elevationGlow * 0.7 + 
+                peakGlow * 0.5 +
+                edgeGlow * 0.6, 
                 0.0, 1.0
             );
             totalGlow *= shimmer;
             
-            // Enhanced color mixing with cloth texture influence
-            vec3 baseColor = mix(uWireColor, uWireColor * 1.2, depthColor);
-            baseColor = mix(baseColor, baseColor * clothVariation, clothInfluence * 0.2);
+            // Color with cloth texture influence
+            vec3 baseColor = mix(uWireColor, uWireColor * 1.1, vDepth * 0.2);
+            baseColor = mix(baseColor, baseColor * weavePattern, clothIntensity * 0.3);
             
-            vec3 finalColor = mix(baseColor, uAccent, totalGlow * 0.8);
+            vec3 finalColor = mix(baseColor, uAccent, totalGlow * 0.7);
             
-            // More prominent peak highlighting
+            // Highlight extreme peaks
             if (vElevation > 2.5) {
-                float peakFactor = smoothstep(2.5, 4.5, vElevation);
-                finalColor = mix(finalColor, uAccent * 1.4, peakFactor * 0.5);
+                float peakFactor = smoothstep(2.5, 4.0, vElevation);
+                finalColor = mix(finalColor, uAccent * 1.3, peakFactor * 0.4);
             }
             
-            // Significantly increased alpha calculation for better visibility with cloth texture
-            float clothAlpha = (0.5 + clothInfluence * 0.5);
-            float alpha = uWireOpacity * depthFade * (0.9 + totalGlow * 0.4) * clothAlpha;
+            // Alpha calculation with cloth texture influence
+            float clothAlpha = (0.7 + clothIntensity * 0.3);
+            float alpha = uWireOpacity * depthFade * (0.8 + totalGlow * 0.3) * clothAlpha;
 
-            // Increased boost for extreme peaks
-            if (vElevation > 3.5) {
-                alpha += 0.5;
-                finalColor += uAccent * 0.35;
+            // Boost alpha for peaks
+            if (vElevation > 3.0) {
+                alpha += 0.3;
+                finalColor += uAccent * 0.25;
             }
             
-            // Higher minimum visibility for near grid
+            // Ensure minimum visibility for near grid
             if (vDepth < 0.3) {
-                alpha = max(alpha, uWireOpacity * 0.8);
+                alpha = max(alpha, uWireOpacity * 0.7);
             }
             
-            // Add subtle cloth pattern to alpha for textured appearance
-            alpha *= (0.95 + clothInfluence * 0.1);
+            // Add cloth pattern variation to alpha
+            alpha *= (0.9 + clothIntensity * 0.15);
             
             if (alpha <= 0.01) discard;
             gl_FragColor = vec4(finalColor, alpha);
@@ -385,7 +377,7 @@ const Grid = ({ theme, breakpoint }) => {
 						gridParams.width,
 						gridParams.height,
 						gridParams.segs,
-						gridParams.segs * 0.75,
+						Math.floor(gridParams.segs * 0.75),
 					]}
 				/>
 				<shaderMaterial
@@ -397,24 +389,26 @@ const Grid = ({ theme, breakpoint }) => {
 					side={THREE.DoubleSide}
 					vertexShader={vertexShader}
 					fragmentShader={fragmentShader}
+					extensions={{ derivatives: true }}
 				/>
 			</mesh>
 		</group>
 	);
 };
 
-// Floating Logo Component
-const FloatingLogo = ({ breakpoint, logoOpacity = 0.4 }) => {
+// Blurry Floating Logo Component
+const FloatingLogo = ({ breakpoint, logoOpacity = 0.3 }) => {
 	const base = useRef();
 	const texture = useTexture(logo);
+	const [blurAmount] = useState(2.5); // Controls blur intensity
 
 	useEffect(() => {
 		if (!texture) return;
+		// Cross-browser compatible texture settings
 		texture.colorSpace = THREE.SRGBColorSpace;
-		texture.anisotropy = 16;
-		texture.minFilter = THREE.LinearMipmapLinearFilter;
+		texture.minFilter = THREE.LinearFilter;
 		texture.magFilter = THREE.LinearFilter;
-		texture.generateMipmaps = true;
+		texture.generateMipmaps = false;
 		texture.needsUpdate = true;
 	}, [texture]);
 
@@ -449,15 +443,63 @@ const FloatingLogo = ({ breakpoint, logoOpacity = 0.4 }) => {
 		if (base.current) base.current.scale.set(scaleXY[0], scaleXY[1], 1);
 	}, [scaleXY]);
 
+	// Blur shader for the logo
+	const blurVertexShader = `
+		varying vec2 vUv;
+		void main() {
+			vUv = uv;
+			gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+		}
+	`;
+
+	const blurFragmentShader = `
+		uniform sampler2D map;
+		uniform float opacity;
+		uniform float blurAmount;
+		varying vec2 vUv;
+		
+		void main() {
+			vec4 color = vec4(0.0);
+			float total = 0.0;
+			float blurPixels = blurAmount * 0.01;
+			
+			// Simple Gaussian-like blur
+			for (float x = -4.0; x <= 4.0; x += 1.0) {
+				for (float y = -4.0; y <= 4.0; y += 1.0) {
+					vec2 offset = vec2(x, y) * blurPixels;
+					float weight = 1.0 - length(vec2(x, y)) / 5.0;
+					weight = weight * weight;
+					color += texture2D(map, vUv + offset) * weight;
+					total += weight;
+				}
+			}
+			
+			color /= total;
+			color.a *= opacity;
+			gl_FragColor = color;
+		}
+	`;
+
+	const blurUniforms = useMemo(
+		() => ({
+			map: { value: texture },
+			opacity: { value: logoOpacity },
+			blurAmount: { value: blurAmount },
+		}),
+		[texture, logoOpacity, blurAmount]
+	);
+
 	return (
 		<group ref={base} position={[0, 0, -10]} renderOrder={1}>
 			<mesh>
 				<planeGeometry args={[1, 1]} />
-				<meshBasicMaterial
-					map={texture}
-					transparent
+				<shaderMaterial
+					uniforms={blurUniforms}
+					vertexShader={blurVertexShader}
+					fragmentShader={blurFragmentShader}
+					transparent={true}
 					depthWrite={false}
-					opacity={logoOpacity}
+					extensions={{ derivatives: true }}
 				/>
 			</mesh>
 		</group>
@@ -486,7 +528,12 @@ const Background3D = () => {
 	}, [breakpoint]);
 
 	if (!webglOk) {
-		return null;
+		return (
+			<div
+				className="fixed inset-0 -z-10 overflow-hidden bg-gradient-to-br from-slate-900 to-slate-800"
+				aria-hidden="true"
+			/>
+		);
 	}
 
 	return (
@@ -496,12 +543,20 @@ const Background3D = () => {
 				gl={{
 					antialias: true,
 					alpha: true,
-					powerPreference: 'high-performance',
+					powerPreference: 'default', // Better browser compatibility
 				}}
-				dpr={[1, Math.min(2, window.devicePixelRatio || 2)]}
+				dpr={Math.min(1.5, window.devicePixelRatio || 1)} // Lower DPR for better performance
 				onCreated={({ gl }) => {
 					gl.setClearColor(0x000000, 0);
 					gl.outputColorSpace = THREE.SRGBColorSpace;
+					// Cross-browser context handling
+					try {
+						gl.getContext().getShaderPrecisionFormat(gl.FRAGMENT_SHADER, gl.HIGH_FLOAT);
+					} catch (e) {
+						console.warn(
+							'High precision shaders not supported, using medium precision'
+						);
+					}
 				}}
 			>
 				<Grid theme={theme} breakpoint={breakpoint} />
