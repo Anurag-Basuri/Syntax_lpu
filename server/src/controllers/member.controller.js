@@ -15,10 +15,13 @@ const generateAndSendTokens = async (member, res, message, statusCode) => {
 	member.refreshToken = refreshToken;
 	await member.save({ validateBeforeSave: false });
 
+	// Cookie options: lax for dev, none+secure for production (for cross-site)
+	const isProd = process.env.NODE_ENV === 'production';
 	const options = {
 		httpOnly: true,
-		secure: process.env.NODE_ENV === 'production',
-		sameSite: 'strict',
+		secure: !!isProd,
+		sameSite: isProd ? 'none' : 'lax', // 'none' in prod when frontend served from different origin
+		path: '/', // ensure cookie is sent on refresh route
 		maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
 	};
 
