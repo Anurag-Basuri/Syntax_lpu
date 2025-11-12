@@ -25,6 +25,7 @@ export const getAllMembers = async () => {
 export const getLeaders = async () => {
 	try {
 		const response = await publicClient.get('/api/v1/members/getleaders');
+		console.log("This is response",response);
 		// backend: { members: leaders } inside data.data
 		return response.data?.data?.members || [];
 	} catch (error) {
