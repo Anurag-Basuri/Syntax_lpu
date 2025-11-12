@@ -110,8 +110,8 @@ const arvantisSchema = new mongoose.Schema(
 		},
 		description: {
 			type: String,
-			required: [true, 'A description for the fest is required.'],
 			trim: true,
+			// make description optional so a fest can be created with minimal details
 		},
 		startDate: {
 			type: Date,
@@ -135,11 +135,32 @@ const arvantisSchema = new mongoose.Schema(
 				ref: 'Event',
 			},
 		],
-		partners: [partnerSchema],
+		partners: {
+			type: [partnerSchema],
+			default: [],
+		},
 		poster: {
 			type: mediaSchema,
 		},
-		gallery: [mediaSchema],
+		gallery: {
+			type: [mediaSchema],
+			default: [],
+		},
+		// lightweight metadata to keep creation minimal but useful
+		location: {
+			type: String,
+			trim: true,
+			maxlength: 200,
+		},
+		contactEmail: {
+			type: String,
+			trim: true,
+			lowercase: true,
+			validate: {
+				validator: (v) => !v || /^\S+@\S+\.\S+$/.test(v),
+				message: (props) => `${props.value} is not a valid email`,
+			},
+		},
 	},
 	{
 		timestamps: true,
@@ -179,19 +200,18 @@ arvantisSchema.virtual('computedStatus').get(function () {
 // Before saving, generate a slug and validate dates
 arvantisSchema.pre('save', async function (next) {
 	// Validate that endDate is not before startDate
-	if (this.endDate < this.startDate) {
+	if (this.endDate && this.startDate && this.endDate < this.startDate) {
 		return next(new Error('End date cannot be before the start date.'));
 	}
 
 	// Generate slug from name and year if missing or modified
 	if (this.isModified('name') || this.isModified('year') || !this.slug) {
-		const base = `${slugify(this.name)}-${this.year}`;
+		const base = `${slugify(this.name || 'arvantis')}-${this.year || new Date().getFullYear()}`;
 		let candidate = base;
 		let i = 0;
 
 		// ensure uniqueness (very small loop)
 		/* eslint-disable no-await-in-loop */
-		// If another document uses same slug, append increment
 		while (
 			await mongoose.models.Arvantis.findOne({
 				slug: candidate,
@@ -210,7 +230,6 @@ arvantisSchema.pre('save', async function (next) {
 });
 
 // Optional cascade cleanup: when a fest is removed, clear its reference from related events
-// (only if you want that behavior — it's safe and idempotent)
 arvantisSchema.pre('findOneAndDelete', async function (next) {
 	try {
 		const doc = await this.model.findOne(this.getFilter()).lean();
@@ -222,7 +241,6 @@ arvantisSchema.pre('findOneAndDelete', async function (next) {
 				.exec();
 		}
 	} catch (err) {
-		// swallow errors to avoid blocking deletion, but log in dev
 		/* eslint-disable no-console */
 		if (process.env.NODE_ENV !== 'production') console.warn('Arvantis cleanup failed', err);
 		/* eslint-enable no-console */
