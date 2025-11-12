@@ -9,19 +9,22 @@ import { Parser } from 'json2csv';
 
 // --- Helper Function to find a fest by slug or year ---
 const findFestBySlugOrYear = async (identifier, populate = false) => {
-	const query = /^\d{4}$/.test(identifier) ? { year: identifier } : { slug: identifier };
+	// if identifier looks like a 4-digit year, treat it as year (number)
+	const isYear = /^\d{4}$/.test(String(identifier));
+	const query = isYear ? { year: parseInt(identifier, 10) } : { slug: identifier };
 	let festQuery = Arvantis.findOne(query);
 
 	if (populate) {
+		// populate minimal event fields that match the Event model
 		festQuery = festQuery.populate({
 			path: 'events',
-			select: 'name eventDate type',
+			select: 'title eventDate category',
 		});
 	}
 
 	const fest = await festQuery;
 	if (!fest) {
-		throw new ApiError(404, `Fest with identifier '${identifier}' not found.`);
+		throw new ApiError.NotFound(`Fest with identifier '${identifier}' not found.`);
 	}
 	return fest;
 };
@@ -61,7 +64,7 @@ const createFest = asyncHandler(async (req, res) => {
 
 	const existingFest = await Arvantis.findOne({ year });
 	if (existingFest) {
-		throw new ApiError(409, `A fest for the year ${year} already exists.`);
+		throw new ApiError.Conflict(`A fest for the year ${year} already exists.`);
 	}
 
 	const fest = await Arvantis.create({ name, year, description, startDate, endDate, status });
@@ -104,7 +107,7 @@ const updateFestDetails = asyncHandler(async (req, res) => {
 const deleteFest = asyncHandler(async (req, res) => {
 	const fest = await findFestBySlugOrYear(req.params.identifier);
 
-	// Collect all media publicIds for deletion
+	// Collect all media publicIds for deletion (Cloudinary expects public_id)
 	const mediaToDelete = [];
 	if (fest.poster?.publicId) {
 		mediaToDelete.push({
@@ -112,10 +115,15 @@ const deleteFest = asyncHandler(async (req, res) => {
 			resource_type: fest.poster.resource_type || 'image',
 		});
 	}
-	fest.gallery.forEach((item) => {
-		mediaToDelete.push({ public_id: item.publicId, resource_type: item.resource_type });
+	(fest.gallery || []).forEach((item) => {
+		if (item?.publicId) {
+			mediaToDelete.push({
+				public_id: item.publicId,
+				resource_type: item.resource_type || 'image',
+			});
+		}
 	});
-	fest.partners.forEach((p) => {
+	(fest.partners || []).forEach((p) => {
 		if (p.logo?.publicId) {
 			mediaToDelete.push({
 				public_id: p.logo.publicId,
@@ -124,7 +132,7 @@ const deleteFest = asyncHandler(async (req, res) => {
 		}
 	});
 
-	// Delete all associated media from Cloudinary
+	// Delete all associated media from Cloudinary (ignore errors inside deleteFiles)
 	if (mediaToDelete.length > 0) {
 		await deleteFiles(mediaToDelete);
 	}
@@ -142,16 +150,15 @@ const deleteFest = asyncHandler(async (req, res) => {
 
 // Add a new partner (sponsor or collaborator) to a fest
 const addPartner = asyncHandler(async (req, res) => {
-	const { name, website, type, tier } = req.body;
+	const { name, website, tier } = req.body;
 	const fest = await findFestBySlugOrYear(req.params.identifier);
 
-	if (!req.file) throw new ApiError(400, 'Partner logo is required.');
+	if (!req.file) throw new ApiError.BadRequest('Partner logo is required.');
 
 	const logoFile = await uploadFile(req.file, { folder: `arvantis/${fest.year}/partners` });
 	const newPartner = {
 		name,
 		website,
-		type,
 		tier,
 		logo: {
 			url: logoFile.url,
@@ -172,7 +179,7 @@ const removePartner = asyncHandler(async (req, res) => {
 
 	const partnerIndex = fest.partners.findIndex((p) => p.name === partnerName);
 	if (partnerIndex === -1) {
-		throw new ApiError(404, `Partner '${partnerName}' not found.`);
+		throw new ApiError.NotFound(`Partner '${partnerName}' not found.`);
 	}
 
 	const [removedPartner] = fest.partners.splice(partnerIndex, 1);
@@ -195,10 +202,11 @@ const linkEventToFest = asyncHandler(async (req, res) => {
 	const fest = await findFestBySlugOrYear(req.params.identifier);
 
 	if (!mongoose.isValidObjectId(eventId) || !(await Event.findById(eventId))) {
-		throw new ApiError(404, 'Event not found with the provided ID.');
+		throw new ApiError.NotFound('Event not found with the provided ID.');
 	}
-	if (fest.events.includes(eventId)) {
-		throw new ApiError(409, 'This event is already linked to the fest.');
+	// avoid duplicates (compare string ids)
+	if ((fest.events || []).some((e) => String(e) === String(eventId))) {
+		throw new ApiError.Conflict('This event is already linked to the fest.');
 	}
 
 	fest.events.push(eventId);
@@ -220,8 +228,9 @@ const unlinkEventFromFest = asyncHandler(async (req, res) => {
 // Update fest poster
 const updateFestPoster = asyncHandler(async (req, res) => {
 	const fest = await findFestBySlugOrYear(req.params.identifier);
-	if (!req.file) throw new ApiError(400, 'Poster file is required.');
+	if (!req.file) throw new ApiError.BadRequest('Poster file is required.');
 
+	// remove previous poster if present
 	if (fest.poster?.publicId) {
 		await deleteFile({
 			public_id: fest.poster.publicId,
@@ -243,7 +252,7 @@ const updateFestPoster = asyncHandler(async (req, res) => {
 // Add media items to the gallery
 const addGalleryMedia = asyncHandler(async (req, res) => {
 	const fest = await findFestBySlugOrYear(req.params.identifier);
-	if (!req.files?.length) throw new ApiError(400, 'At least one media file is required.');
+	if (!req.files?.length) throw new ApiError.BadRequest('At least one media file is required.');
 
 	const uploadPromises = req.files.map((file) =>
 		uploadFile(file, { folder: `arvantis/${fest.year}/gallery` })
@@ -251,8 +260,8 @@ const addGalleryMedia = asyncHandler(async (req, res) => {
 	const uploadedFiles = await Promise.all(uploadPromises);
 
 	const newMediaItems = uploadedFiles.map((file) => ({
-		url: file.secure_url,
-		publicId: file.public_id,
+		url: file.url,
+		publicId: file.publicId,
 		resource_type: file.resource_type,
 	}));
 
@@ -267,7 +276,7 @@ const removeGalleryMedia = asyncHandler(async (req, res) => {
 	const fest = await findFestBySlugOrYear(identifier);
 
 	const mediaIndex = fest.gallery.findIndex((item) => item.publicId === publicId);
-	if (mediaIndex === -1) throw new ApiError(404, 'Media item not found in the gallery.');
+	if (mediaIndex === -1) throw new ApiError.NotFound('Media item not found in the gallery.');
 
 	const [mediaItem] = fest.gallery.splice(mediaIndex, 1);
 	await deleteFile({ public_id: mediaItem.publicId, resource_type: mediaItem.resource_type });
@@ -281,7 +290,7 @@ const removeGalleryMedia = asyncHandler(async (req, res) => {
 // Export all fests data as CSV
 const exportFestsCSV = asyncHandler(async (req, res) => {
 	const fests = await Arvantis.find().sort({ year: -1 }).lean();
-	if (fests.length === 0) throw new ApiError(404, 'No fest data to export.');
+	if (fests.length === 0) throw new ApiError.NotFound('No fest data to export.');
 
 	const fields = [
 		{ label: 'Year', value: 'year' },
@@ -331,7 +340,7 @@ const getFestStatistics = asyncHandler(async (req, res) => {
 		totalFests: stats[0].totalFests || 0,
 		totalPartners: stats[0].totalPartners || 0,
 		totalEvents: stats[0].totalEvents || 0,
-		statusCounts: stats[0].statusCounts.reduce((acc, curr) => {
+		statusCounts: (stats[0].statusCounts || []).reduce((acc, curr) => {
 			acc[curr._id] = curr.count;
 			return acc;
 		}, {}),
@@ -355,7 +364,7 @@ const getFestAnalytics = asyncHandler(async (req, res) => {
 						$filter: {
 							input: '$partners',
 							as: 'p',
-							cond: { $eq: ['$$p.type', 'sponsor'] },
+							cond: { $eq: ['$$p.tier', 'sponsor'] }, // best-effort mapping
 						},
 					},
 				},
@@ -364,7 +373,7 @@ const getFestAnalytics = asyncHandler(async (req, res) => {
 						$filter: {
 							input: '$partners',
 							as: 'p',
-							cond: { $eq: ['$$p.type', 'collaborator'] },
+							cond: { $eq: ['$$p.tier', 'collaborator'] },
 						},
 					},
 				},
@@ -378,7 +387,7 @@ const getFestAnalytics = asyncHandler(async (req, res) => {
 // Generate a detailed report for a single fest
 const generateFestReport = asyncHandler(async (req, res) => {
 	const fest = await findFestBySlugOrYear(req.params.identifier, true);
-	// You can expand this report with more details as needed
+	// Keep report minimal but useful
 	const report = {
 		festDetails: {
 			name: fest.name,
@@ -386,9 +395,10 @@ const generateFestReport = asyncHandler(async (req, res) => {
 			status: fest.status,
 			startDate: fest.startDate,
 			endDate: fest.endDate,
+			location: fest.location || null,
 		},
 		events: fest.events,
-		partners: fest.partners.map((p) => ({ name: p.name, type: p.type, tier: p.tier })),
+		partners: fest.partners.map((p) => ({ name: p.name, tier: p.tier, website: p.website })),
 	};
 	return ApiResponse.success(res, report, 'Fest report generated successfully.');
 });
