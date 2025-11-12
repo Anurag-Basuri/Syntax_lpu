@@ -318,8 +318,7 @@ const getCurrentMember = asyncHandler(async (req, res) => {
 
 // Get the leaders
 const getLeaders = asyncHandler(async (req, res) => {
-	const members = await Member.find().lean({ virtuals: true });
-	const leaders = members.filter((m) => m.isLeader);
+	const leaders = await Member.find({ designation: { $in: ['CEO', 'CTO', 'COO', 'CMO'] } }).select('fullname designation profilePicture email phone');
 
 	return ApiResponse.success(res, { members: leaders }, 'Club leaders retrieved successfully');
 });
