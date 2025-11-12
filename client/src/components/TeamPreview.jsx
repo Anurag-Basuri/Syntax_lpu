@@ -5,7 +5,7 @@ import { useLeaders } from '../hooks/useMembers';
 
 const CARD_THEME = {
 	bg: 'from-cyan-500/20 via-blue-500/20 to-sky-500/20',
-	glow: '0, 200, 255, 0.30',
+	glow: '0, 200, 255, 0.18', // softer glow for subtle shadow
 };
 
 // tiny SVG placeholder (data URL) used when profile image fails to load
@@ -31,6 +31,16 @@ const TeamPreview = () => {
 	const handleCardClick = (id) => {
 		if (!id) return;
 		navigate(`/team/${encodeURIComponent(id)}`);
+	};
+
+	// Glass card base style (uses backdrop blur for 'frosted glass' effect)
+	const glassStyle = {
+		background:
+			'linear-gradient(135deg, rgba(255,255,255,0.025) 0%, rgba(255,255,255,0.015) 100%)',
+		backdropFilter: 'blur(8px) saturate(1.05)',
+		WebkitBackdropFilter: 'blur(8px) saturate(1.05)',
+		border: '1px solid rgba(255,255,255,0.06)',
+		boxShadow: `0 8px 30px rgba(${CARD_THEME.glow})`,
 	};
 
 	// Error UI (non-blocking): show retry + view full team CTA
@@ -148,32 +158,40 @@ const TeamPreview = () => {
 						</motion.div>
 					</div>
 
-					{/* Grid */}
+					{/* Grid: responsive columns (1 / 2 / 3 / 4) and gap tuned for small screens */}
 					<motion.div
 						initial={{ opacity: 0, y: 18 }}
 						animate={{ opacity: 1, y: 0 }}
 						transition={{ duration: 0.7, delay: 0.08 }}
-						className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6"
+						className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-4 sm:gap-6"
 						role="list"
 					>
 						{isLoading
 							? // skeletons
-							  Array.from({ length: 3 }).map((_, i) => (
+							  Array.from({ length: 4 }).map((_, i) => (
 									<div
 										key={i}
-										className="glass-card p-6 shadow border border-white/10 animate-pulse"
+										className="p-4 sm:p-6 rounded-lg animate-pulse"
 										role="listitem"
 										aria-busy="true"
 									>
-										<div className="text-center">
-											<div className="w-20 h-20 mx-auto mb-4 rounded-full bg-slate-700/40 border border-white/10" />
-											<div className="h-4 w-3/4 mx-auto mb-2 rounded bg-slate-700/40" />
-											<div className="h-3 w-1/2 mx-auto rounded bg-slate-700/40" />
+										<div
+											className="h-full p-4 rounded-lg"
+											style={{
+												...glassStyle,
+												minHeight: 160,
+											}}
+										>
+											<div className="text-center">
+												<div className="w-16 h-16 sm:w-20 sm:h-20 mx-auto mb-4 rounded-full bg-slate-700/40 border border-white/10" />
+												<div className="h-4 w-3/4 mx-auto mb-2 rounded bg-slate-700/40" />
+												<div className="h-3 w-1/2 mx-auto rounded bg-slate-700/40" />
+											</div>
 										</div>
 									</div>
 							  ))
 							: // members
-							  (leaders || []).slice(0, 6).map((member, idx) => {
+							  (leaders || []).slice(0, 8).map((member, idx) => {
 									const id =
 										member?._id ||
 										member?.id ||
@@ -194,7 +212,7 @@ const TeamPreview = () => {
 											key={id}
 											initial={{ opacity: 0, y: 12 }}
 											animate={{ opacity: 1, y: 0 }}
-											transition={{ duration: 0.5, delay: idx * 0.05 }}
+											transition={{ duration: 0.5, delay: idx * 0.04 }}
 											role="listitem"
 										>
 											{/* Entire card is clickable and keyboard-accessible */}
@@ -208,15 +226,20 @@ const TeamPreview = () => {
 												}}
 												role="button"
 												tabIndex={0}
-												className="w-full text-left glass-card p-6 shadow hover:scale-[1.01] transition-transform duration-150 border border-white/10 rounded-lg block focus:outline-none focus-visible:ring-2 focus-visible:ring-accent cursor-pointer"
-												aria-label={`View profile for ${name}`}
+												className="w-full text-left p-4 sm:p-6 rounded-lg block focus:outline-none focus-visible:ring-2 focus-visible:ring-accent cursor-pointer transform transition will-change-transform"
 											>
-												<div className="relative z-10 text-center">
+												<div
+													className="h-full rounded-lg flex flex-col items-center justify-center gap-3"
+													style={{
+														...glassStyle,
+														minHeight: 160,
+													}}
+												>
 													{img ? (
 														<img
 															src={img}
 															alt={name}
-															className="w-20 h-20 mx-auto mb-4 rounded-full object-cover border-2 border-white/10"
+															className="w-16 h-16 sm:w-20 sm:h-20 mx-auto mb-1 rounded-full object-cover border-2 border-white/10 shadow-sm"
 															loading="lazy"
 															onError={(e) => {
 																e.currentTarget.onerror = null;
@@ -224,8 +247,8 @@ const TeamPreview = () => {
 															}}
 														/>
 													) : (
-														<div className="w-20 h-20 mx-auto mb-4 rounded-full border border-white/10 bg-white/5 flex items-center justify-center">
-															<span className="text-2xl font-semibold text-primary">
+														<div className="w-16 h-16 sm:w-20 sm:h-20 mx-auto mb-1 rounded-full border border-white/10 bg-white/5 flex items-center justify-center">
+															<span className="text-xl sm:text-2xl font-semibold text-primary">
 																{(
 																	name?.charAt(0) || '?'
 																).toUpperCase()}
@@ -233,12 +256,42 @@ const TeamPreview = () => {
 														</div>
 													)}
 
-													<h3 className="text-lg font-semibold text-primary mb-1 truncate">
-														{name}
-													</h3>
-													<p className="text-accent text-sm truncate">
-														{role}
-													</p>
+													<div className="text-center px-2">
+														<h3 className="text-sm sm:text-base font-semibold text-primary mb-1 truncate">
+															{name}
+														</h3>
+														<p className="text-xs sm:text-sm text-accent truncate">
+															{role}
+														</p>
+													</div>
+
+													{/* subtle CTA row for larger screens */}
+													<div className="mt-2 hidden sm:flex items-center gap-2">
+														<button
+															onClick={(e) => {
+																e.stopPropagation();
+																handleCardClick(id);
+															}}
+															className="px-3 py-1 rounded-full text-sm btn-outline"
+															aria-label={`Open ${name} profile`}
+														>
+															View
+														</button>
+														<button
+															onClick={(e) => {
+																e.stopPropagation();
+																navigate(
+																	`/team#${encodeURIComponent(
+																		id
+																	)}`
+																);
+															}}
+															className="px-3 py-1 rounded-full text-sm btn-primary text-white"
+															aria-label={`Explore team page near ${name}`}
+														>
+															Team
+														</button>
+													</div>
 												</div>
 											</div>
 										</motion.div>
@@ -247,7 +300,7 @@ const TeamPreview = () => {
 					</motion.div>
 
 					{/* CTA */}
-					<div className="text-center mt-12">
+					<div className="text-center mt-8">
 						<motion.button
 							onClick={() => navigate('/team')}
 							whileHover={{ scale: 1.03 }}
