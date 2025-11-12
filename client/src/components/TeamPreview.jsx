@@ -1,6 +1,6 @@
 import React from 'react';
 import { motion } from 'framer-motion';
-import { useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { useLeaders } from '../hooks/useMembers';
 
 const CARD_THEME = {
@@ -9,13 +9,14 @@ const CARD_THEME = {
 };
 
 const TeamPreview = () => {
-	const { data: leaders = [], isLoading, isError } = useLeaders();
+	const { data: rawLeaders = [], isLoading, isError } = useLeaders();
 	const navigate = useNavigate();
 
-	// If there's an error or no leaders are found after loading, don't render the component.
-	if (!isLoading && (isError || leaders.length === 0)) {
-		return null;
-	}
+	// normalize shape: API may return either an array or { members: [...] }
+	const leaders = Array.isArray(rawLeaders) ? rawLeaders : rawLeaders?.members ?? [];
+
+	// If there's an error, render nothing (caller can decide). If loading, show skeletons below.
+	if (!isLoading && isError) return null;
 
 	return (
 		<section
@@ -70,12 +71,12 @@ const TeamPreview = () => {
 										</div>
 									</div>
 							  ))
-							: // Actual Team Members
+							: // Actual Team Members (normalize data shape)
 							  leaders.slice(0, 6).map((member, index) => {
-									const id = member._id || `member-${index}`;
-									const name = member.fullname || 'Team Member';
-									const role = member.designation || 'Role';
-									const img = member.profilePicture?.url;
+									const id = member._id || member.id || `member-${index}`;
+									const name = member.fullname || member.name || 'Team Member';
+									const role = member.designation || member.role || 'Role';
+									const img = member.profilePicture?.url || member.avatar;
 
 									return (
 										<motion.div
@@ -85,12 +86,13 @@ const TeamPreview = () => {
 											transition={{ duration: 0.6, delay: index * 0.06 }}
 											role="listitem"
 										>
-											<button
-												type="button"
-												onClick={() => navigate(`/team/${id}`)}
-												className="w-full text-left glass-card p-6 shadow-2xl hover-lift border border-white/12 focus:outline-none focus:ring-2 focus:ring-accent rounded-lg"
+											{/* Use Link so routing works even if some parent blocks pointer events */}
+											<Link
+												to={`/team/${encodeURIComponent(id)}`}
+												className="w-full text-left glass-card p-6 shadow-2xl hover-lift border border-white/12 focus:outline-none focus:ring-2 focus:ring-accent rounded-lg block"
 												style={{
 													boxShadow: `0 0 24px rgba(${CARD_THEME.glow})`,
+													textDecoration: 'none',
 												}}
 												aria-label={`View profile for ${name}`}
 											>
@@ -118,7 +120,7 @@ const TeamPreview = () => {
 														{role}
 													</p>
 												</div>
-											</button>
+											</Link>
 										</motion.div>
 									);
 							  })}
