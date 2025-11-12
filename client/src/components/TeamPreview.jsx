@@ -1,6 +1,6 @@
 import React from 'react';
 import { motion } from 'framer-motion';
-import { Link, useNavigate } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { useLeaders } from '../hooks/useMembers';
 
 const CARD_THEME = {
@@ -16,13 +16,24 @@ const TeamPreview = () => {
 	const { data: rawLeaders, isLoading, isError, refetch } = useLeaders();
 	const navigate = useNavigate();
 
-	// normalize shape: API may return either an array or { members: [...] }
+	// Normalize possible shapes returned by hook/service
 	const leaders = React.useMemo(() => {
 		if (!rawLeaders) return [];
-		return Array.isArray(rawLeaders) ? rawLeaders : rawLeaders?.members ?? [];
+		if (Array.isArray(rawLeaders)) return rawLeaders;
+		// handle shapes: { members: [...] } or { data: { members: [...] } }
+		if (Array.isArray(rawLeaders.members)) return rawLeaders.members;
+		if (rawLeaders.data && Array.isArray(rawLeaders.data.members))
+			return rawLeaders.data.members;
+		return [];
 	}, [rawLeaders]);
 
-	// show a small unobtrusive error UI with retry so page doesn't disappear
+	// Click handler that ensures navigation works even if Link isn't used
+	const handleCardClick = (id) => {
+		if (!id) return;
+		navigate(`/team/${encodeURIComponent(id)}`);
+	};
+
+	// Error UI (non-blocking): show retry + view full team CTA
 	if (!isLoading && isError) {
 		return (
 			<section
@@ -30,15 +41,18 @@ const TeamPreview = () => {
 				aria-labelledby="team-heading"
 			>
 				<div className="max-w-4xl mx-auto text-center">
-					<h2 id="team-heading" className="text-2xl font-semibold mb-4">
+					<h2 id="team-heading" className="text-2xl font-semibold mb-3">
 						Meet Our Core Team
 					</h2>
-					<p className="mb-6 text-muted">We couldn't load the team right now.</p>
-					<div className="flex items-center justify-center gap-3">
+					<p className="mb-6 text-muted">
+						Something went wrong loading the team. This might be a temporary network
+						issue.
+					</p>
+					<div className="flex flex-col sm:flex-row items-center justify-center gap-3">
 						<button
 							onClick={() => refetch()}
 							className="btn-outline px-4 py-2 rounded"
-							aria-label="Retry loading team"
+							aria-label="Retry"
 						>
 							Retry
 						</button>
@@ -47,6 +61,59 @@ const TeamPreview = () => {
 							className="btn-primary px-4 py-2 rounded text-white"
 						>
 							View Full Team
+						</button>
+					</div>
+					<p className="mt-4 text-sm text-muted">
+						If the problem persists, contact support or try again later.
+					</p>
+				</div>
+			</section>
+		);
+	}
+
+	// Empty-state UI when the request succeeded but there are no leaders
+	if (!isLoading && !isError && leaders.length === 0) {
+		return (
+			<section
+				className="section-container py-normal bg-transparent"
+				aria-labelledby="team-heading"
+			>
+				<div className="max-w-4xl mx-auto text-center">
+					<h2 id="team-heading" className="text-2xl font-semibold mb-3">
+						Meet Our Core Team
+					</h2>
+					<div className="mx-auto mb-6 w-full max-w-md">
+						{/* simple illustrative SVG */}
+						<div className="rounded-lg bg-white/3 p-6 flex items-center justify-center">
+							<svg
+								width="160"
+								height="100"
+								viewBox="0 0 160 100"
+								fill="none"
+								xmlns="http://www.w3.org/2000/svg"
+								aria-hidden
+							>
+								<rect width="160" height="100" rx="8" fill="#0b1220" />
+								<g opacity="0.9" fill="#9fb4ff">
+									<circle cx="40" cy="48" r="14" />
+									<circle cx="80" cy="36" r="10" />
+									<circle cx="120" cy="50" r="12" />
+								</g>
+							</svg>
+						</div>
+					</div>
+					<p className="text-muted mb-6">
+						No leaders published yet — we are growing the team. Check back soon.
+					</p>
+					<div className="flex items-center justify-center gap-3">
+						<button
+							onClick={() => navigate('/team')}
+							className="btn-primary px-5 py-2 rounded text-white"
+						>
+							Explore Team Page
+						</button>
+						<button onClick={() => refetch()} className="btn-outline px-5 py-2 rounded">
+							Refresh
 						</button>
 					</div>
 				</div>
@@ -130,9 +197,18 @@ const TeamPreview = () => {
 											transition={{ duration: 0.5, delay: idx * 0.05 }}
 											role="listitem"
 										>
-											<Link
-												to={`/team/${encodeURIComponent(id)}`}
-												className="w-full text-left glass-card p-6 shadow hover:scale-[1.01] transition-transform duration-150 border border-white/10 rounded-lg block focus:outline-none focus:ring-2 focus:ring-accent"
+											{/* Entire card is clickable and keyboard-accessible */}
+											<div
+												onClick={() => handleCardClick(id)}
+												onKeyDown={(e) => {
+													if (e.key === 'Enter' || e.key === ' ') {
+														e.preventDefault();
+														handleCardClick(id);
+													}
+												}}
+												role="button"
+												tabIndex={0}
+												className="w-full text-left glass-card p-6 shadow hover:scale-[1.01] transition-transform duration-150 border border-white/10 rounded-lg block focus:outline-none focus-visible:ring-2 focus-visible:ring-accent cursor-pointer"
 												aria-label={`View profile for ${name}`}
 											>
 												<div className="relative z-10 text-center">
@@ -164,7 +240,7 @@ const TeamPreview = () => {
 														{role}
 													</p>
 												</div>
-											</Link>
+											</div>
 										</motion.div>
 									);
 							  })}
