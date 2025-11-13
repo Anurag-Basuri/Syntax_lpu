@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useState, useCallback, useRef, useMemo } from 'react';
 import {
 	getAllFests,
 	getFestDetails,
@@ -115,6 +115,7 @@ const ArvantisTab = ({ setDashboardError = () => {} }) => {
 	// local error
 	const [localError, setLocalError] = useState('');
 	const [toast, setToast] = useState(null); // { type: 'success'|'error', message }
+	const toastTimeoutRef = useRef(null);
 
 	// helper: normalize identifier for API usage (slug | year | _id)
 	const resolveIdentifier = (festOrIdentifier) => {
@@ -212,7 +213,84 @@ const ArvantisTab = ({ setDashboardError = () => {} }) => {
 			setLoading(false);
 		}
 	}, [limit, loadFestByIdentifier, setDashboardError]);
+	/* changed code */
+	const fetchYearsAndLatest = useCallback(async () => {
+		setLoading(true);
+		setLocalError('');
+		try {
+			const res = await getAllFests(
+				{ page: 1, limit, sortBy: 'year', sortOrder: 'desc' },
+				{ admin: true }
+			);
+			const docs = Array.isArray(res.docs) ? res.docs : [];
+			setFests(docs);
 
+			// years (desc)
+			const yrs = Array.from(new Set(docs.map((d) => d.year)))
+				.sort((a, b) => b - a)
+				.map((y) => String(y));
+			setYears(yrs);
+
+			// Choose best fest to open automatically:
+			// Prefer current year ongoing/upcoming, then highest year ongoing/upcoming, then most recent completed.
+			const nowYear = new Date().getFullYear();
+			const statusRank = (s) => {
+				if (!s) return 0;
+				if (s === 'ongoing') return 4;
+				if (s === 'upcoming') return 3;
+				if (s === 'completed') return 2;
+				if (s === 'postponed') return 1;
+				if (s === 'cancelled') return 0;
+				return 0;
+			};
+
+			let candidate = null;
+			// Prefer current year with best status
+			const currentYearCandidates = docs
+				.filter((d) => Number(d.year) === nowYear)
+				.sort((a, b) => statusRank(b.status) - statusRank(a.status));
+			if (
+				currentYearCandidates.length > 0 &&
+				statusRank(currentYearCandidates[0].status) > 1
+			) {
+				candidate = currentYearCandidates[0];
+			}
+
+			// Otherwise prefer highest year with ongoing/upcoming
+			if (!candidate) {
+				const prefer = docs
+					.filter((d) => ['ongoing', 'upcoming'].includes(d.status))
+					.sort((a, b) => b.year - a.year || statusRank(b.status) - statusRank(a.status));
+				if (prefer.length) candidate = prefer[0];
+			}
+
+			// Fallback to most recent completed
+			if (!candidate) {
+				const completed = docs
+					.filter((d) => d.status === 'completed')
+					.sort((a, b) => b.year - a.year);
+				if (completed.length) candidate = completed[0];
+			}
+
+			// Final fallback: first doc (already sorted by year desc)
+			if (!candidate && docs.length) candidate = docs[0];
+
+			if (candidate) {
+				const id = candidate.slug || candidate.year || candidate._id;
+				setSelectedYear(String(candidate.year));
+				await loadFestByIdentifier(id, { setSelected: false });
+			} else {
+				setActiveFest(null);
+				setPartners([]);
+			}
+		} catch (err) {
+			const msg = err?.message || 'Failed to fetch fests.';
+			setLocalError(msg);
+			setDashboardError(msg);
+		} finally {
+			setLoading(false);
+		}
+	}, [limit, loadFestByIdentifier, setDashboardError]);
 	// Fetch events (used for linking) once
 	const fetchEvents = useCallback(async () => {
 		try {
@@ -260,6 +338,23 @@ const ArvantisTab = ({ setDashboardError = () => {} }) => {
 					.includes(q)
 			);
 		});
+	/* changed code */
+	const visibleFests = useMemo(
+		() =>
+			(fests || [])
+				.filter((f) => (!selectedYear ? true : String(f.year) === String(selectedYear)))
+				.filter((f) => {
+					if (!query) return true;
+					const q = String(query).toLowerCase();
+					return (
+						String(f.year).includes(q) ||
+						((f.name || '') + ' ' + (f.description || '') + ' ' + (f.slug || ''))
+							.toLowerCase()
+							.includes(q)
+					);
+				}),
+		[fests, selectedYear, query]
+	);
 
 	/* Actions */
 
@@ -269,6 +364,24 @@ const ArvantisTab = ({ setDashboardError = () => {} }) => {
 		// auto-dismiss after 3.5s
 		setTimeout(() => setToast(null), 3500);
 	};
+	// Toast helper (safe: reuses ref and clears previous timeout)
+	const showToast = (message, type = 'success') => {
+		setToast({ message, type });
+		if (toastTimeoutRef.current) {
+			clearTimeout(toastTimeoutRef.current);
+		}
+		toastTimeoutRef.current = setTimeout(() => {
+			setToast(null);
+			toastTimeoutRef.current = null;
+		}, 3500);
+	};
+
+	// clear toast timer on unmount
+	useEffect(() => {
+		return () => {
+			if (toastTimeoutRef.current) clearTimeout(toastTimeoutRef.current);
+		};
+	}, []);
 
 	const handleCreateSubmit = async (e) => {
 		e.preventDefault();
@@ -732,6 +845,13 @@ const ArvantisTab = ({ setDashboardError = () => {} }) => {
 											: 'bg-gray-900/30 border-gray-800 hover:bg-gray-900/40'
 									}`}
 									disabled={actionBusy}
+									tabIndex={0}
+									aria-current={
+										activeFest &&
+										resolveIdentifier(activeFest) === resolveIdentifier(f)
+											? 'true'
+											: 'false'
+									}
 								>
 									<div className="flex items-center justify-between">
 										<div>
@@ -1256,7 +1376,7 @@ const ArvantisTab = ({ setDashboardError = () => {} }) => {
 };
 
 /* Small helper component included inline to avoid missing import errors */
-const PartnerQuickAdd = ({ onAdd = () => {}, disabled = false }) => {
+const PartnerQuickAdd = React.memo(({ onAdd = () => {}, disabled = false }) => {
 	const [name, setName] = useState('');
 	const [tier, setTier] = useState('sponsor');
 	const [website, setWebsite] = useState('');
@@ -1297,6 +1417,7 @@ const PartnerQuickAdd = ({ onAdd = () => {}, disabled = false }) => {
 				placeholder="Partner name"
 				className="w-full p-2 rounded bg-gray-700 text-white mb-2"
 				disabled={disabled}
+				aria-label="Partner name"
 			/>
 			<div className="flex gap-2 mb-2">
 				<select
@@ -1304,6 +1425,7 @@ const PartnerQuickAdd = ({ onAdd = () => {}, disabled = false }) => {
 					onChange={(e) => setTier(e.target.value)}
 					className="p-2 bg-gray-700 rounded text-white"
 					disabled={disabled}
+					aria-label="Partner tier"
 				>
 					<option value="sponsor">Sponsor</option>
 					<option value="collaborator">Collaborator</option>
@@ -1314,6 +1436,7 @@ const PartnerQuickAdd = ({ onAdd = () => {}, disabled = false }) => {
 					placeholder="Website (optional)"
 					className="p-2 rounded bg-gray-700 text-white flex-1"
 					disabled={disabled}
+					aria-label="Partner website"
 				/>
 			</div>
 			<input
@@ -1322,6 +1445,7 @@ const PartnerQuickAdd = ({ onAdd = () => {}, disabled = false }) => {
 				onChange={(e) => setLogoFile(e.target.files?.[0] || null)}
 				className="mb-2"
 				disabled={disabled}
+				aria-label="Partner logo"
 			/>
 			{err && <div className="text-xs text-red-400 mb-2">{err}</div>}
 			<button
@@ -1329,11 +1453,10 @@ const PartnerQuickAdd = ({ onAdd = () => {}, disabled = false }) => {
 				className="w-full py-2 bg-green-600 rounded text-white"
 				onClick={submit}
 				disabled={adding || disabled}
+				aria-disabled={adding || disabled}
 			>
 				{adding ? 'Adding...' : 'Add Partner'}
 			</button>
 		</div>
 	);
-};
-
-export default ArvantisTab;
+});
