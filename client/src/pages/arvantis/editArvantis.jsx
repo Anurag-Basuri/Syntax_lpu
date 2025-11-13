@@ -1,8 +1,8 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { 
-  Sparkles, X, Loader2, Plus, DownloadCloud, BarChart2, 
-  Calendar, MapPin, Users, Image, Film, Link2, Unlink, 
-  Copy, Trash2, Edit3, ChevronDown, ChevronUp, Star, 
+import {
+  Sparkles, X, Loader2, Plus, DownloadCloud, BarChart2,
+  Calendar, MapPin, Users, Image, Film, Link2,
+  Copy, Trash2, Edit3, ChevronDown, ChevronUp, Star,
   Trophy, Search, Eye, Settings, Share2, Zap,
   Building2, Camera, Video
 } from 'lucide-react';
@@ -26,279 +26,34 @@ import {
 } from '../../services/arvantisServices.js';
 import { apiClient } from '../../services/api.js';
 
+// replace inline UI helpers with component imports:
+import Badge from '../../components/arvantis/Badge';
+import GlassCard from '../../components/arvantis/GlassCard';
+import EmptyState from '../../components/arvantis/EmptyState';
+import LoadingSpinner from '../../components/arvantis/LoadingSpinner';
+import Toast from '../../components/arvantis/Toast';
+import StatCard from '../../components/arvantis/StatCard';
+import PartnerQuickAdd from '../../components/arvantis/PartnerQuickAdd';
+
 // Premium UI Components
-const Badge = ({ children, variant = 'default', className = '', size = 'md' }) => {
-  const variants = {
-    default: 'bg-gray-500/20 text-gray-300 border border-gray-500/30',
-    upcoming: 'bg-blue-500/20 text-blue-300 border border-blue-500/30 shadow-lg shadow-blue-500/20',
-    ongoing: 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 shadow-lg shadow-emerald-500/20',
-    completed: 'bg-purple-500/20 text-purple-300 border border-purple-500/30 shadow-lg shadow-purple-500/20',
-    cancelled: 'bg-red-500/20 text-red-300 border border-red-500/30 shadow-lg shadow-red-500/20',
-    postponed: 'bg-amber-500/20 text-amber-300 border border-amber-500/30 shadow-lg shadow-amber-500/20',
-    sponsor: 'bg-gradient-to-r from-amber-500/20 to-orange-500/20 text-amber-300 border border-amber-500/30',
-    collaborator: 'bg-gradient-to-r from-blue-500/20 to-cyan-500/20 text-blue-300 border border-blue-500/30',
-    premium: 'bg-gradient-to-r from-purple-500/20 to-pink-500/20 text-purple-300 border border-purple-500/30',
-  };
-
-  const sizes = {
-    sm: 'px-2 py-1 text-xs',
-    md: 'px-3 py-1.5 text-sm',
-    lg: 'px-4 py-2 text-base'
-  };
-
-  return (
-    <span
-      className={`inline-flex items-center rounded-full font-semibold backdrop-blur-sm transition-all duration-300 ${variants[variant]} ${sizes[size]} ${className}`}
-    >
-      {children}
-    </span>
-  );
+const variants = {
+  default: 'bg-gray-500/20 text-gray-300 border border-gray-500/30',
+  upcoming: 'bg-blue-500/20 text-blue-300 border border-blue-500/30 shadow-lg shadow-blue-500/20',
+  ongoing: 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 shadow-lg shadow-emerald-500/20',
+  completed: 'bg-purple-500/20 text-purple-300 border border-purple-500/30 shadow-lg shadow-purple-500/20',
+  cancelled: 'bg-red-500/20 text-red-300 border border-red-500/30 shadow-lg shadow-red-500/20',
+  postponed: 'bg-amber-500/20 text-amber-300 border border-amber-500/30 shadow-lg shadow-amber-500/20',
+  sponsor: 'bg-gradient-to-r from-amber-500/20 to-orange-500/20 text-amber-300 border border-amber-500/30',
+  collaborator: 'bg-gradient-to-r from-blue-500/20 to-cyan-500/20 text-blue-300 border border-blue-500/30',
+  premium: 'bg-gradient-to-r from-purple-500/20 to-pink-500/20 text-purple-300 border border-purple-500/30',
 };
 
-const GlassCard = ({ children, className = '', hover = false, gradient = false }) => (
-  <div
-    className={`bg-white/5 backdrop-blur-xl border border-white/10 rounded-3xl shadow-2xl ${
-      gradient ? 'bg-gradient-to-br from-white/5 to-white/10' : ''
-    } ${
-      hover ? 'hover:bg-white/10 hover:border-white/20 hover:scale-[1.02] transition-all duration-300' : ''
-    } ${className}`}
-  >
-    {children}
-  </div>
-);
-
-const EmptyState = ({ 
-  title, 
-  subtitle, 
-  icon: Icon = Sparkles, 
-  action,
-  size = 'md'
-}) => (
-  <GlassCard className={`text-center ${size === 'lg' ? 'p-12' : 'p-8'}`}>
-    <div className="flex justify-center mb-6">
-      <div className="p-4 bg-gradient-to-br from-purple-500/20 to-pink-500/20 rounded-3xl shadow-lg">
-        <Icon className={`${size === 'lg' ? 'w-12 h-12' : 'w-8 h-8'} text-purple-300`} />
-      </div>
-    </div>
-    <h3 className={`font-semibold text-white mb-3 ${size === 'lg' ? 'text-2xl' : 'text-lg'}`}>
-      {title}
-    </h3>
-    <p className={`text-gray-400 mb-6 ${size === 'lg' ? 'text-base' : 'text-sm'}`}>
-      {subtitle}
-    </p>
-    {action}
-  </GlassCard>
-);
-
-const LoadingSpinner = ({ size = 'lg', text = 'Loading...', className = '' }) => (
-  <div className={`flex flex-col items-center justify-center py-12 ${className}`}>
-    <div
-      className={`animate-spin rounded-full border-2 border-transparent border-t-purple-500 border-r-pink-500 ${
-        size === 'sm' ? 'w-6 h-6' : size === 'md' ? 'w-10 h-10' : 'w-16 h-16'
-      }`}
-    />
-    {text && (
-      <p className="mt-4 text-gray-400 text-sm font-medium animate-pulse">
-        {text}
-      </p>
-    )}
-  </div>
-);
-
-const Toast = ({ message, type = 'success', onDismiss }) => {
-  const icons = {
-    success: <div className="w-6 h-6 bg-emerald-500 rounded-full flex items-center justify-center">✓</div>,
-    error: <div className="w-6 h-6 bg-red-500 rounded-full flex items-center justify-center">!</div>,
-    warning: <div className="w-6 h-6 bg-amber-500 rounded-full flex items-center justify-center">⚠</div>,
-    info: <div className="w-6 h-6 bg-blue-500 rounded-full flex items-center justify-center">i</div>,
-  };
-
-  const backgrounds = {
-    success: 'bg-gradient-to-r from-emerald-600 to-green-600 shadow-lg shadow-emerald-500/25',
-    error: 'bg-gradient-to-r from-red-600 to-pink-600 shadow-lg shadow-red-500/25',
-    warning: 'bg-gradient-to-r from-amber-600 to-orange-600 shadow-lg shadow-amber-500/25',
-    info: 'bg-gradient-to-r from-blue-600 to-cyan-600 shadow-lg shadow-blue-500/25',
-  };
-
-  return (
-    <div
-      className={`${backgrounds[type]} text-white px-6 py-4 rounded-2xl backdrop-blur-xl flex items-center gap-4 animate-in slide-in-from-right-full duration-500`}
-    >
-      {icons[type]}
-      <span className="flex-1 font-medium text-sm">{message}</span>
-      <button
-        onClick={onDismiss}
-        className="hover:bg-white/20 rounded-full p-1.5 transition-all duration-200"
-      >
-        <X className="w-4 h-4" />
-      </button>
-    </div>
-  );
+const sizes = {
+  sm: 'px-2 py-1 text-xs',
+  md: 'px-3 py-1.5 text-sm',
+  lg: 'px-4 py-2 text-base'
 };
 
-const StatCard = ({ title, value, icon: Icon, trend, className = '' }) => (
-  <GlassCard hover className={`p-6 ${className}`}>
-    <div className="flex items-center justify-between">
-      <div>
-        <p className="text-gray-400 text-sm font-medium mb-2">{title}</p>
-        <p className="text-2xl font-bold text-white">{value}</p>
-        {trend && (
-          <p className={`text-xs font-medium mt-1 ${
-            trend.startsWith('+') ? 'text-emerald-400' : 'text-red-400'
-          }`}>
-            {trend}
-          </p>
-        )}
-      </div>
-      <div className="p-3 bg-gradient-to-br from-purple-500/20 to-pink-500/20 rounded-2xl">
-        <Icon className="w-6 h-6 text-purple-300" />
-      </div>
-    </div>
-  </GlassCard>
-);
-
-// Enhanced Partner Quick Add
-const PartnerQuickAdd = React.memo(({ onAdd = () => {}, disabled = false }) => {
-  const [isExpanded, setIsExpanded] = useState(false);
-  const [name, setName] = useState('');
-  const [tier, setTier] = useState('sponsor');
-  const [website, setWebsite] = useState('');
-  const [logoFile, setLogoFile] = useState(null);
-  const [adding, setAdding] = useState(false);
-  const [err, setErr] = useState('');
-
-  const submit = async () => {
-    setErr('');
-    if (!name || !logoFile) {
-      setErr('Partner name and logo are required');
-      return;
-    }
-    setAdding(true);
-    try {
-      const fd = new FormData();
-      fd.append('name', name);
-      fd.append('tier', tier);
-      if (website) fd.append('website', website);
-      fd.append('logo', logoFile);
-      await onAdd(fd);
-      setName('');
-      setTier('sponsor');
-      setWebsite('');
-      setLogoFile(null);
-      setIsExpanded(false);
-    } catch (e) {
-      setErr(e?.message || 'Failed to add partner');
-    } finally {
-      setAdding(false);
-    }
-  };
-
-  if (!isExpanded) {
-    return (
-      <button
-        onClick={() => setIsExpanded(true)}
-        disabled={disabled}
-        className="w-full p-4 border-2 border-dashed border-white/10 rounded-2xl hover:border-purple-500/50 hover:bg-purple-500/5 transition-all duration-300 group"
-      >
-        <div className="flex items-center justify-center gap-3 text-gray-400 group-hover:text-purple-300">
-          <Plus className="w-5 h-5" />
-          <span className="font-medium">Add New Partner</span>
-        </div>
-      </button>
-    );
-  }
-
-  return (
-    <GlassCard className="p-6 animate-in fade-in duration-300">
-      <div className="flex items-center justify-between mb-4">
-        <h4 className="text-lg font-semibold text-white">Add New Partner</h4>
-        <button
-          onClick={() => setIsExpanded(false)}
-          className="p-2 hover:bg-white/10 rounded-xl transition-colors"
-        >
-          <X className="w-4 h-4 text-gray-400" />
-        </button>
-      </div>
-      
-      <div className="space-y-4">
-        <input
-          value={name}
-          onChange={(e) => setName(e.target.value)}
-          placeholder="Partner name"
-          className="w-full p-4 bg-white/5 border border-white/10 rounded-2xl text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent backdrop-blur-sm transition-all duration-300"
-          disabled={disabled}
-        />
-        
-        <div className="grid grid-cols-2 gap-4">
-          <select
-            value={tier}
-            onChange={(e) => setTier(e.target.value)}
-            className="p-4 bg-white/5 border border-white/10 rounded-2xl text-white focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent backdrop-blur-sm transition-all duration-300"
-            disabled={disabled}
-          >
-            <option value="sponsor">Sponsor</option>
-            <option value="collaborator">Collaborator</option>
-            <option value="partner">Partner</option>
-          </select>
-          
-          <input
-            value={website}
-            onChange={(e) => setWebsite(e.target.value)}
-            placeholder="Website (optional)"
-            className="p-4 bg-white/5 border border-white/10 rounded-2xl text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent backdrop-blur-sm transition-all duration-300"
-            disabled={disabled}
-          />
-        </div>
-
-        <div className="border-2 border-dashed border-white/10 rounded-2xl p-4 hover:border-purple-500/50 transition-all duration-300">
-          <input
-            type="file"
-            accept="image/*"
-            onChange={(e) => setLogoFile(e.target.files?.[0] || null)}
-            className="w-full text-white file:mr-4 file:py-3 file:px-6 file:rounded-2xl file:border-0 file:text-sm file:font-semibold file:bg-gradient-to-r file:from-purple-500 file:to-pink-500 file:text-white hover:file:from-purple-600 hover:file:to-pink-600 transition-all duration-300"
-            disabled={disabled}
-          />
-          {logoFile && (
-            <p className="text-emerald-400 text-sm mt-2 font-medium">
-              ✓ Selected: {logoFile.name}
-            </p>
-          )}
-        </div>
-
-        {err && (
-          <div className="p-4 bg-red-500/20 border border-red-500/30 rounded-2xl text-red-300 text-sm font-medium">
-            {err}
-          </div>
-        )}
-
-        <div className="flex gap-3">
-          <button
-            onClick={submit}
-            disabled={adding || disabled}
-            className="flex-1 py-4 bg-gradient-to-r from-emerald-500 to-green-500 text-white rounded-2xl hover:from-emerald-600 hover:to-green-600 transition-all duration-300 disabled:opacity-50 font-semibold shadow-lg shadow-emerald-500/25"
-          >
-            {adding ? (
-              <div className="flex items-center justify-center gap-2">
-                <Loader2 className="w-4 h-4 animate-spin" />
-                Adding Partner...
-              </div>
-            ) : (
-              'Add Partner'
-            )}
-          </button>
-          <button
-            onClick={() => setIsExpanded(false)}
-            className="px-6 py-4 bg-white/5 border border-white/10 text-white rounded-2xl hover:bg-white/10 transition-all duration-300 font-semibold"
-          >
-            Cancel
-          </button>
-        </div>
-      </div>
-    </GlassCard>
-  );
-});
-
-// Main Component
 const ArvantisTab = ({ setDashboardError = () => {} }) => {
   const [fests, setFests] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -518,7 +273,9 @@ const ArvantisTab = ({ setDashboardError = () => {} }) => {
       await fetchYearsAndLatest();
       await fetchEvents();
     })();
-  }, [fetchYearsAndLatest, fetchEvents]);
+    // run once on mount — these callbacks are stable in this component
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const handleSelectYear = async (yearStr) => {
     setSelectedYear(yearStr ?? '');
@@ -970,7 +727,7 @@ const ArvantisTab = ({ setDashboardError = () => {} }) => {
       </GlassCard>
 
       {localError && (
-        <div className="mb-6 p-6 bg-red-500/20 border border-red-500/30 rounded-2xl text-red-300 text-sm font-medium backdrop-blur-sm">
+        <div className="mb-6 p-6 bg-red-500/20 border border-red-500/30 rounded-2xl text-red-300 text-sm font-medium">
           <div className="flex items-center gap-3">
             <div className="w-6 h-6 bg-red-500 rounded-full flex items-center justify-center">!</div>
             {localError}
@@ -1175,7 +932,7 @@ const ArvantisTab = ({ setDashboardError = () => {} }) => {
                           {activeFest.status}
                         </Badge>
                       </div>
-                      
+
                       <p className="text-xl text-gray-300 mb-6 leading-relaxed">
                         {activeFest.description || 'No description provided for this festival.'}
                       </p>
@@ -1242,7 +999,7 @@ const ArvantisTab = ({ setDashboardError = () => {} }) => {
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
                   {/* Partners Section */}
                   <GlassCard className="p-6">
-                    <div 
+                    <div
                       className="flex items-center justify-between cursor-pointer mb-6 p-4 hover:bg-white/5 rounded-2xl transition-all duration-300"
                       onClick={() => toggleSection('partners')}
                     >
@@ -1253,8 +1010,8 @@ const ArvantisTab = ({ setDashboardError = () => {} }) => {
                           {(partners || []).length}
                         </Badge>
                       </h3>
-                      {expandedSections.partners ? 
-                        <ChevronUp className="w-5 h-5 text-gray-400" /> : 
+                      {expandedSections.partners ?
+                        <ChevronUp className="w-5 h-5 text-gray-400" /> :
                         <ChevronDown className="w-5 h-5 text-gray-400" />
                       }
                     </div>
@@ -1300,9 +1057,9 @@ const ArvantisTab = ({ setDashboardError = () => {} }) => {
                                           {p.tier || 'partner'}
                                         </Badge>
                                         {p.website && (
-                                          <a 
-                                            href={p.website} 
-                                            target="_blank" 
+                                          <a
+                                            href={p.website}
+                                            target="_blank"
                                             rel="noopener noreferrer"
                                             className="text-blue-400 hover:text-blue-300 text-sm font-medium transition-colors"
                                           >
@@ -1334,7 +1091,7 @@ const ArvantisTab = ({ setDashboardError = () => {} }) => {
 
                   {/* Events Section */}
                   <GlassCard className="p-6">
-                    <div 
+                    <div
                       className="flex items-center justify-between cursor-pointer mb-6 p-4 hover:bg-white/5 rounded-2xl transition-all duration-300"
                       onClick={() => toggleSection('events')}
                     >
@@ -1345,8 +1102,8 @@ const ArvantisTab = ({ setDashboardError = () => {} }) => {
                           {(activeFest.events || []).length}
                         </Badge>
                       </h3>
-                      {expandedSections.events ? 
-                        <ChevronUp className="w-5 h-5 text-gray-400" /> : 
+                      {expandedSections.events ?
+                        <ChevronUp className="w-5 h-5 text-gray-400" /> :
                         <ChevronDown className="w-5 h-5 text-gray-400" />
                       }
                     </div>
@@ -1385,7 +1142,7 @@ const ArvantisTab = ({ setDashboardError = () => {} }) => {
                                   className="p-3 text-red-400 hover:bg-red-500/20 rounded-2xl transition-all duration-300 opacity-0 group-hover:opacity-100"
                                   title="Unlink event"
                                 >
-                                  <Unlink className="w-4 h-4" />
+                                  <Link2 className="w-4 h-4" />
                                 </button>
                               </div>
                             ))}
@@ -1417,7 +1174,7 @@ const ArvantisTab = ({ setDashboardError = () => {} }) => {
 
                 {/* Media Section */}
                 <GlassCard className="p-6">
-                  <div 
+                  <div
                     className="flex items-center justify-between cursor-pointer mb-6 p-4 hover:bg-white/5 rounded-2xl transition-all duration-300"
                     onClick={() => toggleSection('media')}
                   >
@@ -1428,8 +1185,8 @@ const ArvantisTab = ({ setDashboardError = () => {} }) => {
                         {((activeFest.gallery || []).length) + (activeFest.poster?.url ? 1 : 0)}
                       </Badge>
                     </h3>
-                    {expandedSections.media ? 
-                      <ChevronUp className="w-5 h-5 text-gray-400" /> : 
+                    {expandedSections.media ?
+                      <ChevronUp className="w-5 h-5 text-gray-400" /> :
                       <ChevronDown className="w-5 h-5 text-gray-400" />
                     }
                   </div>
@@ -1780,21 +1537,21 @@ const ArvantisTab = ({ setDashboardError = () => {} }) => {
       )}
 
       {/* Custom Scrollbar Styles */}
-      <style jsx>{`
-        .custom-scrollbar::-webkit-scrollbar {
-          width: 6px;
-        }
-        .custom-scrollbar::-webkit-scrollbar-track {
-          background: rgba(255, 255, 255, 0.1);
-          border-radius: 10px;
-        }
-        .custom-scrollbar::-webkit-scrollbar-thumb {
-          background: rgba(255, 255, 255, 0.3);
-          border-radius: 10px;
-        }
-        .custom-scrollbar::-webkit-scrollbar-thumb:hover {
-          background: rgba(255, 255, 255, 0.5);
-        }
+      <style>{`
+         .custom-scrollbar::-webkit-scrollbar {
+           width: 6px;
+         }
+         .custom-scrollbar::-webkit-scrollbar-track {
+           background: rgba(255, 255, 255, 0.1);
+           border-radius: 10px;
+         }
+         .custom-scrollbar::-webkit-scrollbar-thumb {
+           background: rgba(255, 255, 255, 0.3);
+           border-radius: 10px;
+         }
+         .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+           background: rgba(255, 255, 255, 0.5);
+         }
       `}</style>
     </div>
   );
