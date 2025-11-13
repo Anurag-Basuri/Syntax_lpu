@@ -396,12 +396,15 @@ const ArvantisTab = ({ setDashboardError = () => {} }) => {
 	};
 
 	/* Analytics & CSV */
+	// --- small helper: safe format date for filenames ---
+	const safe = (s = '') => String(s).replace(/[:]/g, '-');
+
 	const exportCSV = async () => {
 		setDownloadingCSV(true);
 		setLocalError('');
 		try {
 			const blob = await exportFestsCSV();
-			downloadBlob(blob, `arvantis-fests-${new Date().toISOString()}.csv`);
+			downloadBlob(blob, `arvantis-fests-${safe(new Date().toISOString())}.csv`);
 		} catch (err) {
 			const msg = err?.message || 'Failed to export CSV.';
 			setLocalError(msg);
@@ -417,6 +420,7 @@ const ArvantisTab = ({ setDashboardError = () => {} }) => {
 			const a = await getFestAnalytics();
 			const s = await getFestStatistics();
 			setPartners([]); // hide partners when analytics open
+			// keep selectedYear so user can go back
 			setActiveFest({ __analytics: true, analytics: a, statistics: s });
 		} catch (err) {
 			const msg = err?.message || 'Failed to load analytics.';
@@ -431,7 +435,7 @@ const ArvantisTab = ({ setDashboardError = () => {} }) => {
 			const id = fest.slug || fest.year || fest._id;
 			const report = await generateFestReport(id);
 			const blob = new Blob([JSON.stringify(report, null, 2)], { type: 'application/json' });
-			downloadBlob(blob, `arvantis-report-${id}.json`);
+			downloadBlob(blob, `arvantis-report-${safe(id)}.json`);
 		} catch (err) {
 			const msg = err?.message || 'Failed to generate report.';
 			setLocalError(msg);
@@ -535,171 +539,235 @@ const ArvantisTab = ({ setDashboardError = () => {} }) => {
 					<Loader2 className="w-10 h-10 animate-spin text-white" />
 				</div>
 			) : activeFest ? (
-				<div className="bg-gradient-to-br from-gray-800/60 to-gray-900/60 p-6 rounded-2xl shadow-lg border border-gray-700">
-					<div className="flex items-start justify-between">
-						<div>
-							<h2 className="text-2xl font-bold text-white">{activeFest.name}</h2>
-							<div className="text-sm text-gray-400">
-								{activeFest.year} •{' '}
-								{activeFest.location || 'Lovely Professional University'}
+				// If analytics object, render analytics panel
+				activeFest.__analytics ? (
+					<div className="bg-gradient-to-br from-gray-800/60 to-gray-900/60 p-6 rounded-2xl shadow-lg border border-gray-700">
+						<div className="flex items-center justify-between">
+							<div>
+								<h2 className="text-2xl font-bold text-white">
+									Arvantis — Analytics
+								</h2>
+								<p className="text-sm text-gray-400">
+									Year-over-year analytics and high-level statistics
+								</p>
 							</div>
-							<p className="mt-3 text-sm text-gray-300">
-								{activeFest.description || 'No description'}
-							</p>
+							<div className="flex gap-2">
+								<button
+									type="button"
+									className="px-3 py-2 bg-indigo-600 text-white rounded"
+									onClick={() => fetchYearsAndLatest()}
+								>
+									Back to Latest
+								</button>
+							</div>
 						</div>
-						<span
-							className={`px-3 py-1 rounded-full text-xs font-medium ${statusBadge(
-								activeFest.status
-							)}`}
-						>
-							{activeFest.status}
-						</span>
-					</div>
 
-					{/* actions */}
-					<div className="mt-4 flex gap-2">
-						<button
-							type="button"
-							className="px-3 py-2 bg-indigo-600 text-white rounded"
-							onClick={() => openEdit(activeFest)}
-						>
-							Edit
-						</button>
-						<button
-							type="button"
-							className="px-3 py-2 bg-yellow-500 text-white rounded"
-							onClick={() => generateReport(activeFest)}
-						>
-							Report
-						</button>
-						<button
-							type="button"
-							className="px-3 py-2 bg-red-600 text-white rounded"
-							onClick={() => removeFest(activeFest)}
-						>
-							Delete
-						</button>
-					</div>
+						<div className="mt-6 grid grid-cols-1 md:grid-cols-2 gap-4">
+							{/* Statistics summary */}
+							<div className="p-4 bg-gray-800 rounded">
+								<h4 className="text-sm text-gray-300 mb-2">Summary</h4>
+								<pre className="text-xs text-gray-200 break-words">
+									{JSON.stringify(activeFest.statistics || {}, null, 2)}
+								</pre>
+							</div>
 
-					{/* detail panel (partners, events, media) */}
-					<div className="mt-6">
-						{/* partners */}
-						<div className="mb-4">
-							<h4 className="text-sm text-gray-300">Partners</h4>
-							<ul className="mt-2 space-y-2">
-								{(partners || []).map((p) => (
-									<li
-										key={p.name}
-										className="flex items-center justify-between bg-gray-800 p-2 rounded"
-									>
-										<div className="flex items-center gap-3">
-											{p.logo?.url ? (
-												<img
-													src={p.logo.url}
-													alt={p.name}
-													className="w-10 h-10 rounded"
-												/>
-											) : (
-												<div className="w-10 h-10 bg-gray-700 rounded" />
-											)}
-											<div>
-												<div className="text-sm text-white">{p.name}</div>
-												<div className="text-xs text-gray-400">
-													{p.tier || '-'}
-												</div>
-											</div>
-										</div>
-										<button
-											type="button"
-											className="text-red-500"
-											onClick={() => removeExistingPartner(p.name)}
-										>
-											Remove
-										</button>
-									</li>
-								))}
-								{(partners || []).length === 0 && (
-									<div className="text-xs text-gray-500 mt-2">
-										No partners yet
-									</div>
+							{/* Analytics series */}
+							<div className="p-4 bg-gray-800 rounded">
+								<h4 className="text-sm text-gray-300 mb-2">Yearly Analytics</h4>
+								{(activeFest.analytics || []).length === 0 ? (
+									<div className="text-xs text-gray-500">No analytics data</div>
+								) : (
+									<ul className="text-xs text-gray-200 space-y-2">
+										{activeFest.analytics.map((row) => (
+											<li key={row.year} className="flex justify-between">
+												<span>{row.year}</span>
+												<span>
+													Events: {row.eventCount} • Partners:{' '}
+													{row.partnerCount}
+												</span>
+											</li>
+										))}
+									</ul>
 								)}
-							</ul>
-							{/* quick add partner form (kept simple) */}
-							<PartnerQuickAdd onAdd={(fd) => addNewPartner(fd)} />
+							</div>
+						</div>
+					</div>
+				) : (
+					// Regular fest details
+					<div className="bg-gradient-to-br from-gray-800/60 to-gray-900/60 p-6 rounded-2xl shadow-lg border border-gray-700">
+						<div className="flex items-start justify-between">
+							<div>
+								<h2 className="text-2xl font-bold text-white">
+									{activeFest.name || 'Arvantis'}
+								</h2>
+								<div className="text-sm text-gray-400">
+									{activeFest.year ?? '-'} •{' '}
+									{activeFest.location || 'Lovely Professional University'}
+								</div>
+								<p className="mt-3 text-sm text-gray-300">
+									{activeFest.description || 'No description'}
+								</p>
+							</div>
+							{(activeFest.status || activeFest.computedStatus) && (
+								<span
+									className={`px-3 py-1 rounded-full text-xs font-medium ${statusBadge(
+										activeFest.status || activeFest.computedStatus
+									)}`}
+								>
+									{activeFest.status || activeFest.computedStatus}
+								</span>
+							)}
 						</div>
 
-						{/* linked events */}
-						<div className="mb-4">
-							<h4 className="text-sm text-gray-300">Linked Events</h4>
-							{(activeFest.events || []).length === 0 ? (
-								<div className="text-xs text-gray-500 mt-2">No linked events</div>
-							) : (
+						{/* actions */}
+						<div className="mt-4 flex gap-2">
+							<button
+								type="button"
+								className="px-3 py-2 bg-indigo-600 text-white rounded"
+								onClick={() => openEdit(activeFest)}
+							>
+								Edit
+							</button>
+							<button
+								type="button"
+								className="px-3 py-2 bg-yellow-500 text-white rounded"
+								onClick={() => generateReport(activeFest)}
+							>
+								Report
+							</button>
+							<button
+								type="button"
+								className="px-3 py-2 bg-red-600 text-white rounded"
+								onClick={() => removeFest(activeFest)}
+							>
+								Delete
+							</button>
+						</div>
+
+						{/* detail panel (partners, events, media) */}
+						<div className="mt-6">
+							{/* partners */}
+							<div className="mb-4">
+								<h4 className="text-sm text-gray-300">Partners</h4>
 								<ul className="mt-2 space-y-2">
-									{(activeFest.events || []).map((ev) => (
+									{(partners || []).map((p, idx) => (
 										<li
-											key={ev._id || ev}
+											key={p.publicId || p.name || idx}
 											className="flex items-center justify-between bg-gray-800 p-2 rounded"
 										>
-											<div className="text-sm text-white">
-												{ev.title || ev}
+											<div className="flex items-center gap-3">
+												{p.logo?.url ? (
+													<img
+														src={p.logo.url}
+														alt={p.name}
+														className="w-10 h-10 rounded"
+													/>
+												) : (
+													<div className="w-10 h-10 bg-gray-700 rounded" />
+												)}
+												<div>
+													<div className="text-sm text-white">
+														{p.name}
+													</div>
+													<div className="text-xs text-gray-400">
+														{p.tier || '-'}
+													</div>
+												</div>
 											</div>
 											<button
 												type="button"
-												className="text-sm text-red-500"
-												onClick={() => handleUnlinkEvent(ev._id || ev)}
+												className="text-red-500"
+												onClick={() => removeExistingPartner(p.name)}
 											>
-												Unlink
+												Remove
 											</button>
 										</li>
 									))}
+									{(partners || []).length === 0 && (
+										<div className="text-xs text-gray-500 mt-2">
+											No partners yet
+										</div>
+									)}
 								</ul>
-							)}
-							{/* link event select */}
-							<div className="mt-2">
-								<select
-									className="bg-gray-800 text-gray-200 p-2 rounded"
-									onChange={(e) => {
-										const v = e.target.value;
-										if (v) handleLinkEvent(activeFest, v);
-										e.target.value = '';
-									}}
-								>
-									<option value="">Link an event</option>
-									{(events || []).map((ev) => (
-										<option key={ev._id} value={ev._id}>
-											{ev.title}
-										</option>
-									))}
-								</select>
+								{/* quick add partner form (kept simple) */}
+								<PartnerQuickAdd onAdd={(fd) => addNewPartner(fd)} />
 							</div>
-						</div>
 
-						{/* media */}
-						<div className="mb-4">
-							<h4 className="text-sm text-gray-300">Media</h4>
-							{activeFest.poster?.url && (
-								<img
-									src={activeFest.poster.url}
-									alt="poster"
-									className="w-full h-48 object-cover rounded-lg mb-3"
-								/>
-							)}
-							<div className="flex gap-2 items-center">
-								<input
-									type="file"
-									accept="image/*"
-									onChange={(e) => uploadPoster(e.target.files?.[0])}
-								/>
-								<input
-									type="file"
-									accept="image/*"
-									multiple
-									onChange={(e) => addGallery([...e.target.files])}
-								/>
+							{/* linked events */}
+							<div className="mb-4">
+								<h4 className="text-sm text-gray-300">Linked Events</h4>
+								{(activeFest.events || []).length === 0 ? (
+									<div className="text-xs text-gray-500 mt-2">
+										No linked events
+									</div>
+								) : (
+									<ul className="mt-2 space-y-2">
+										{(activeFest.events || []).map((ev) => (
+											<li
+												key={ev._id || ev}
+												className="flex items-center justify-between bg-gray-800 p-2 rounded"
+											>
+												<div className="text-sm text-white">
+													{ev.title || ev}
+												</div>
+												<button
+													type="button"
+													className="text-sm text-red-500"
+													onClick={() => handleUnlinkEvent(ev._id || ev)}
+												>
+													Unlink
+												</button>
+											</li>
+										))}
+									</ul>
+								)}
+								{/* link event select */}
+								<div className="mt-2">
+									<select
+										className="bg-gray-800 text-gray-200 p-2 rounded"
+										onChange={(e) => {
+											const v = e.target.value;
+											if (v) handleLinkEvent(activeFest, v);
+											e.target.value = '';
+										}}
+									>
+										<option value="">Link an event</option>
+										{(events || []).map((ev) => (
+											<option key={ev._id} value={ev._id}>
+												{ev.title}
+											</option>
+										))}
+									</select>
+								</div>
+							</div>
+
+							{/* media */}
+							<div className="mb-4">
+								<h4 className="text-sm text-gray-300">Media</h4>
+								{activeFest.poster?.url && (
+									<img
+										src={activeFest.poster.url}
+										alt="poster"
+										className="w-full h-48 object-cover rounded-lg mb-3"
+									/>
+								)}
+								<div className="flex gap-2 items-center">
+									<input
+										type="file"
+										accept="image/*"
+										onChange={(e) => uploadPoster(e.target.files?.[0])}
+									/>
+									<input
+										type="file"
+										accept="image/*"
+										multiple
+										onChange={(e) => addGallery([...e.target.files])}
+									/>
+								</div>
 							</div>
 						</div>
 					</div>
-				</div>
+				)
 			) : (
 				<div className="text-center text-gray-400">
 					No fest selected. Click "Latest" or choose a year to view that fest. You can
@@ -926,7 +994,6 @@ const PartnerQuickAdd = ({ onAdd = () => {} }) => {
 				>
 					<option value="sponsor">Sponsor</option>
 					<option value="collaborator">Collaborator</option>
-					<option value="other">Other</option>
 				</select>
 				<input
 					value={website}
