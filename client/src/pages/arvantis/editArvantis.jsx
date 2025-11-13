@@ -1008,15 +1008,18 @@ const ArvantisTab = ({ setDashboardError = () => {} }) => {
 											{activeFest.description || 'No description'}
 										</p>
 									</div>
-									{(activeFest.status || activeFest.computedStatus) && (
-										<Badge
-											className={statusBadge(
-												activeFest.status || activeFest.computedStatus
-											)}
-										>
-											{activeFest.status || activeFest.computedStatus}
-										</Badge>
-									)}
+									<div className="ml-auto">
+										{/* show computed status only (no manual status controls) */}
+										{(activeFest.status || activeFest.computedStatus) && (
+											<Badge
+												className={statusBadge(
+													activeFest.status || activeFest.computedStatus
+												)}
+											>
+												{activeFest.status || activeFest.computedStatus}
+											</Badge>
+										)}
+									</div>
 								</div>
 
 								<div className="mt-4 flex gap-2">
@@ -1045,6 +1048,19 @@ const ArvantisTab = ({ setDashboardError = () => {} }) => {
 										>
 											Delete
 										</button>
+									</div>
+
+									{/* show computed status only (no manual status controls) */}
+									<div className="ml-auto">
+										{(activeFest.status || activeFest.computedStatus) && (
+											<Badge
+												className={statusBadge(
+													activeFest.status || activeFest.computedStatus
+												)}
+											>
+												{activeFest.status || activeFest.computedStatus}
+											</Badge>
+										)}
 									</div>
 								</div>
 
