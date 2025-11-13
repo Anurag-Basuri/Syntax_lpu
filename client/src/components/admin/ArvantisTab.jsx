@@ -481,7 +481,26 @@ const ArvantisTab = ({ setDashboardError = () => {} }) => {
 	};
 
 	const uploadPoster = async (file) => {
-		if (!activeFest || !file) return;
+		if (!activeFest) {
+			showToast('No active fest selected', 'error');
+			return;
+		}
+		if (!file) {
+			showToast('No file selected', 'error');
+			return;
+		}
+		// client-side validation to match server limits
+		const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
+		const ALLOWED = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif'];
+		if (!ALLOWED.includes(file.type)) {
+			showToast('Invalid file type. Use JPG/PNG/GIF.', 'error');
+			return;
+		}
+		if (file.size > MAX_FILE_SIZE) {
+			showToast('File too large. Max 10 MB allowed.', 'error');
+			return;
+		}
+
 		setActionBusy(true);
 		setLocalError('');
 		try {
@@ -503,7 +522,35 @@ const ArvantisTab = ({ setDashboardError = () => {} }) => {
 	};
 
 	const addGallery = async (files) => {
-		if (!activeFest || !files?.length) return;
+		if (!activeFest) {
+			showToast('No active fest selected', 'error');
+			return;
+		}
+		if (!files || !files.length) {
+			showToast('No files selected for gallery', 'error');
+			return;
+		}
+		// client-side validation
+		const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
+		const ALLOWED = [
+			'image/jpeg',
+			'image/jpg',
+			'image/png',
+			'image/gif',
+			'video/mp4',
+			'video/webm',
+		];
+		for (const f of files) {
+			if (!ALLOWED.includes(f.type)) {
+				showToast(`Invalid file type: ${f.name}`, 'error');
+				return;
+			}
+			if (f.size > MAX_FILE_SIZE) {
+				showToast(`File too large: ${f.name}`, 'error');
+				return;
+			}
+		}
+
 		setActionBusy(true);
 		setLocalError('');
 		try {
