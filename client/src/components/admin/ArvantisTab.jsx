@@ -28,19 +28,26 @@ import {
 	DownloadCloud,
 	BarChart2,
 	FileText,
+	Search,
 } from 'lucide-react';
 
 /*
-  ArvantisTab:
-  - prop initialActive: 'fests' | 'partners' to open a specific subtab
-  - prop setDashboardError: global error handler
+  Premium ArvantisTab:
+  - single unified admin UI
+  - search & filter, card grid, concise modals, inline partner quick-actions
+  - uses existing services
 */
-const ArvantisTab = ({ initialActive = 'fests', setDashboardError }) => {
-	const [active, setActive] = useState(initialActive);
+const ArvantisTab = ({ setDashboardError }) => {
 	const [fests, setFests] = useState([]);
 	const [loading, setLoading] = useState(true);
 	const [events, setEvents] = useState([]);
-	const [showCreate, setShowCreate] = useState(false);
+	const [query, setQuery] = useState('');
+	const [statusFilter, setStatusFilter] = useState('');
+	const [sortBy, setSortBy] = useState('year');
+	const [page, setPage] = useState(1);
+	const [limit] = useState(12);
+
+	const [createOpen, setCreateOpen] = useState(false);
 	const [createLoading, setCreateLoading] = useState(false);
 	const [createForm, setCreateForm] = useState({
 		name: '',
@@ -49,33 +56,40 @@ const ArvantisTab = ({ initialActive = 'fests', setDashboardError }) => {
 		startDate: '',
 		endDate: '',
 	});
-	const [selectedFest, setSelectedFest] = useState(null);
+
+	const [activeFest, setActiveFest] = useState(null); // details when opened
 	const [editOpen, setEditOpen] = useState(false);
 	const [editForm, setEditForm] = useState({});
-	const [modalError, setModalError] = useState('');
-	const [partnersList, setPartnersList] = useState([]);
-	const [analytics, setAnalytics] = useState(null);
-	const [statistics, setStatistics] = useState(null);
+	const [partners, setPartners] = useState([]);
+	const [loadingPartners, setLoadingPartners] = useState(false);
 	const [downloadingCSV, setDownloadingCSV] = useState(false);
 
-	const fetchFests = useCallback(async () => {
-		setLoading(true);
-		try {
-			const res = await getAllFests(
-				{ page: 1, limit: 50, sortBy: 'year', sortOrder: 'desc' },
-				{ admin: true }
-			);
-			setFests(res.docs || []);
-		} catch (err) {
-			setDashboardError(err.message || 'Failed to fetch fests.');
-		} finally {
-			setLoading(false);
-		}
-	}, [setDashboardError]);
+	const fetchFests = useCallback(
+		async (opts = {}) => {
+			setLoading(true);
+			try {
+				const params = {
+					page: opts.page ?? page,
+					limit,
+					sortBy,
+					sortOrder: 'desc',
+				};
+				if (statusFilter) params.status = statusFilter;
+				if (query) params.search = query;
+				const res = await getAllFests(params, { admin: true });
+				setFests(res.docs || []);
+			} catch (err) {
+				setDashboardError(err.message || 'Failed to fetch fests.');
+			} finally {
+				setLoading(false);
+			}
+		},
+		[page, limit, sortBy, statusFilter, query, setDashboardError]
+	);
 
 	const fetchEvents = useCallback(async () => {
 		try {
-			const res = await getAllEvents({ page: 1, limit: 200 });
+			const res = await getAllEvents({ page: 1, limit: 500 });
 			setEvents(res.docs || []);
 		} catch (err) {
 			setDashboardError(err.message || 'Failed to fetch events.');
@@ -87,25 +101,22 @@ const ArvantisTab = ({ initialActive = 'fests', setDashboardError }) => {
 		fetchEvents();
 	}, [fetchFests, fetchEvents]);
 
-	/* --- Create / Delete --- */
-	const handleCreateFest = async (e) => {
+	// Debounced search UX (simple approach)
+	useEffect(() => {
+		const t = setTimeout(() => fetchFests({ page: 1 }), 350);
+		return () => clearTimeout(t);
+	}, [query, statusFilter, sortBy]); // eslint-disable-line
+
+	/* Create Fest */
+	const handleCreate = async (e) => {
 		e?.preventDefault();
 		setCreateLoading(true);
-		setModalError('');
-		const { name, description, startDate, endDate, year } = createForm;
-		if (!name || !description || !startDate || !endDate) {
-			setModalError('Please fill required fields.');
-			setCreateLoading(false);
-			return;
-		}
-		if (new Date(endDate) < new Date(startDate)) {
-			setModalError('End date cannot be before start date.');
-			setCreateLoading(false);
-			return;
-		}
 		try {
-			await createFest({ name, year: Number(year), description, startDate, endDate });
-			setShowCreate(false);
+			if (!createForm.name || !createForm.startDate || !createForm.endDate) {
+				throw new Error('Please provide name, start and end dates.');
+			}
+			await createFest(createForm);
+			setCreateOpen(false);
 			setCreateForm({
 				name: '',
 				year: new Date().getFullYear(),
@@ -113,16 +124,57 @@ const ArvantisTab = ({ initialActive = 'fests', setDashboardError }) => {
 				startDate: '',
 				endDate: '',
 			});
-			await fetchFests();
+			await fetchFests({ page: 1 });
 		} catch (err) {
-			setModalError(err.message || 'Failed to create fest.');
+			setDashboardError(err.message || 'Failed to create fest.');
 		} finally {
 			setCreateLoading(false);
 		}
 	};
 
-	const handleDeleteFest = async (fest) => {
-		if (!window.confirm(`Delete fest "${fest.name}"? This cannot be undone.`)) return;
+	/* Open details */
+	const openFest = async (fest) => {
+		try {
+			const details = await getFestDetails(fest.slug || fest.year || fest._id, {
+				admin: true,
+			});
+			setActiveFest(details);
+			setPartners(details.partners || []);
+		} catch (err) {
+			setDashboardError(err.message || 'Failed to load fest details.');
+		}
+	};
+
+	/* Edit */
+	const openEdit = (fest) => {
+		setEditForm({
+			name: fest.name || '',
+			description: fest.description || '',
+			startDate: fest.startDate ? new Date(fest.startDate).toISOString().slice(0, 10) : '',
+			endDate: fest.endDate ? new Date(fest.endDate).toISOString().slice(0, 10) : '',
+			status: fest.status || 'upcoming',
+			location: fest.location || '',
+			contactEmail: fest.contactEmail || '',
+		});
+		setActiveFest(fest);
+		setEditOpen(true);
+	};
+
+	const saveEdit = async () => {
+		if (!activeFest) return;
+		try {
+			const id = activeFest.slug || activeFest.year || activeFest._id;
+			await updateFestDetails(id, editForm);
+			setEditOpen(false);
+			await fetchFests();
+		} catch (err) {
+			setDashboardError(err.message || 'Failed to update fest.');
+		}
+	};
+
+	/* Delete */
+	const removeFest = async (fest) => {
+		if (!window.confirm(`Delete "${fest.name}"? This cannot be undone.`)) return;
 		try {
 			const id = fest.slug || fest.year || fest._id;
 			await deleteFest(id);
@@ -132,136 +184,108 @@ const ArvantisTab = ({ initialActive = 'fests', setDashboardError }) => {
 		}
 	};
 
-	/* --- Edit / Poster / Gallery / Events --- */
-	const openEdit = async (fest) => {
+	/* Poster & Gallery */
+	const uploadPoster = async (file) => {
+		if (!activeFest || !file) return;
 		try {
-			const details = await getFestDetails(fest.slug || fest.year || fest._id, {
-				admin: true,
-			});
-			setSelectedFest(details);
-			setEditForm({
-				name: details.name || '',
-				description: details.description || '',
-				startDate: details.startDate
-					? new Date(details.startDate).toISOString().slice(0, 10)
-					: '',
-				endDate: details.endDate
-					? new Date(details.endDate).toISOString().slice(0, 10)
-					: '',
-				status: details.status || 'upcoming',
-				location: details.location || '',
-				contactEmail: details.contactEmail || '',
-			});
-			setPartnersList(details.partners || []);
-			setEditOpen(true);
-		} catch (err) {
-			setDashboardError(err.message || 'Failed to load fest details.');
-		}
-	};
-
-	const handleUpdateFest = async () => {
-		if (!selectedFest) return;
-		setModalError('');
-		try {
-			const id = selectedFest.slug || selectedFest.year || selectedFest._id;
-			await updateFestDetails(id, editForm);
-			setEditOpen(false);
-			await fetchFests();
-		} catch (err) {
-			setModalError(err.message || 'Failed to update fest.');
-		}
-	};
-
-	const handlePosterUpload = async (file) => {
-		if (!selectedFest || !file) return;
-		try {
-			const id = selectedFest.slug || selectedFest.year || selectedFest._id;
+			const id = activeFest.slug || activeFest.year || activeFest._id;
 			const fd = new FormData();
 			fd.append('poster', file);
 			await updateFestPoster(id, fd);
 			const refreshed = await getFestDetails(id, { admin: true });
-			setSelectedFest(refreshed);
+			setActiveFest(refreshed);
 			await fetchFests();
 		} catch (err) {
 			setDashboardError(err.message || 'Failed to upload poster.');
 		}
 	};
 
-	const handleAddGallery = async (files) => {
-		if (!selectedFest || !files?.length) return;
+	const addGallery = async (files) => {
+		if (!activeFest || !files?.length) return;
 		try {
-			const id = selectedFest.slug || selectedFest.year || selectedFest._id;
+			const id = activeFest.slug || activeFest.year || activeFest._id;
 			const fd = new FormData();
 			for (const f of files) fd.append('media', f);
 			await addGalleryMedia(id, fd);
 			const refreshed = await getFestDetails(id, { admin: true });
-			setSelectedFest(refreshed);
+			setActiveFest(refreshed);
 			await fetchFests();
 		} catch (err) {
 			setDashboardError(err.message || 'Failed to add gallery media.');
 		}
 	};
 
-	const handleRemoveGallery = async (publicId) => {
-		if (!selectedFest) return;
+	const removeGalleryItem = async (publicId) => {
+		if (!activeFest) return;
 		try {
-			const id = selectedFest.slug || selectedFest.year || selectedFest._id;
+			const id = activeFest.slug || activeFest.year || activeFest._id;
 			await removeGalleryMedia(id, publicId);
 			const refreshed = await getFestDetails(id, { admin: true });
-			setSelectedFest(refreshed);
+			setActiveFest(refreshed);
 			await fetchFests();
 		} catch (err) {
 			setDashboardError(err.message || 'Failed to remove gallery media.');
 		}
 	};
 
-	const handleLinkEvent = async (fest, eventId) => {
+	/* Events linking */
+	const handleLinkEvent = async (eventId) => {
+		if (!activeFest || !eventId) return;
 		try {
-			const id = fest.slug || fest.year || fest._id;
+			const id = activeFest.slug || activeFest.year || activeFest._id;
 			await linkEventToFest(id, eventId);
+			const refreshed = await getFestDetails(id, { admin: true });
+			setActiveFest(refreshed);
 			await fetchFests();
 		} catch (err) {
 			setDashboardError(err.message || 'Failed to link event.');
 		}
 	};
 
-	const handleUnlinkEvent = async (fest, eventId) => {
-		if (!window.confirm('Unlink this event from the fest?')) return;
+	const handleUnlinkEvent = async (eventId) => {
+		if (!activeFest || !eventId) return;
+		if (!window.confirm('Unlink this event?')) return;
 		try {
-			const id = fest.slug || fest.year || fest._id;
+			const id = activeFest.slug || activeFest.year || activeFest._id;
 			await unlinkEventFromFest(id, eventId);
+			const refreshed = await getFestDetails(id, { admin: true });
+			setActiveFest(refreshed);
 			await fetchFests();
 		} catch (err) {
 			setDashboardError(err.message || 'Failed to unlink event.');
 		}
 	};
 
-	/* --- Partners (uses addPartner/removePartner) --- */
-	const handleAddPartner = async (festId, formData) => {
+	/* Partners quick manage */
+	const addNewPartner = async (fd) => {
+		if (!activeFest) return;
 		try {
-			const fest = fests.find((f) => f._id === festId);
-			const id = fest.slug || fest.year || fest._id;
-			await addPartner(id, formData);
+			const id = activeFest.slug || activeFest.year || activeFest._id;
+			await addPartner(id, fd);
+			const refreshed = await getFestDetails(id, { admin: true });
+			setPartners(refreshed.partners || []);
 			await fetchFests();
 		} catch (err) {
 			setDashboardError(err.message || 'Failed to add partner.');
 		}
 	};
 
-	const handleRemovePartner = async (festId, partnerName) => {
+	const removeExistingPartner = async (partnerName) => {
+		if (!activeFest) return;
 		if (!window.confirm(`Remove partner "${partnerName}"?`)) return;
 		try {
-			const fest = fests.find((f) => f._id === festId);
-			const id = fest.slug || fest.year || fest._id;
+			const id = activeFest.slug || activeFest.year || activeFest._id;
 			await removePartner(id, partnerName);
+			const refreshed = await getFestDetails(id, { admin: true });
+			setPartners(refreshed.partners || []);
 			await fetchFests();
 		} catch (err) {
 			setDashboardError(err.message || 'Failed to remove partner.');
 		}
 	};
 
-	/* --- Analytics / CSV / Reports --- */
-	const handleExportCSV = async () => {
+	/* Analytics & CSV */
+	const exportCSV = async () => {
 		setDownloadingCSV(true);
 		try {
 			const blob = await exportFestsCSV();
@@ -284,18 +308,18 @@ const ArvantisTab = ({ initialActive = 'fests', setDashboardError }) => {
 		try {
 			const a = await getFestAnalytics();
 			const s = await getFestStatistics();
-			setAnalytics(a);
-			setStatistics(s);
+			// quick show as modal-like card
+			setPartners([]); // hide partners when analytics open
+			setActiveFest({ __analytics: true, analytics: a, statistics: s });
 		} catch (err) {
 			setDashboardError(err.message || 'Failed to load analytics.');
 		}
 	};
 
-	const handleGenerateReport = async (fest) => {
+	const generateReport = async (fest) => {
 		try {
 			const id = fest.slug || fest.year || fest._id;
 			const report = await generateFestReport(id);
-			// simple download JSON report
 			const blob = new Blob([JSON.stringify(report, null, 2)], { type: 'application/json' });
 			const url = URL.createObjectURL(blob);
 			const a = document.createElement('a');
@@ -310,366 +334,388 @@ const ArvantisTab = ({ initialActive = 'fests', setDashboardError }) => {
 		}
 	};
 
-	/* --- UI --- */
-	// simple select of events for linking inside each fest row
-	return (
-		<div className="max-w-6xl mx-auto py-6">
-			<div className="flex gap-3 mb-4">
-				<button
-					className={`px-4 py-2 rounded ${
-						active === 'fests' ? 'bg-blue-600 text-white' : 'bg-gray-700 text-gray-100'
-					}`}
-					onClick={() => setActive('fests')}
-				>
-					Fests
-				</button>
-				<button
-					className={`px-4 py-2 rounded ${
-						active === 'partners'
-							? 'bg-blue-600 text-white'
-							: 'bg-gray-700 text-gray-100'
-					}`}
-					onClick={() => setActive('partners')}
-				>
-					Partners
-				</button>
-			</div>
+	/* UI helpers */
+	const statusBadge = (s) => {
+		const map = {
+			upcoming: 'bg-indigo-100 text-indigo-800',
+			ongoing: 'bg-green-100 text-green-800',
+			completed: 'bg-gray-100 text-gray-800',
+			cancelled: 'bg-red-100 text-red-800',
+			postponed: 'bg-yellow-100 text-yellow-800',
+		};
+		return map[s] || 'bg-gray-100 text-gray-800';
+	};
 
-			{active === 'fests' ? (
-				<section>
-					<div className="flex items-center justify-between mb-4">
-						<h2 className="text-xl font-bold">Manage Fests</h2>
-						<div className="flex gap-2">
-							<button
-								className="flex items-center gap-2 px-3 py-1 rounded bg-green-600 text-white"
-								onClick={() => setShowCreate(true)}
-							>
-								<Plus className="w-4 h-4" /> New Fest
-							</button>
-							<button
-								className="flex items-center gap-2 px-3 py-1 rounded bg-gray-800 text-white"
-								onClick={loadAnalytics}
-							>
-								<BarChart2 className="w-4 h-4" /> Analytics
-							</button>
-							<button
-								className="flex items-center gap-2 px-3 py-1 rounded bg-sky-700 text-white"
-								onClick={handleExportCSV}
-								disabled={downloadingCSV}
-							>
-								<DownloadCloud className="w-4 h-4" /> Export CSV
-							</button>
-						</div>
+	return (
+		<div className="max-w-7xl mx-auto py-6">
+			<header className="flex items-center justify-between mb-6">
+				<div>
+					<h1 className="text-2xl font-extrabold text-white">Arvantis — Admin</h1>
+					<p className="text-sm text-gray-400">
+						Manage fests, partners, media and analytics
+					</p>
+				</div>
+
+				<div className="flex items-center gap-3">
+					<div className="relative">
+						<input
+							placeholder="Search fests..."
+							value={query}
+							onChange={(e) => setQuery(e.target.value)}
+							className="pl-10 pr-3 py-2 rounded-lg bg-gray-800 text-gray-100 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+						/>
+						<Search className="absolute left-3 top-2.5 text-gray-400" />
 					</div>
 
-					{loading ? (
-						<div className="py-10 flex justify-center">
-							<Loader2 className="w-8 h-8 animate-spin" />
-						</div>
-					) : (
-						<table className="w-full text-sm mb-6">
-							<thead>
-								<tr>
-									<th className="text-left p-2">Name</th>
-									<th className="text-left p-2">Year</th>
-									<th className="text-left p-2">Events</th>
-									<th className="text-left p-2">Actions</th>
-								</tr>
-							</thead>
-							<tbody>
-								{fests.map((fest) => (
-									<tr key={fest._id || fest.slug || fest.year}>
-										<td className="p-2">{fest.name}</td>
-										<td className="p-2">{fest.year}</td>
-										<td className="p-2">
-											{Array.isArray(fest.events) ? fest.events.length : '-'}
-										</td>
-										<td className="p-2 flex gap-2">
-											<button
-												className="px-2 py-1 bg-indigo-600 text-white rounded"
-												onClick={() => openEdit(fest)}
-											>
-												Edit
-											</button>
-											<button
-												className="px-2 py-1 bg-yellow-600 text-white rounded"
-												onClick={() => setSelectedFest(fest)}
-											>
-												View
-											</button>
-											<button
-												className="px-2 py-1 bg-gray-700 text-white rounded"
-												onClick={() => handleGenerateReport(fest)}
-												title="Generate report"
-											>
-												<FileText className="w-4 h-4 inline" />
-											</button>
-											<button
-												className="px-2 py-1 bg-red-600 text-white rounded"
-												onClick={() => handleDeleteFest(fest)}
-											>
-												<Trash2 className="w-4 h-4 inline" />
-											</button>
-										</td>
-									</tr>
-								))}
-							</tbody>
-						</table>
-					)}
+					<select
+						value={statusFilter}
+						onChange={(e) => setStatusFilter(e.target.value)}
+						className="p-2 rounded-lg bg-gray-800 text-gray-100"
+					>
+						<option value="">All statuses</option>
+						<option value="upcoming">Upcoming</option>
+						<option value="ongoing">Ongoing</option>
+						<option value="completed">Completed</option>
+						<option value="cancelled">Cancelled</option>
+						<option value="postponed">Postponed</option>
+					</select>
 
-					{/* Selected Fest quick view (poster/gallery/events) */}
-					{selectedFest && (
-						<div className="p-4 bg-white rounded shadow mb-6">
-							<div className="flex justify-between items-start">
+					<select
+						value={sortBy}
+						onChange={(e) => setSortBy(e.target.value)}
+						className="p-2 rounded-lg bg-gray-800 text-gray-100"
+					>
+						<option value="year">Sort: Year</option>
+						<option value="name">Sort: Name</option>
+						<option value="startDate">Sort: Start Date</option>
+					</select>
+
+					<button
+						className="flex items-center gap-2 px-3 py-2 bg-gradient-to-r from-indigo-600 to-sky-500 text-white rounded-lg shadow"
+						onClick={() => setCreateOpen(true)}
+					>
+						<Plus className="w-4 h-4" /> New Fest
+					</button>
+
+					<button
+						title="Analytics"
+						className="p-2 rounded-lg bg-gray-800 text-gray-200"
+						onClick={loadAnalytics}
+					>
+						<BarChart2 />
+					</button>
+
+					<button
+						title="Export CSV"
+						className="p-2 rounded-lg bg-gray-800 text-gray-200"
+						onClick={exportCSV}
+						disabled={downloadingCSV}
+					>
+						<DownloadCloud />
+					</button>
+				</div>
+			</header>
+
+			{/* Grid */}
+			{loading ? (
+				<div className="py-20 flex justify-center">
+					<Loader2 className="w-10 h-10 animate-spin text-white" />
+				</div>
+			) : (
+				<div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+					{fests.map((fest) => (
+						<div
+							key={fest._id || fest.slug || fest.year}
+							className="bg-gradient-to-br from-gray-800/60 to-gray-900/60 p-4 rounded-2xl shadow-lg border border-gray-700"
+						>
+							<div className="flex items-start justify-between">
 								<div>
-									<h3 className="text-lg font-semibold">{selectedFest.name}</h3>
-									<div className="text-sm text-gray-600">
-										{selectedFest.description}
+									<h3 className="text-lg font-semibold text-white">
+										{fest.name}
+									</h3>
+									<div className="text-sm text-gray-400">
+										{fest.year} • {fest.location || '—'}
 									</div>
 								</div>
-								<div className="flex gap-2">
-									<input
-										type="file"
-										accept="image/*"
-										onChange={(e) => handlePosterUpload(e.target.files?.[0])}
-									/>
-									<input
-										type="file"
-										accept="image/*"
-										multiple
-										onChange={(e) => handleAddGallery([...e.target.files])}
-									/>
-								</div>
+								<span
+									className={`px-2 py-1 rounded-full text-xs font-medium ${statusBadge(
+										fest.status
+									)}`}
+								>
+									{fest.status}
+								</span>
 							</div>
 
-							{selectedFest.poster?.url && (
-								<div className="mt-4">
-									<img
-										src={selectedFest.poster.url}
-										alt="poster"
-										className="w-48 h-28 object-cover rounded"
-									/>
-								</div>
-							)}
+							<p className="mt-3 text-sm text-gray-300 line-clamp-3">
+								{fest.description || 'No description'}
+							</p>
 
-							{(selectedFest.gallery || []).length > 0 && (
-								<div className="mt-4 flex gap-2">
-									{selectedFest.gallery.map((g) => (
-										<div key={g.publicId} className="relative">
-											<img
-												src={g.url}
-												alt=""
-												className="w-28 h-20 object-cover rounded"
-											/>
-											<button
-												className="absolute top-1 right-1 bg-red-600 text-white p-1 rounded"
-												onClick={() => handleRemoveGallery(g.publicId)}
-											>
-												x
-											</button>
-										</div>
-									))}
+							<div className="mt-4 flex items-center justify-between">
+								<div className="flex items-center gap-2 text-sm text-gray-300">
+									<button
+										className="px-2 py-1 bg-indigo-600 text-white rounded-md"
+										onClick={() => openFest(fest)}
+									>
+										Open
+									</button>
+									<button
+										className="px-2 py-1 bg-gray-700 text-white rounded-md"
+										onClick={() => openEdit(fest)}
+									>
+										Edit
+									</button>
+									<button
+										className="px-2 py-1 bg-yellow-500 text-white rounded-md"
+										onClick={() => generateReport(fest)}
+									>
+										Report
+									</button>
 								</div>
-							)}
 
-							{/* events link/unlink area */}
-							<div className="mt-4">
-								<h4 className="font-medium">Linked Events</h4>
-								{(selectedFest.events || []).length === 0 ? (
-									<div className="text-sm text-gray-500">No events linked</div>
-								) : (
-									<ul className="space-y-2">
-										{selectedFest.events.map((ev) => (
-											<li
-												key={ev._id}
-												className="flex items-center justify-between p-2 bg-gray-50 rounded"
-											>
-												<div>
-													<div className="font-medium">{ev.title}</div>
-													<div className="text-xs text-gray-600">
-														{new Date(ev.eventDate).toLocaleString()}
-													</div>
-												</div>
-												<div className="flex gap-2">
-													<button
-														className="px-2 py-1 bg-red-500 text-white rounded"
-														onClick={() =>
-															handleUnlinkEvent(selectedFest, ev._id)
-														}
-													>
-														Unlink
-													</button>
-												</div>
-											</li>
-										))}
-									</ul>
-								)}
-								{/* link an event */}
-								<div className="mt-3 flex gap-2 items-center">
+								<div className="flex items-center gap-2">
 									<select
-										className="p-2 border rounded"
-										onChange={(e) =>
-											handleLinkEvent(selectedFest, e.target.value)
-										}
+										className="bg-gray-800 text-gray-200 p-1 rounded"
+										onChange={(e) => handleLinkEvent(fest, e.target.value)}
 										defaultValue=""
 									>
-										<option value="">Link an event</option>
-										{events.map((ev) => (
+										<option value="">Link event</option>
+										{events.slice(0, 10).map((ev) => (
 											<option key={ev._id} value={ev._id}>
 												{ev.title}
 											</option>
 										))}
 									</select>
+									<button
+										className="p-2 rounded bg-red-600 text-white"
+										onClick={() => removeFest(fest)}
+										title="Delete"
+									>
+										<Trash2 />
+									</button>
 								</div>
 							</div>
 						</div>
-					)}
-				</section>
-			) : (
-				<section>
-					{/* Partners panel */}
-					<div className="flex items-center justify-between mb-4">
-						<h2 className="text-xl font-bold">Partners</h2>
+					))}
+				</div>
+			)}
+
+			{/* Active fest side panel / modal */}
+			{activeFest && (
+				<div className="fixed right-6 top-20 bottom-6 w-96 bg-gradient-to-b from-gray-900 to-gray-800 rounded-2xl p-4 shadow-xl overflow-auto z-50">
+					<div className="flex items-start justify-between mb-3">
+						<div>
+							<h3 className="text-lg font-bold text-white">
+								{activeFest.name || 'Analytics'}
+							</h3>
+							<p className="text-xs text-gray-400">
+								{activeFest.year ? `${activeFest.year}` : ''}
+							</p>
+						</div>
+						<button
+							className="text-gray-300"
+							onClick={() => {
+								setActiveFest(null);
+								setPartners([]);
+							}}
+						>
+							<X />
+						</button>
 					</div>
 
-					{/* List fests and open partners for a chosen fest */}
-					<div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+					{/* analytics panel */}
+					{activeFest.__analytics ? (
 						<div>
-							<h4 className="font-medium mb-2">Fests</h4>
-							<ul className="space-y-2">
-								{fests.map((f) => (
-									<li
-										key={f._id}
-										className={`p-2 rounded cursor-pointer ${
-											selectedFest && selectedFest._id === f._id
-												? 'bg-blue-50'
-												: 'bg-white'
-										}`}
-										onClick={async () => {
-											try {
-												const details = await getFestDetails(
-													f.slug || f.year || f._id,
-													{ admin: true }
-												);
-												setSelectedFest(details);
-												setPartnersList(details.partners || []);
-											} catch (err) {
-												setDashboardError(
-													err.message || 'Failed to load fest.'
-												);
-											}
-										}}
-									>
-										<div className="font-medium">{f.name}</div>
-										<div className="text-xs text-gray-500">{f.year}</div>
-									</li>
-								))}
-							</ul>
+							<h4 className="text-sm font-semibold text-gray-200">Overview</h4>
+							<pre className="mt-2 text-xs text-gray-300 bg-gray-800 p-3 rounded">
+								{JSON.stringify(
+									{
+										analytics: activeFest.analytics,
+										statistics: activeFest.statistics,
+									},
+									null,
+									2
+								)}
+							</pre>
 						</div>
+					) : (
+						<>
+							{activeFest.poster?.url && (
+								<img
+									src={activeFest.poster.url}
+									alt="poster"
+									className="w-full h-40 object-cover rounded-lg mb-3"
+								/>
+							)}
+							<div className="text-sm text-gray-300 mb-3">
+								{activeFest.description || '—'}
+							</div>
 
-						<div className="md:col-span-2">
-							{!selectedFest ? (
-								<div className="text-sm text-gray-500">
-									Select a fest to manage partners.
-								</div>
-							) : (
-								<>
-									<h4 className="font-medium mb-2">
-										Partners for {selectedFest.name}
-									</h4>
-									<ul className="space-y-3 mb-4">
-										{partnersList.length === 0 && (
-											<div className="text-sm text-gray-500">
-												No partners yet.
-											</div>
-										)}
-										{partnersList.map((p) => (
+							<div className="mb-3">
+								<h5 className="text-xs text-gray-400 uppercase tracking-wide">
+									Partners
+								</h5>
+								{loadingPartners ? (
+									<div className="py-2 text-sm text-gray-400">Loading...</div>
+								) : (
+									<ul className="space-y-2 mt-2">
+										{(partners || []).map((p) => (
 											<li
 												key={p.name}
-												className="flex items-center justify-between p-3 bg-white rounded"
+												className="flex items-center justify-between bg-gray-800 p-2 rounded"
 											>
-												<div className="flex items-center gap-3">
+												<div className="flex items-center gap-2">
 													{p.logo?.url ? (
 														<img
 															src={p.logo.url}
-															alt={p.name}
-															className="w-12 h-12 object-cover rounded"
+															className="w-10 h-10 rounded"
 														/>
 													) : (
-														<div className="w-12 h-12 bg-gray-200 rounded flex items-center justify-center">
-															<UploadCloud />
-														</div>
+														<div className="w-10 h-10 bg-gray-700 rounded" />
 													)}
 													<div>
-														<div className="font-medium">{p.name}</div>
-														<div className="text-xs text-gray-600">
+														<div className="text-sm text-white">
+															{p.name}
+														</div>
+														<div className="text-xs text-gray-400">
 															{p.tier || '-'}
 														</div>
 													</div>
 												</div>
 												<button
-													className="text-red-500"
-													onClick={() =>
-														handleRemovePartner(
-															selectedFest._id,
-															p.name
-														)
-													}
+													className="text-red-500 text-sm"
+													onClick={() => removeExistingPartner(p.name)}
 												>
-													<Trash2 className="w-4 h-4" />
+													Remove
+												</button>
+											</li>
+										))}
+										{(partners || []).length === 0 && (
+											<div className="text-xs text-gray-500 mt-2">
+												No partners yet
+											</div>
+										)}
+									</ul>
+								)}
+							</div>
+
+							<div className="mb-3">
+								<h5 className="text-xs text-gray-400 uppercase tracking-wide">
+									Linked Events
+								</h5>
+								{(activeFest.events || []).length === 0 ? (
+									<div className="text-xs text-gray-500 mt-2">
+										No linked events
+									</div>
+								) : (
+									<ul className="mt-2 space-y-2">
+										{(activeFest.events || []).map((ev) => (
+											<li
+												key={ev._id}
+												className="flex items-center justify-between bg-gray-800 p-2 rounded"
+											>
+												<div>
+													<div className="text-sm text-white">
+														{ev.title}
+													</div>
+													<div className="text-xs text-gray-400">
+														{new Date(ev.eventDate).toLocaleString()}
+													</div>
+												</div>
+												<button
+													className="text-sm text-red-500"
+													onClick={() => handleUnlinkEvent(ev._id)}
+												>
+													Unlink
 												</button>
 											</li>
 										))}
 									</ul>
+								)}
+							</div>
 
-									{/* Add partner form */}
-									<AddPartnerForm
-										festId={selectedFest._id}
-										onAdd={(fd) => handleAddPartner(selectedFest._id, fd)}
-									/>
-								</>
-							)}
-						</div>
-					</div>
-				</section>
+							<div className="mt-4 space-y-2">
+								<label className="text-xs text-gray-400">Upload poster</label>
+								<input
+									type="file"
+									accept="image/*"
+									onChange={(e) => uploadPoster(e.target.files?.[0])}
+								/>
+								<label className="text-xs text-gray-400">Add gallery images</label>
+								<input
+									type="file"
+									accept="image/*"
+									multiple
+									onChange={(e) => addGallery([...e.target.files])}
+								/>
+							</div>
+
+							<div className="mt-4 flex gap-2">
+								<button
+									className="flex-1 py-2 bg-indigo-600 text-white rounded"
+									onClick={() => openEdit(activeFest)}
+								>
+									Edit
+								</button>
+								<button
+									className="flex-1 py-2 bg-gray-700 text-white rounded"
+									onClick={() => generateReport(activeFest)}
+								>
+									Report
+								</button>
+							</div>
+						</>
+					)}
+				</div>
 			)}
 
-			{/* Create Modal */}
-			{showCreate && (
-				<div className="fixed inset-0 z-40 flex items-center justify-center bg-black/40">
-					<div className="bg-white p-6 rounded max-w-md w-full relative">
-						<button
-							className="absolute top-3 right-3"
-							onClick={() => setShowCreate(false)}
-						>
-							<X />
-						</button>
-						<h3 className="font-semibold mb-3">Create Fest</h3>
-						<form onSubmit={handleCreateFest} className="space-y-3">
+			{/* Create modal */}
+			{createOpen && (
+				<div className="fixed inset-0 z-40 flex items-center justify-center bg-black/50">
+					<div className="bg-gray-900 p-6 rounded-2xl w-full max-w-md">
+						<div className="flex items-center justify-between mb-4">
+							<h3 className="text-lg font-bold text-white">Create Fest</h3>
+							<button className="text-gray-300" onClick={() => setCreateOpen(false)}>
+								<X />
+							</button>
+						</div>
+						<form onSubmit={handleCreate} className="space-y-3">
 							<input
 								placeholder="Name"
 								value={createForm.name}
 								onChange={(e) =>
 									setCreateForm({ ...createForm, name: e.target.value })
 								}
-								className="w-full p-2 border rounded"
+								className="w-full p-2 rounded bg-gray-800 text-white"
 							/>
-							<input
-								type="number"
-								placeholder="Year"
-								value={createForm.year}
-								onChange={(e) =>
-									setCreateForm({ ...createForm, year: Number(e.target.value) })
-								}
-								className="w-full p-2 border rounded"
-							/>
+							<div className="grid grid-cols-2 gap-2">
+								<input
+									placeholder="Year"
+									type="number"
+									value={createForm.year}
+									onChange={(e) =>
+										setCreateForm({
+											...createForm,
+											year: Number(e.target.value),
+										})
+									}
+									className="p-2 rounded bg-gray-800 text-white"
+								/>
+								<input
+									placeholder="Location"
+									value={createForm.location}
+									onChange={(e) =>
+										setCreateForm({ ...createForm, location: e.target.value })
+									}
+									className="p-2 rounded bg-gray-800 text-white"
+								/>
+							</div>
 							<textarea
 								placeholder="Description"
 								value={createForm.description}
 								onChange={(e) =>
 									setCreateForm({ ...createForm, description: e.target.value })
 								}
-								className="w-full p-2 border rounded h-24"
+								className="w-full p-2 rounded bg-gray-800 text-white h-24"
 							/>
 							<div className="grid grid-cols-2 gap-2">
 								<input
@@ -678,7 +724,7 @@ const ArvantisTab = ({ initialActive = 'fests', setDashboardError }) => {
 									onChange={(e) =>
 										setCreateForm({ ...createForm, startDate: e.target.value })
 									}
-									className="p-2 border rounded"
+									className="p-2 rounded bg-gray-800 text-white"
 								/>
 								<input
 									type="date"
@@ -686,45 +732,52 @@ const ArvantisTab = ({ initialActive = 'fests', setDashboardError }) => {
 									onChange={(e) =>
 										setCreateForm({ ...createForm, endDate: e.target.value })
 									}
-									className="p-2 border rounded"
+									className="p-2 rounded bg-gray-800 text-white"
 								/>
 							</div>
-							{modalError && <div className="text-red-500">{modalError}</div>}
-							<button
-								type="submit"
-								disabled={createLoading}
-								className="w-full py-2 bg-blue-600 text-white rounded"
-							>
-								{createLoading ? 'Creating...' : 'Create'}
-							</button>
+							<div className="flex gap-2">
+								<button
+									type="submit"
+									disabled={createLoading}
+									className="flex-1 py-2 bg-indigo-600 text-white rounded"
+								>
+									{createLoading ? 'Creating...' : 'Create'}
+								</button>
+								<button
+									type="button"
+									className="flex-1 py-2 bg-gray-700 text-white rounded"
+									onClick={() => setCreateOpen(false)}
+								>
+									Cancel
+								</button>
+							</div>
 						</form>
 					</div>
 				</div>
 			)}
 
-			{/* Edit Modal */}
-			{editOpen && selectedFest && (
-				<div className="fixed inset-0 z-40 flex items-center justify-center bg-black/40">
-					<div className="bg-white p-6 rounded max-w-lg w-full relative">
-						<button
-							className="absolute top-3 right-3"
-							onClick={() => setEditOpen(false)}
-						>
-							<X />
-						</button>
-						<h3 className="font-semibold mb-3">Edit Fest — {selectedFest.name}</h3>
+			{/* Edit modal */}
+			{editOpen && (
+				<div className="fixed inset-0 z-40 flex items-center justify-center bg-black/50">
+					<div className="bg-gray-900 p-6 rounded-2xl w-full max-w-lg">
+						<div className="flex items-center justify-between mb-4">
+							<h3 className="text-lg font-bold text-white">Edit Fest</h3>
+							<button className="text-gray-300" onClick={() => setEditOpen(false)}>
+								<X />
+							</button>
+						</div>
 						<div className="space-y-3">
 							<input
 								value={editForm.name}
 								onChange={(e) => setEditForm({ ...editForm, name: e.target.value })}
-								className="w-full p-2 border rounded"
+								className="w-full p-2 rounded bg-gray-800 text-white"
 							/>
 							<textarea
 								value={editForm.description}
 								onChange={(e) =>
 									setEditForm({ ...editForm, description: e.target.value })
 								}
-								className="w-full p-2 border rounded h-24"
+								className="w-full p-2 rounded bg-gray-800 text-white h-28"
 							/>
 							<div className="grid grid-cols-2 gap-2">
 								<input
@@ -733,7 +786,7 @@ const ArvantisTab = ({ initialActive = 'fests', setDashboardError }) => {
 									onChange={(e) =>
 										setEditForm({ ...editForm, startDate: e.target.value })
 									}
-									className="p-2 border rounded"
+									className="p-2 rounded bg-gray-800 text-white"
 								/>
 								<input
 									type="date"
@@ -741,37 +794,18 @@ const ArvantisTab = ({ initialActive = 'fests', setDashboardError }) => {
 									onChange={(e) =>
 										setEditForm({ ...editForm, endDate: e.target.value })
 									}
-									className="p-2 border rounded"
+									className="p-2 rounded bg-gray-800 text-white"
 								/>
 							</div>
-							<div className="flex gap-2">
-								<input
-									placeholder="Location"
-									value={editForm.location}
-									onChange={(e) =>
-										setEditForm({ ...editForm, location: e.target.value })
-									}
-									className="p-2 border rounded flex-1"
-								/>
-								<input
-									placeholder="Contact email"
-									value={editForm.contactEmail}
-									onChange={(e) =>
-										setEditForm({ ...editForm, contactEmail: e.target.value })
-									}
-									className="p-2 border rounded flex-1"
-								/>
-							</div>
-							{modalError && <div className="text-red-500">{modalError}</div>}
 							<div className="flex gap-2">
 								<button
-									className="flex-1 py-2 bg-blue-600 text-white rounded"
-									onClick={handleUpdateFest}
+									className="flex-1 py-2 bg-indigo-600 text-white rounded"
+									onClick={saveEdit}
 								>
 									Save
 								</button>
 								<button
-									className="flex-1 py-2 bg-gray-300 rounded"
+									className="flex-1 py-2 bg-gray-700 text-white rounded"
 									onClick={() => setEditOpen(false)}
 								>
 									Cancel
@@ -781,83 +815,6 @@ const ArvantisTab = ({ initialActive = 'fests', setDashboardError }) => {
 					</div>
 				</div>
 			)}
-
-			{/* Analytics display */}
-			{analytics && statistics && (
-				<div className="mt-6 p-4 bg-white rounded shadow">
-					<h4 className="font-semibold mb-2">Analytics & Statistics</h4>
-					<pre className="text-xs max-h-48 overflow-auto bg-gray-50 p-2 rounded">
-						{JSON.stringify({ analytics, statistics }, null, 2)}
-					</pre>
-				</div>
-			)}
-		</div>
-	);
-};
-
-const AddPartnerForm = ({ festId, onAdd }) => {
-	const [form, setForm] = useState({ name: '', tier: 'sponsor', website: '', logo: null });
-	const [adding, setAdding] = useState(false);
-	const [error, setError] = useState('');
-
-	const handleFile = (e) => setForm({ ...form, logo: e.target.files?.[0] || null });
-
-	const submit = async () => {
-		setError('');
-		if (!form.name || !form.logo) {
-			setError('Name and logo required');
-			return;
-		}
-		setAdding(true);
-		try {
-			const fd = new FormData();
-			fd.append('name', form.name);
-			fd.append('tier', form.tier);
-			if (form.website) fd.append('website', form.website);
-			fd.append('logo', form.logo);
-			await onAdd(fd);
-			setForm({ name: '', tier: 'sponsor', website: '', logo: null });
-		} catch (err) {
-			setError(err.message || 'Failed to add partner');
-		} finally {
-			setAdding(false);
-		}
-	};
-
-	return (
-		<div className="p-3 bg-gray-50 rounded">
-			<input
-				placeholder="Partner name"
-				value={form.name}
-				onChange={(e) => setForm({ ...form, name: e.target.value })}
-				className="w-full p-2 border rounded mb-2"
-			/>
-			<div className="flex gap-2 mb-2">
-				<select
-					value={form.tier}
-					onChange={(e) => setForm({ ...form, tier: e.target.value })}
-					className="p-2 border rounded flex-1"
-				>
-					<option value="sponsor">Sponsor</option>
-					<option value="collaborator">Collaborator</option>
-					<option value="other">Other</option>
-				</select>
-				<input
-					placeholder="Website (optional)"
-					value={form.website}
-					onChange={(e) => setForm({ ...form, website: e.target.value })}
-					className="p-2 border rounded flex-1"
-				/>
-			</div>
-			<input type="file" accept="image/*" onChange={handleFile} className="mb-2" />
-			{error && <div className="text-red-500 mb-2">{error}</div>}
-			<button
-				className="w-full py-2 bg-green-600 text-white rounded"
-				onClick={submit}
-				disabled={adding}
-			>
-				{adding ? 'Adding...' : 'Add Partner'}
-			</button>
 		</div>
 	);
 };
