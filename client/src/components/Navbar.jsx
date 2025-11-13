@@ -10,7 +10,7 @@ import {
 	User,
 	LogOut,
 	ChevronDown,
-	QrCode,
+	Eye,
 	Sparkles,
 	Users,
 	Contact,
@@ -147,12 +147,20 @@ const AuthSection = ({ onNavigate }) => {
 									<span>Dashboard</span>
 								</button>
 								<button
-									onClick={() => onNavigate('/show')}
+									onClick={() => onNavigate('/appliesandcontacts/show')}
 									className="user-dropdown-item"
 									role="menuitem"
 								>
-									<QrCode className="dropdown-icon" />
+									<Eye className="dropdown-icon" />
 									<span>Show</span>
+								</button>
+								<button
+									onClick={() => onNavigate('/edit/arvantis')}
+									className="user-dropdown-item"
+									role="menuitem"
+								>
+									<Sparkles className="dropdown-icon" />
+									<span>Arvantis</span>
 								</button>
 							</div>
 							<div className="user-dropdown-footer">
