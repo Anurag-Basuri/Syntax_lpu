@@ -18,18 +18,7 @@ import {
 	generateFestReport,
 } from '../../services/arvantisServices.js';
 import { getAllEvents } from '../../services/eventServices.js';
-import {
-	Loader2,
-	Plus,
-	X,
-	Link2,
-	Trash2,
-	UploadCloud,
-	DownloadCloud,
-	BarChart2,
-	FileText,
-	Search,
-} from 'lucide-react';
+import { Loader2, Plus, X, Trash2, DownloadCloud, BarChart2, Search } from 'lucide-react';
 
 /*
   Premium ArvantisTab:
@@ -37,7 +26,7 @@ import {
   - search & filter, card grid, concise modals, inline partner quick-actions
   - uses existing services
 */
-const ArvantisTab = ({ setDashboardError }) => {
+const ArvantisTab = ({ token, setDashboardError }) => {
 	const [fests, setFests] = useState([]);
 	const [loading, setLoading] = useState(true);
 	const [events, setEvents] = useState([]);
@@ -79,7 +68,7 @@ const ArvantisTab = ({ setDashboardError }) => {
 				const res = await getAllFests(params, { admin: true });
 				setFests(res.docs || []);
 			} catch (err) {
-				setDashboardError(err.message || 'Failed to fetch fests.');
+				setDashboardError(err?.message || 'Failed to fetch fests.');
 			} finally {
 				setLoading(false);
 			}
@@ -92,7 +81,7 @@ const ArvantisTab = ({ setDashboardError }) => {
 			const res = await getAllEvents({ page: 1, limit: 500 });
 			setEvents(res.docs || []);
 		} catch (err) {
-			setDashboardError(err.message || 'Failed to fetch events.');
+			setDashboardError(err?.message || 'Failed to fetch events.');
 		}
 	}, [setDashboardError]);
 
@@ -132,7 +121,7 @@ const ArvantisTab = ({ setDashboardError }) => {
 			});
 			await fetchFests({ page: 1 });
 		} catch (err) {
-			setDashboardError(err.message || 'Failed to create fest.');
+			setDashboardError(err?.message || 'Failed to create fest.');
 		} finally {
 			setCreateLoading(false);
 		}
@@ -147,7 +136,7 @@ const ArvantisTab = ({ setDashboardError }) => {
 			setActiveFest(details);
 			setPartners(details.partners || []);
 		} catch (err) {
-			setDashboardError(err.message || 'Failed to load fest details.');
+			setDashboardError(err?.message || 'Failed to load fest details.');
 		}
 	};
 
@@ -170,11 +159,15 @@ const ArvantisTab = ({ setDashboardError }) => {
 		if (!activeFest) return;
 		try {
 			const id = activeFest.slug || activeFest.year || activeFest._id;
-			await updateFestDetails(id, editForm);
+			// Prevent sending immutable fields (name/location) — server enforces immutability.
+			const payload = { ...editForm };
+			delete payload.name;
+			delete payload.location;
+			await updateFestDetails(id, payload);
 			setEditOpen(false);
 			await fetchFests();
 		} catch (err) {
-			setDashboardError(err.message || 'Failed to update fest.');
+			setDashboardError(err?.message || 'Failed to update fest.');
 		}
 	};
 
@@ -186,7 +179,7 @@ const ArvantisTab = ({ setDashboardError }) => {
 			await deleteFest(id);
 			await fetchFests();
 		} catch (err) {
-			setDashboardError(err.message || 'Failed to delete fest.');
+			setDashboardError(err?.message || 'Failed to delete fest.');
 		}
 	};
 
@@ -202,7 +195,7 @@ const ArvantisTab = ({ setDashboardError }) => {
 			setActiveFest(refreshed);
 			await fetchFests();
 		} catch (err) {
-			setDashboardError(err.message || 'Failed to upload poster.');
+			setDashboardError(err?.message || 'Failed to upload poster.');
 		}
 	};
 
@@ -217,7 +210,7 @@ const ArvantisTab = ({ setDashboardError }) => {
 			setActiveFest(refreshed);
 			await fetchFests();
 		} catch (err) {
-			setDashboardError(err.message || 'Failed to add gallery media.');
+			setDashboardError(err?.message || 'Failed to add gallery media.');
 		}
 	};
 
@@ -230,21 +223,34 @@ const ArvantisTab = ({ setDashboardError }) => {
 			setActiveFest(refreshed);
 			await fetchFests();
 		} catch (err) {
-			setDashboardError(err.message || 'Failed to remove gallery media.');
+			setDashboardError(err?.message || 'Failed to remove gallery media.');
 		}
 	};
 
-	/* Events linking */
-	const handleLinkEvent = async (eventId) => {
-		if (!activeFest || !eventId) return;
+	/* Events linking
+       handleLinkEvent supports two signatures:
+         - handleLinkEvent(fest, eventId)  -> link event to given fest
+         - handleLinkEvent(eventId)        -> link event to activeFest
+    */
+	const handleLinkEvent = async (festOrEventId, maybeEventId) => {
+		let fest = activeFest;
+		let eventId = festOrEventId;
+		if (maybeEventId !== undefined) {
+			fest = festOrEventId;
+			eventId = maybeEventId;
+		}
+		if (!fest || !eventId) return;
 		try {
-			const id = activeFest.slug || activeFest.year || activeFest._id;
+			const id = fest.slug || fest.year || fest._id;
 			await linkEventToFest(id, eventId);
 			const refreshed = await getFestDetails(id, { admin: true });
-			setActiveFest(refreshed);
+			// If we linked to activeFest, update it; otherwise refresh list
+			if (activeFest && String(activeFest._id) === String(fest._id)) {
+				setActiveFest(refreshed);
+			}
 			await fetchFests();
 		} catch (err) {
-			setDashboardError(err.message || 'Failed to link event.');
+			setDashboardError(err?.message || 'Failed to link event.');
 		}
 	};
 
@@ -258,7 +264,7 @@ const ArvantisTab = ({ setDashboardError }) => {
 			setActiveFest(refreshed);
 			await fetchFests();
 		} catch (err) {
-			setDashboardError(err.message || 'Failed to unlink event.');
+			setDashboardError(err?.message || 'Failed to unlink event.');
 		}
 	};
 
@@ -272,7 +278,7 @@ const ArvantisTab = ({ setDashboardError }) => {
 			setPartners(refreshed.partners || []);
 			await fetchFests();
 		} catch (err) {
-			setDashboardError(err.message || 'Failed to add partner.');
+			setDashboardError(err?.message || 'Failed to add partner.');
 		}
 	};
 
@@ -286,7 +292,7 @@ const ArvantisTab = ({ setDashboardError }) => {
 			setPartners(refreshed.partners || []);
 			await fetchFests();
 		} catch (err) {
-			setDashboardError(err.message || 'Failed to remove partner.');
+			setDashboardError(err?.message || 'Failed to remove partner.');
 		}
 	};
 
@@ -304,7 +310,7 @@ const ArvantisTab = ({ setDashboardError }) => {
 			a.remove();
 			URL.revokeObjectURL(url);
 		} catch (err) {
-			setDashboardError(err.message || 'Failed to export CSV.');
+			setDashboardError(err?.message || 'Failed to export CSV.');
 		} finally {
 			setDownloadingCSV(false);
 		}
@@ -318,7 +324,7 @@ const ArvantisTab = ({ setDashboardError }) => {
 			setPartners([]); // hide partners when analytics open
 			setActiveFest({ __analytics: true, analytics: a, statistics: s });
 		} catch (err) {
-			setDashboardError(err.message || 'Failed to load analytics.');
+			setDashboardError(err?.message || 'Failed to load analytics.');
 		}
 	};
 
@@ -336,7 +342,7 @@ const ArvantisTab = ({ setDashboardError }) => {
 			a.remove();
 			URL.revokeObjectURL(url);
 		} catch (err) {
-			setDashboardError(err.message || 'Failed to generate report.');
+			setDashboardError(err?.message || 'Failed to generate report.');
 		}
 	};
 
@@ -440,7 +446,8 @@ const ArvantisTab = ({ setDashboardError }) => {
 										{fest.name}
 									</h3>
 									<div className="text-sm text-gray-400">
-										{fest.year} • {fest.location || '—'}
+										{fest.year} •{' '}
+										{fest.location || 'Lovely Professional University'}
 									</div>
 								</div>
 								<span
@@ -685,15 +692,6 @@ const ArvantisTab = ({ setDashboardError }) => {
 							</button>
 						</div>
 						<form onSubmit={handleCreate} className="space-y-3">
-							{' '}
-							<input
-								placeholder="Name"
-								value={createForm.name}
-								onChange={(e) =>
-									setCreateForm({ ...createForm, name: e.target.value })
-								}
-								className="w-full p-2 rounded bg-gray-800 text-white"
-							/>
 							{/* Name is fixed to "Arvantis" and not editable in the admin UI */}
 							<div className="grid grid-cols-2 gap-2">
 								<input
@@ -705,14 +703,6 @@ const ArvantisTab = ({ setDashboardError }) => {
 											...createForm,
 											year: Number(e.target.value),
 										})
-									}
-									className="p-2 rounded bg-gray-800 text-white"
-								/>
-								<input
-									placeholder="Location"
-									value={createForm.location}
-									onChange={(e) =>
-										setCreateForm({ ...createForm, location: e.target.value })
 									}
 									className="p-2 rounded bg-gray-800 text-white"
 								/>
@@ -782,10 +772,11 @@ const ArvantisTab = ({ setDashboardError }) => {
 							</button>
 						</div>
 						<div className="space-y-3">
+							{/* Name & location shown but read-only (Arvantis & LPU) */}
 							<input
 								value={editForm.name}
-								onChange={(e) => setEditForm({ ...editForm, name: e.target.value })}
-								className="w-full p-2 rounded bg-gray-800 text-white"
+								disabled
+								className="w-full p-2 rounded bg-gray-700 text-gray-300 cursor-not-allowed"
 							/>
 							<textarea
 								value={editForm.description}
