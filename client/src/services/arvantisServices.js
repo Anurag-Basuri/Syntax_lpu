@@ -100,11 +100,11 @@ export const createFest = async (festData) => {
 	try {
 		// allow FormData or plain object
 		const isForm = festData instanceof FormData;
-		const response = await apiClient.post('/api/v1/arvantis', festData, {
-			headers: isForm
-				? { 'Content-Type': 'multipart/form-data' }
-				: { 'Content-Type': 'application/json' },
-		});
+		const response = isForm
+			? await apiClient.post('/api/v1/arvantis', festData) // let axios set Content-Type & boundary
+			: await apiClient.post('/api/v1/arvantis', festData, {
+					headers: { 'Content-Type': 'application/json' },
+			  });
 		return response.data.data;
 	} catch (error) {
 		throw new Error(extractError(error, 'Failed to create fest.'));
@@ -113,17 +113,12 @@ export const createFest = async (festData) => {
 
 export const updateFestDetails = async (identifier, updateData) => {
 	try {
-		// route path is /:identifier/update
 		const isForm = updateData instanceof FormData;
-		const response = await apiClient.patch(
-			`/api/v1/arvantis/${identifier}/update`,
-			updateData,
-			{
-				headers: isForm
-					? { 'Content-Type': 'multipart/form-data' }
-					: { 'Content-Type': 'application/json' },
-			}
-		);
+		const response = isForm
+			? await apiClient.patch(`/api/v1/arvantis/${identifier}/update`, updateData) // FormData handled by axios
+			: await apiClient.patch(`/api/v1/arvantis/${identifier}/update`, updateData, {
+					headers: { 'Content-Type': 'application/json' },
+			  });
 		return response.data.data;
 	} catch (error) {
 		throw new Error(extractError(error, 'Failed to update fest details.'));
@@ -142,9 +137,8 @@ export const deleteFest = async (identifier) => {
 
 export const addPartner = async (identifier, formData) => {
 	try {
-		const response = await apiClient.post(`/api/v1/arvantis/${identifier}/partners`, formData, {
-			headers: { 'Content-Type': 'multipart/form-data' },
-		});
+		// pass FormData directly so axios can set multipart boundary
+		const response = await apiClient.post(`/api/v1/arvantis/${identifier}/partners`, formData);
 		return response.data.data;
 	} catch (error) {
 		throw new Error(extractError(error, 'Failed to add partner.'));
@@ -182,9 +176,8 @@ export const unlinkEventFromFest = async (identifier, eventId) => {
 
 export const updateFestPoster = async (identifier, formData) => {
 	try {
-		const response = await apiClient.patch(`/api/v1/arvantis/${identifier}/poster`, formData, {
-			headers: { 'Content-Type': 'multipart/form-data' },
-		});
+		// do not set Content-Type manually for FormData
+		const response = await apiClient.patch(`/api/v1/arvantis/${identifier}/poster`, formData);
 		return response.data.data;
 	} catch (error) {
 		throw new Error(extractError(error, 'Failed to update poster.'));
@@ -193,9 +186,8 @@ export const updateFestPoster = async (identifier, formData) => {
 
 export const addGalleryMedia = async (identifier, formData) => {
 	try {
-		const response = await apiClient.post(`/api/v1/arvantis/${identifier}/gallery`, formData, {
-			headers: { 'Content-Type': 'multipart/form-data' },
-		});
+		// pass FormData directly
+		const response = await apiClient.post(`/api/v1/arvantis/${identifier}/gallery`, formData);
 		return response.data.data;
 	} catch (error) {
 		throw new Error(extractError(error, 'Failed to add gallery media.'));
