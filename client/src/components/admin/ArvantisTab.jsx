@@ -27,7 +27,7 @@ import { Loader2, Plus, X, Trash2, DownloadCloud, BarChart2, Search } from 'luci
   - Search + year filter for list
   - Explicit confirmations for destructive actions
   - Consistent identifier resolution (slug/year/_id)
-  - Reuseable small components (Badge, EmptyState)
+  - Reusable small components (Badge, EmptyState)
 */
 
 const Badge = ({ children, className = '' }) => (
@@ -85,6 +85,7 @@ const ArvantisTab = ({ setDashboardError = () => {} }) => {
 	const [actionBusy, setActionBusy] = useState(false);
 	// local error
 	const [localError, setLocalError] = useState('');
+	const [toast, setToast] = useState(null); // { type: 'success'|'error', message }
 
 	// helper: normalize identifier for API usage (slug | year | _id)
 	const resolveIdentifier = (festOrIdentifier) => {
@@ -108,6 +109,9 @@ const ArvantisTab = ({ setDashboardError = () => {} }) => {
 		a.remove();
 		URL.revokeObjectURL(url);
 	};
+
+	// safe filename
+	const safe = (s = '') => String(s).replace(/[:]/g, '-');
 
 	// Load a fest details by identifier (slug/year/_id) and set UI state
 	const loadFestByIdentifier = useCallback(
@@ -190,6 +194,7 @@ const ArvantisTab = ({ setDashboardError = () => {} }) => {
 		}
 	}, [setDashboardError]);
 
+	// single effect to initialize
 	useEffect(() => {
 		fetchYearsAndLatest();
 		fetchEvents();
@@ -213,8 +218,6 @@ const ArvantisTab = ({ setDashboardError = () => {} }) => {
 
 	/* Actions */
 
-	const safe = (s = '') => String(s).replace(/[:]/g, '-');
-
 	const exportCSV = async () => {
 		setDownloadingCSV(true);
 		setLocalError('');
@@ -231,7 +234,6 @@ const ArvantisTab = ({ setDashboardError = () => {} }) => {
 	};
 
 	const openEdit = async (fest) => {
-		// ensure we have fresh details before editing
 		setLocalError('');
 		setActionBusy(true);
 		try {
@@ -288,10 +290,12 @@ const ArvantisTab = ({ setDashboardError = () => {} }) => {
 			const id = resolveIdentifier(fest);
 			await deleteFest(id);
 			await fetchYearsAndLatest();
+			showToast('Fest deleted', 'success');
 		} catch (err) {
 			const msg = err?.message || 'Failed to delete fest.';
 			setLocalError(msg);
 			setDashboardError(msg);
+			showToast(msg, 'error');
 		} finally {
 			setActionBusy(false);
 		}
@@ -308,10 +312,12 @@ const ArvantisTab = ({ setDashboardError = () => {} }) => {
 			await updateFestPoster(id, fd);
 			await loadFestByIdentifier(id);
 			await fetchYearsAndLatest();
+			showToast('Poster uploaded', 'success');
 		} catch (err) {
 			const msg = err?.message || 'Failed to upload poster.';
 			setLocalError(msg);
 			setDashboardError(msg);
+			showToast(msg, 'error');
 		} finally {
 			setActionBusy(false);
 		}
@@ -328,10 +334,12 @@ const ArvantisTab = ({ setDashboardError = () => {} }) => {
 			await addGalleryMedia(id, fd);
 			await loadFestByIdentifier(id);
 			await fetchYearsAndLatest();
+			showToast('Gallery updated', 'success');
 		} catch (err) {
 			const msg = err?.message || 'Failed to add gallery media.';
 			setLocalError(msg);
 			setDashboardError(msg);
+			showToast(msg, 'error');
 		} finally {
 			setActionBusy(false);
 		}
@@ -347,10 +355,12 @@ const ArvantisTab = ({ setDashboardError = () => {} }) => {
 			await removeGalleryMedia(id, publicId);
 			await loadFestByIdentifier(id);
 			await fetchYearsAndLatest();
+			showToast('Media removed', 'success');
 		} catch (err) {
 			const msg = err?.message || 'Failed to remove gallery media.';
 			setLocalError(msg);
 			setDashboardError(msg);
+			showToast(msg, 'error');
 		} finally {
 			setActionBusy(false);
 		}
@@ -370,10 +380,12 @@ const ArvantisTab = ({ setDashboardError = () => {} }) => {
 			const id = resolveIdentifier(fest);
 			await linkEventToFest(id, eventId);
 			await loadFestByIdentifier(id);
+			showToast('Event linked', 'success');
 		} catch (err) {
 			const msg = err?.message || 'Failed to link event.';
 			setLocalError(msg);
 			setDashboardError(msg);
+			showToast(msg, 'error');
 		} finally {
 			setActionBusy(false);
 		}
@@ -388,10 +400,12 @@ const ArvantisTab = ({ setDashboardError = () => {} }) => {
 			const id = resolveIdentifier(activeFest);
 			await unlinkEventFromFest(id, eventId);
 			await loadFestByIdentifier(id);
+			showToast('Event unlinked', 'success');
 		} catch (err) {
 			const msg = err?.message || 'Failed to unlink event.';
 			setLocalError(msg);
 			setDashboardError(msg);
+			showToast(msg, 'error');
 		} finally {
 			setActionBusy(false);
 		}
@@ -405,10 +419,12 @@ const ArvantisTab = ({ setDashboardError = () => {} }) => {
 			const id = resolveIdentifier(activeFest);
 			await addPartner(id, fd);
 			await loadFestByIdentifier(id);
+			showToast('Partner added', 'success');
 		} catch (err) {
 			const msg = err?.message || 'Failed to add partner.';
 			setLocalError(msg);
 			setDashboardError(msg);
+			showToast(msg, 'error');
 		} finally {
 			setActionBusy(false);
 		}
@@ -423,10 +439,12 @@ const ArvantisTab = ({ setDashboardError = () => {} }) => {
 			const id = resolveIdentifier(activeFest);
 			await removePartner(id, partnerName);
 			await loadFestByIdentifier(id);
+			showToast('Partner removed', 'success');
 		} catch (err) {
 			const msg = err?.message || 'Failed to remove partner.';
 			setLocalError(msg);
 			setDashboardError(msg);
+			showToast(msg, 'error');
 		} finally {
 			setActionBusy(false);
 		}
@@ -458,10 +476,12 @@ const ArvantisTab = ({ setDashboardError = () => {} }) => {
 			const report = await generateFestReport(id);
 			const blob = new Blob([JSON.stringify(report, null, 2)], { type: 'application/json' });
 			downloadBlob(blob, `arvantis-report-${safe(id)}.json`);
+			showToast('Report generated', 'success');
 		} catch (err) {
 			const msg = err?.message || 'Failed to generate report.';
 			setLocalError(msg);
 			setDashboardError(msg);
+			showToast(msg, 'error');
 		} finally {
 			setActionBusy(false);
 		}
@@ -478,20 +498,7 @@ const ArvantisTab = ({ setDashboardError = () => {} }) => {
 		return map[s] || 'bg-gray-100 text-gray-800';
 	};
 
-	/* Filtered list for UI */
-	const visibleFests = fests
-		.filter((f) => (!selectedYear ? true : String(f.year) === String(selectedYear)))
-		.filter((f) => {
-			if (!query) return true;
-			const q = query.toLowerCase();
-			return (
-				String(f.year).includes(q) ||
-				(String(f.name || '') + ' ' + (f.description || '') + ' ' + (f.slug || ''))
-					.toLowerCase()
-					.includes(q)
-			);
-		});
-
+	/* UI render */
 	return (
 		<div className="max-w-7xl mx-auto py-6">
 			<header className="flex items-center justify-between mb-4">
@@ -610,7 +617,9 @@ const ArvantisTab = ({ setDashboardError = () => {} }) => {
 												{f.status}
 											</Badge>
 											<div className="text-xs text-gray-400">
-												{new Date(f.startDate).toLocaleDateString()}
+												{f.startDate
+													? new Date(f.startDate).toLocaleDateString()
+													: '-'}
 											</div>
 										</div>
 									</div>
@@ -734,6 +743,28 @@ const ArvantisTab = ({ setDashboardError = () => {} }) => {
 									>
 										Delete
 									</button>
+									<button
+										type="button"
+										className="px-3 py-2 bg-gray-700 text-white rounded"
+										onClick={() => duplicateFest(activeFest)}
+										disabled={actionBusy}
+									>
+										Duplicate
+									</button>
+									{/* quick status */}
+									<select
+										className="ml-2 p-1 rounded bg-gray-800 text-white"
+										value={activeFest.status || ''}
+										onChange={(e) => quickSetStatus(e.target.value)}
+										disabled={actionBusy}
+									>
+										<option value="">Status</option>
+										<option value="upcoming">upcoming</option>
+										<option value="ongoing">ongoing</option>
+										<option value="completed">completed</option>
+										<option value="cancelled">cancelled</option>
+										<option value="postponed">postponed</option>
+									</select>
 								</div>
 
 								{/* Panels */}
@@ -930,36 +961,7 @@ const ArvantisTab = ({ setDashboardError = () => {} }) => {
 								<X />
 							</button>
 						</div>
-						<form
-							onSubmit={async (e) => {
-								e.preventDefault();
-								setCreateLoading(true);
-								try {
-									if (!createForm.startDate || !createForm.endDate)
-										throw new Error('Please provide start and end dates.');
-									await createFest({
-										year: createForm.year,
-										description: createForm.description,
-										startDate: createForm.startDate,
-										endDate: createForm.endDate,
-									});
-									setCreateOpen(false);
-									setCreateForm({
-										year: new Date().getFullYear(),
-										description: '',
-										startDate: '',
-										endDate: '',
-									});
-									await fetchYearsAndLatest();
-								} catch (err) {
-									setLocalError(err?.message || 'Failed to create fest.');
-									setDashboardError(err?.message || 'Failed to create fest.');
-								} finally {
-									setCreateLoading(false);
-								}
-							}}
-							className="space-y-3"
-						>
+						<form onSubmit={handleCreateSubmit} className="space-y-3">
 							<div className="grid grid-cols-2 gap-2">
 								<input
 									aria-label="Year"
@@ -1104,6 +1106,19 @@ const ArvantisTab = ({ setDashboardError = () => {} }) => {
 							</div>
 						</div>
 					</div>
+				</div>
+			)}
+
+			{toast && (
+				<div
+					className={`fixed right-4 top-20 z-50 rounded px-4 py-2 ${
+						toast.type === 'success' ? 'bg-green-600' : 'bg-red-600'
+					} text-white`}
+				>
+					{toast.message}{' '}
+					<button className="ml-3 underline" onClick={() => setToast(null)}>
+						Dismiss
+					</button>
 				</div>
 			)}
 		</div>
