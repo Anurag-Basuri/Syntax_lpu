@@ -23,7 +23,7 @@ import { Loader2, Plus, X, Trash2, DownloadCloud, BarChart2, Search } from 'luci
 /*
   Fixed & improved Arvantis admin tab
   - show latest fest by default
-  - remove sorting/status filters per request
+  - ensure actions always operate on the full fest identifier (slug/year/_id)
   - allow selecting a year to load that year's fest
   - defensive network/error handling
 */
@@ -34,10 +34,9 @@ const ArvantisTab = ({ setDashboardError = () => {} }) => {
 	const [events, setEvents] = useState([]);
 	// UI state
 	const [query, setQuery] = useState('');
-	// removed statusFilter and sortBy per request
-	// year selection
+	// year selection — store as string to keep select control stable
 	const [years, setYears] = useState([]);
-	const [selectedYear, setSelectedYear] = useState(null);
+	const [selectedYear, setSelectedYear] = useState('');
 
 	const [page] = useState(1);
 	const [limit] = useState(100);
@@ -69,6 +68,17 @@ const ArvantisTab = ({ setDashboardError = () => {} }) => {
 	// local error
 	const [localError, setLocalError] = useState('');
 
+	// helper: normalize identifier for API usage (slug | year | _id)
+	const resolveIdentifier = (festOrIdentifier) => {
+		if (!festOrIdentifier) return '';
+		if (typeof festOrIdentifier === 'string' || typeof festOrIdentifier === 'number')
+			return String(festOrIdentifier);
+		if (festOrIdentifier.slug) return String(festOrIdentifier.slug);
+		if (festOrIdentifier.year) return String(festOrIdentifier.year);
+		if (festOrIdentifier._id) return String(festOrIdentifier._id);
+		return '';
+	};
+
 	// helper: safe download blob
 	const downloadBlob = (blob, filename) => {
 		const url = URL.createObjectURL(blob);
@@ -80,6 +90,36 @@ const ArvantisTab = ({ setDashboardError = () => {} }) => {
 		a.remove();
 		URL.revokeObjectURL(url);
 	};
+
+	// Load a fest details by identifier (slug/year/_id) and set UI state
+	const loadFestByIdentifier = useCallback(
+		async (identifier, { setSelected = true } = {}) => {
+			if (!identifier) {
+				setActiveFest(null);
+				setPartners([]);
+				if (setSelected) setSelectedYear('');
+				return;
+			}
+			setLoading(true);
+			setLocalError('');
+			try {
+				const id = resolveIdentifier(identifier);
+				const details = await getFestDetails(id, { admin: true });
+				setActiveFest(details);
+				setPartners(Array.isArray(details.partners) ? details.partners : []);
+				if (setSelected && details.year) setSelectedYear(String(details.year));
+			} catch (err) {
+				const msg = err?.message || `Failed to load fest '${identifier}'.`;
+				setLocalError(msg);
+				setDashboardError(msg);
+				setActiveFest(null);
+				setPartners([]);
+			} finally {
+				setLoading(false);
+			}
+		},
+		[setDashboardError]
+	);
 
 	/* --- NEW: load years and latest fest --- */
 	const fetchYearsAndLatest = useCallback(async () => {
@@ -93,27 +133,17 @@ const ArvantisTab = ({ setDashboardError = () => {} }) => {
 			);
 			const docs = Array.isArray(res.docs) ? res.docs : [];
 			setFests(docs);
-			// extract unique years sorted desc
-			const yrs = Array.from(new Set(docs.map((d) => d.year))).sort((a, b) => b - a);
+			// extract unique years sorted desc and store as strings
+			const yrs = Array.from(new Set(docs.map((d) => d.year)))
+				.sort((a, b) => b - a)
+				.map((y) => String(y));
 			setYears(yrs);
-			// pick latest year if available
-			const latest = yrs[0] ?? null;
+			// pick latest year if available and load it
+			const latest = yrs[0] ?? '';
 			setSelectedYear(latest);
-			if (latest !== null) {
-				try {
-					const details = await getFestDetails(latest, { admin: true });
-					setActiveFest(details);
-					setPartners(Array.isArray(details.partners) ? details.partners : []);
-				} catch (err) {
-					// fallback: if fetching by year fails, clear activeFest
-					setActiveFest(null);
-					setPartners([]);
-					const msg = err?.message || 'Failed to load latest fest details.';
-					setLocalError(msg);
-					setDashboardError(msg);
-				}
+			if (latest) {
+				await loadFestByIdentifier(latest, { setSelected: false });
 			} else {
-				// no fests yet
 				setActiveFest(null);
 				setPartners([]);
 			}
@@ -124,7 +154,7 @@ const ArvantisTab = ({ setDashboardError = () => {} }) => {
 		} finally {
 			setLoading(false);
 		}
-	}, [limit, setDashboardError]);
+	}, [limit, loadFestByIdentifier, setDashboardError]);
 
 	// Fetch events (used for linking) once
 	const fetchEvents = useCallback(async () => {
@@ -144,31 +174,19 @@ const ArvantisTab = ({ setDashboardError = () => {} }) => {
 	}, [fetchYearsAndLatest, fetchEvents]);
 
 	// when user selects a year, load that fest
-	const handleSelectYear = async (year) => {
-		setSelectedYear(year);
+	const handleSelectYear = async (yearStr) => {
+		// yearStr is a string ('' means none)
+		setSelectedYear(yearStr ?? '');
 		setLocalError('');
-		if (!year) {
+		if (!yearStr) {
 			setActiveFest(null);
 			setPartners([]);
 			return;
 		}
-		setLoading(true);
-		try {
-			const details = await getFestDetails(year, { admin: true });
-			setActiveFest(details);
-			setPartners(Array.isArray(details.partners) ? details.partners : []);
-		} catch (err) {
-			const msg = err?.message || `Failed to load fest for year ${year}.`;
-			setLocalError(msg);
-			setDashboardError(msg);
-			setActiveFest(null);
-			setPartners([]);
-		} finally {
-			setLoading(false);
-		}
+		await loadFestByIdentifier(yearStr);
 	};
 
-	/* --- Remaining handlers mostly unchanged, operate on activeFest --- */
+	/* --- Remaining handlers updated to use resolveIdentifier --- */
 	/* Create Fest */
 	const handleCreate = async (e) => {
 		e?.preventDefault();
@@ -191,7 +209,7 @@ const ArvantisTab = ({ setDashboardError = () => {} }) => {
 				startDate: '',
 				endDate: '',
 			});
-			// refresh years and latest
+			// refresh years and latest (will load latest fest)
 			await fetchYearsAndLatest();
 		} catch (err) {
 			const msg = err?.message || 'Failed to create fest.';
@@ -206,32 +224,25 @@ const ArvantisTab = ({ setDashboardError = () => {} }) => {
 	const openFest = async (fest) => {
 		setLocalError('');
 		if (!fest) return;
-		try {
-			const id = fest.slug || fest.year || fest._id;
-			const details = await getFestDetails(id, { admin: true });
-			setActiveFest(details);
-			setPartners(Array.isArray(details.partners) ? details.partners : []);
-			// set selected year to the fest year
-			if (details.year) setSelectedYear(details.year);
-		} catch (err) {
-			const msg = err?.message || 'Failed to load fest details.';
-			setLocalError(msg);
-			setDashboardError(msg);
-		}
+		await loadFestByIdentifier(resolveIdentifier(fest));
 	};
 
 	/* Edit */
-	const openEdit = (fest) => {
+	const openEdit = async (fest) => {
+		// ensure we have fresh details before editing
+		await loadFestByIdentifier(resolveIdentifier(fest), { setSelected: false });
+		const target = activeFest || fest;
 		setEditForm({
-			name: fest.name || 'Arvantis',
-			description: fest.description || '',
-			startDate: fest.startDate ? new Date(fest.startDate).toISOString().slice(0, 10) : '',
-			endDate: fest.endDate ? new Date(fest.endDate).toISOString().slice(0, 10) : '',
-			status: fest.status || 'upcoming',
-			location: fest.location || 'Lovely Professional University',
-			contactEmail: fest.contactEmail || '',
+			name: target.name || 'Arvantis',
+			description: target.description || '',
+			startDate: target.startDate
+				? new Date(target.startDate).toISOString().slice(0, 10)
+				: '',
+			endDate: target.endDate ? new Date(target.endDate).toISOString().slice(0, 10) : '',
+			status: target.status || 'upcoming',
+			location: target.location || 'Lovely Professional University',
+			contactEmail: target.contactEmail || '',
 		});
-		setActiveFest(fest);
 		setEditOpen(true);
 	};
 
@@ -239,14 +250,15 @@ const ArvantisTab = ({ setDashboardError = () => {} }) => {
 		setLocalError('');
 		if (!activeFest) return;
 		try {
-			const id = activeFest.slug || activeFest.year || activeFest._id;
+			const id = resolveIdentifier(activeFest);
 			const payload = { ...editForm };
 			delete payload.name;
 			delete payload.location;
 			await updateFestDetails(id, payload);
 			setEditOpen(false);
 			// refresh current fest
-			await handleSelectYear(activeFest.year);
+			await loadFestByIdentifier(id);
+			await fetchYearsAndLatest();
 		} catch (err) {
 			const msg = err?.message || 'Failed to update fest.';
 			setLocalError(msg);
@@ -259,7 +271,7 @@ const ArvantisTab = ({ setDashboardError = () => {} }) => {
 		if (!fest) return;
 		if (!window.confirm(`Delete "${fest.name}"? This cannot be undone.`)) return;
 		try {
-			const id = fest.slug || fest.year || fest._id;
+			const id = resolveIdentifier(fest);
 			await deleteFest(id);
 			// refresh years/latest
 			await fetchYearsAndLatest();
@@ -270,17 +282,16 @@ const ArvantisTab = ({ setDashboardError = () => {} }) => {
 		}
 	};
 
-	/* Poster & Gallery (unchanged) */
+	/* Poster & Gallery */
 	const uploadPoster = async (file) => {
 		if (!activeFest || !file) return;
 		setLocalError('');
 		try {
-			const id = activeFest.slug || activeFest.year || activeFest._id;
+			const id = resolveIdentifier(activeFest);
 			const fd = new FormData();
 			fd.append('poster', file);
 			await updateFestPoster(id, fd);
-			const refreshed = await getFestDetails(id, { admin: true });
-			setActiveFest(refreshed);
+			await loadFestByIdentifier(id);
 			await fetchYearsAndLatest();
 		} catch (err) {
 			const msg = err?.message || 'Failed to upload poster.';
@@ -293,12 +304,11 @@ const ArvantisTab = ({ setDashboardError = () => {} }) => {
 		if (!activeFest || !files?.length) return;
 		setLocalError('');
 		try {
-			const id = activeFest.slug || activeFest.year || activeFest._id;
+			const id = resolveIdentifier(activeFest);
 			const fd = new FormData();
 			for (const f of files) fd.append('media', f);
 			await addGalleryMedia(id, fd);
-			const refreshed = await getFestDetails(id, { admin: true });
-			setActiveFest(refreshed);
+			await loadFestByIdentifier(id);
 			await fetchYearsAndLatest();
 		} catch (err) {
 			const msg = err?.message || 'Failed to add gallery media.';
@@ -311,10 +321,9 @@ const ArvantisTab = ({ setDashboardError = () => {} }) => {
 		if (!activeFest) return;
 		setLocalError('');
 		try {
-			const id = activeFest.slug || activeFest.year || activeFest._id;
+			const id = resolveIdentifier(activeFest);
 			await removeGalleryMedia(id, publicId);
-			const refreshed = await getFestDetails(id, { admin: true });
-			setActiveFest(refreshed);
+			await loadFestByIdentifier(id);
 			await fetchYearsAndLatest();
 		} catch (err) {
 			const msg = err?.message || 'Failed to remove gallery media.';
@@ -323,7 +332,7 @@ const ArvantisTab = ({ setDashboardError = () => {} }) => {
 		}
 	};
 
-	/* Events linking (unchanged) */
+	/* Events linking */
 	const handleLinkEvent = async (festOrEventId, maybeEventId) => {
 		let fest = activeFest;
 		let eventId = festOrEventId;
@@ -334,12 +343,9 @@ const ArvantisTab = ({ setDashboardError = () => {} }) => {
 		if (!fest || !eventId) return;
 		setLocalError('');
 		try {
-			const id = fest.slug || fest.year || fest._id;
+			const id = resolveIdentifier(fest);
 			await linkEventToFest(id, eventId);
-			const refreshed = await getFestDetails(id, { admin: true });
-			if (activeFest && String(activeFest._id) === String(fest._id)) {
-				setActiveFest(refreshed);
-			}
+			await loadFestByIdentifier(id);
 		} catch (err) {
 			const msg = err?.message || 'Failed to link event.';
 			setLocalError(msg);
@@ -352,10 +358,9 @@ const ArvantisTab = ({ setDashboardError = () => {} }) => {
 		if (!window.confirm('Unlink this event?')) return;
 		setLocalError('');
 		try {
-			const id = activeFest.slug || activeFest.year || activeFest._id;
+			const id = resolveIdentifier(activeFest);
 			await unlinkEventFromFest(id, eventId);
-			const refreshed = await getFestDetails(id, { admin: true });
-			setActiveFest(refreshed);
+			await loadFestByIdentifier(id);
 		} catch (err) {
 			const msg = err?.message || 'Failed to unlink event.';
 			setLocalError(msg);
@@ -363,15 +368,14 @@ const ArvantisTab = ({ setDashboardError = () => {} }) => {
 		}
 	};
 
-	/* Partners quick manage (unchanged) */
+	/* Partners quick manage */
 	const addNewPartner = async (fd) => {
 		if (!activeFest) return;
 		setLocalError('');
 		try {
-			const id = activeFest.slug || activeFest.year || activeFest._id;
+			const id = resolveIdentifier(activeFest);
 			await addPartner(id, fd);
-			const refreshed = await getFestDetails(id, { admin: true });
-			setPartners(refreshed.partners || []);
+			await loadFestByIdentifier(id);
 		} catch (err) {
 			const msg = err?.message || 'Failed to add partner.';
 			setLocalError(msg);
@@ -384,10 +388,9 @@ const ArvantisTab = ({ setDashboardError = () => {} }) => {
 		if (!window.confirm(`Remove partner "${partnerName}"?`)) return;
 		setLocalError('');
 		try {
-			const id = activeFest.slug || activeFest.year || activeFest._id;
+			const id = resolveIdentifier(activeFest);
 			await removePartner(id, partnerName);
-			const refreshed = await getFestDetails(id, { admin: true });
-			setPartners(refreshed.partners || []);
+			await loadFestByIdentifier(id);
 		} catch (err) {
 			const msg = err?.message || 'Failed to remove partner.';
 			setLocalError(msg);
@@ -432,7 +435,7 @@ const ArvantisTab = ({ setDashboardError = () => {} }) => {
 	const generateReport = async (fest) => {
 		setLocalError('');
 		try {
-			const id = fest.slug || fest.year || fest._id;
+			const id = resolveIdentifier(fest);
 			const report = await generateFestReport(id);
 			const blob = new Blob([JSON.stringify(report, null, 2)], { type: 'application/json' });
 			downloadBlob(blob, `arvantis-report-${safe(id)}.json`);
@@ -480,10 +483,8 @@ const ArvantisTab = ({ setDashboardError = () => {} }) => {
 					{/* Year selector: latest by default */}
 					<select
 						aria-label="Select fest year"
-						value={selectedYear ?? ''}
-						onChange={(e) =>
-							handleSelectYear(e.target.value ? Number(e.target.value) : null)
-						}
+						value={selectedYear}
+						onChange={(e) => handleSelectYear(e.target.value)}
 						className="p-2 rounded-lg bg-gray-800 text-gray-100"
 					>
 						<option value="">-- Select year (latest shown) --</option>
