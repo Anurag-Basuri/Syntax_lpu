@@ -397,9 +397,17 @@ const ArvantisTab = ({ setDashboardError = () => {} }) => {
 		}
 	}, [limit, setDashboardError]);
 
+	// Ensure initialization runs only once to avoid duplicate network loops
+	const initializedRef = useRef(false);
 	useEffect(() => {
-		fetchYearsAndLatest();
-		fetchEvents();
+		if (initializedRef.current) return;
+		initializedRef.current = true;
+		// intentionally not adding fetchYearsAndLatest / fetchEvents to deps to prevent
+		// re-run if callbacks are recreated by parent re-renders
+		(async () => {
+			await fetchYearsAndLatest();
+			await fetchEvents();
+		})();
 	}, [fetchYearsAndLatest, fetchEvents]);
 
 	const handleSelectYear = async (yearStr) => {
