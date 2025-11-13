@@ -216,6 +216,20 @@ const ArvantisTab = ({ setDashboardError = () => {} }) => {
 		);
 	};
 
+	/* Filtered list for UI (was missing) */
+	const visibleFests = (fests || [])
+		.filter((f) => (!selectedYear ? true : String(f.year) === String(selectedYear)))
+		.filter((f) => {
+			if (!query) return true;
+			const q = String(query).toLowerCase();
+			return (
+				String(f.year).includes(q) ||
+				((f.name || '') + ' ' + (f.description || '') + ' ' + (f.slug || ''))
+					.toLowerCase()
+					.includes(q)
+			);
+		});
+
 	/* Actions */
 
 	const exportCSV = async () => {
