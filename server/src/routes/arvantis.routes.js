@@ -65,7 +65,6 @@ router.get(
 router.post(
 	'/',
 	validate([
-		body('name').notEmpty().trim().withMessage('Fest name is required'),
 		body('year').isInt({ min: 2020 }).withMessage('A valid year (e.g., 2025) is required'),
 		body('description').notEmpty().trim().withMessage('Description is required'),
 		body('startDate').isISO8601().toDate().withMessage('Valid start date is required'),
@@ -81,8 +80,6 @@ router.patch(
 	'/:identifier/update',
 	validate([
 		param('identifier').notEmpty().withMessage('Fest identifier is required'),
-		// Allow optional updates to any of these fields
-		body('name').optional().notEmpty().trim(),
 		body('description').optional().notEmpty().trim(),
 		body('startDate').optional().isISO8601().toDate(),
 		body('endDate').optional().isISO8601().toDate(),

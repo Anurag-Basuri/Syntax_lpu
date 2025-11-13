@@ -60,14 +60,26 @@ const getLandingPageData = asyncHandler(async (req, res) => {
 
 // Create a new Arvantis fest
 const createFest = asyncHandler(async (req, res) => {
-	const { name, year, description, startDate, endDate, status } = req.body;
+	const {year, description, startDate, endDate, status } = req.body;
+
+	// Name and location are fixed for Arvantis. Ignore client-provided name/location.
+	const fixedName = 'Arvantis';
+	const fixedLocation = 'Lovely Professional University';
 
 	const existingFest = await Arvantis.findOne({ year });
 	if (existingFest) {
 		throw new ApiError.Conflict(`A fest for the year ${year} already exists.`);
 	}
 
-	const fest = await Arvantis.create({ name, year, description, startDate, endDate, status });
+	const fest = await Arvantis.create({
+		name: fixedName,
+		year,
+		description,
+		startDate,
+		endDate,
+		status,
+		location: fixedLocation,
+	});
 	return ApiResponse.success(res, fest, 'Fest created successfully', 201);
 });
 
@@ -98,6 +110,9 @@ const getFestDetails = asyncHandler(async (req, res) => {
 // Update fest details
 const updateFestDetails = asyncHandler(async (req, res) => {
 	const fest = await findFestBySlugOrYear(req.params.identifier);
+	if ('name' in req.body) delete req.body.name;
+	if ('location' in req.body) delete req.body.location;
+
 	Object.assign(fest, req.body);
 	await fest.save({ validateBeforeSave: true });
 	return ApiResponse.success(res, fest, 'Fest details updated successfully');
