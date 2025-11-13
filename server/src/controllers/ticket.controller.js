@@ -18,67 +18,98 @@ const createTicket = asyncHandler(async (req, res) => {
 		throw ApiError.NotFound('The specified event does not exist.');
 	}
 
-	// Use the powerful registrationStatus virtual property from the Event model
+	// If event uses external registration, instruct client to redirect
+	if (event.registration?.mode === 'external') {
+		throw ApiError.BadRequest(
+			'This event uses an external registration flow. Redirect the user to the external URL.',
+			{ externalUrl: event.registration.externalUrl }
+		);
+	}
+
+	// Use model virtual to check if registration is open
 	if (event.registrationStatus !== 'OPEN') {
 		throw ApiError.BadRequest(
 			`Registration is currently not open. Status: ${event.registrationStatus}`
 		);
 	}
 
-	// 2. Create the ticket instance
-	const ticket = new Ticket({
-		eventId,
-		eventName: event.title, // Denormalize event name for convenience
-		fullName,
-		email,
-		phone,
-		lpuId,
-		gender,
-		course,
-		hosteler,
-		hostel: hosteler ? hostel : undefined,
-	});
-
-	// 3. Save the ticket and handle potential conflicts
+	// Start a transaction to avoid race conditions (overbooking)
+	const session = await mongoose.startSession();
+	let ticket;
 	try {
-		await ticket.save();
-	} catch (error) {
-		if (error.code === 11000) {
+		await session.withTransaction(async () => {
+			// Re-load the event inside the transaction for a fresh view
+			const ev = await Event.findById(eventId).session(session);
+			if (!ev) throw ApiError.NotFound('Event not found during registration.');
+
+			// Check capacity (treat 0 as unlimited)
+			const effectiveCap = ev.effectiveCapacity || 0;
+			if (effectiveCap > 0) {
+				// count currently registered (tickets stored in registeredUsers array)
+				const currentCount = Array.isArray(ev.registeredUsers)
+					? ev.registeredUsers.length
+					: 0;
+				if (currentCount >= effectiveCap) {
+					throw ApiError.BadRequest('Event is full.');
+				}
+			}
+
+			// Build ticket
+			ticket = new Ticket({
+				eventId,
+				eventName: ev.title,
+				fullName,
+				email,
+				phone,
+				lpuId,
+				gender,
+				course,
+				hosteler,
+				hostel: hosteler ? hostel : undefined,
+			});
+
+			// Save ticket within transaction
+			await ticket.save({ session });
+
+			// Add ticket._id to the event.registeredUsers to reflect occupancy.
+			// Note: schema historically held Member ids; using ticket ids here is intentional to track tickets.
+			await Event.findByIdAndUpdate(
+				eventId,
+				{ $addToSet: { registeredUsers: ticket._id } },
+				{ session }
+			);
+		});
+	} catch (err) {
+		// translate duplicate key into friendly message if thrown by mongoose
+		if (err && err.code === 11000) {
 			throw ApiError.Conflict(
 				'You have already registered for this event with this Email or LPU ID.'
 			);
 		}
-		throw error; // Re-throw other validation errors
+		// rethrow ApiError or other errors
+		throw err;
+	} finally {
+		session.endSession();
 	}
 
-	// 4. Perform side effects (QR generation, email) after successful creation
+	// Post-create side effects (QR + email) — run outside transaction
 	try {
-		// Generate and save QR code
 		const qrCode = await generateTicketQR(ticket.ticketId);
 		ticket.qrCode = { url: qrCode.url, publicId: qrCode.public_id };
 		await ticket.save();
-
-		// Send registration email
 		await sendRegistrationEmail({
-			to: email,
-			name: fullName,
-			eventName: event.title,
-			eventDate: event.eventDate, // Use dynamic event date
-			qrUrl: qrCode.url,
+			to: ticket.email,
+			name: ticket.fullName,
+			eventName: ticket.eventName,
+			eventDate: (await Event.findById(eventId)).eventDate,
+			qrUrl: ticket.qrCode.url,
 		});
 		ticket.emailStatus = 'sent';
 	} catch (sideEffectError) {
 		console.error('Post-creation error (QR/Email):', sideEffectError.message);
-		// The ticket is created, but a side-effect failed. Mark for admin review.
 		ticket.emailStatus = 'failed';
-		// Don't throw an error to the user, as their registration is successful.
-		// The frontend can show a message based on the response.
-	} finally {
 		await ticket.save();
 	}
-
-	// 5. Update the event's registered users list
-	await Event.findByIdAndUpdate(eventId, { $addToSet: { registeredUsers: ticket._id } });
 
 	return ApiResponse.success(
 		res,
