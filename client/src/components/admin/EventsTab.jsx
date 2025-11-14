@@ -5,6 +5,7 @@ import LoadingSpinner from './LoadingSpinner.jsx';
 import ErrorMessage from './ErrorMessage.jsx';
 import EventModal from './EventModal.jsx';
 import EventCard from './EventCard.jsx';
+import { useTheme } from '../../hooks/useTheme.js';
 
 const statusOptions = [
 	{ value: 'all', label: 'All Statuses' },
@@ -28,6 +29,13 @@ const EventsTab = ({
 	setDashboardError,
 	getAllEvents,
 }) => {
+	const { theme } = useTheme();
+	const isDark = theme === 'dark';
+
+	const panelClass = isDark
+		? 'bg-gray-800/50 rounded-xl p-4 border border-gray-700'
+		: 'bg-white rounded-xl p-4 border border-gray-200';
+
 	const [showCreateEvent, setShowCreateEvent] = useState(false);
 	const [showEditEvent, setShowEditEvent] = useState(false);
 	const [eventFields, setEventFields] = useState({
@@ -239,9 +247,15 @@ const EventsTab = ({
 
 			{/* action-level errors */}
 			{(formError || actionError) && (
-				<div className="bg-red-900/10 border border-red-700 rounded-lg p-3 flex items-center gap-3">
+				<div
+					className={`${
+						isDark
+							? 'bg-red-900/10 border border-red-700 text-red-300'
+							: 'bg-red-50 border border-red-200 text-red-700'
+					} rounded-lg p-3 flex items-center gap-3`}
+				>
 					<AlertCircle className="h-5 w-5 text-red-400" />
-					<div className="text-sm text-red-300">{formError || actionError}</div>
+					<div className="text-sm">{formError || actionError}</div>
 				</div>
 			)}
 
@@ -252,19 +266,30 @@ const EventsTab = ({
 			{eventsLoading ? (
 				<LoadingSpinner />
 			) : filteredEvents.length === 0 ? (
-				<div className="text-center py-12 bg-gray-700/30 rounded-xl border border-gray-600">
+				<div className={`${panelClass} text-center py-12 rounded-xl`}>
 					<CalendarDays className="h-12 w-12 mx-auto text-gray-500" />
-					<h3 className="text-xl font-bold text-gray-300 mt-4">No events found</h3>
-					<p className="text-gray-500 mt-2">Create your first event to get started.</p>
+					<h3
+						className={`${
+							isDark ? 'text-gray-300' : 'text-gray-700'
+						} text-xl font-bold mt-4`}
+					>
+						No events found
+					</h3>
+					<p className={`${isDark ? 'text-gray-400' : 'text-gray-500'} mt-2`}>
+						Create your first event to get started.
+					</p>
 					<button
-						className="mt-6 inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-500 text-white"
+						className={`${
+							isDark
+								? 'mt-6 inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-500 text-white'
+								: 'mt-6 inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-500 text-white'
+						}`}
 						onClick={() => {
 							resetForm();
 							setShowCreateEvent(true);
 						}}
 					>
-						<Plus className="h-4 w-4" />
-						Create event
+						<Plus className="h-4 w-4" /> Create event
 					</button>
 				</div>
 			) : (
@@ -276,6 +301,7 @@ const EventsTab = ({
 							onEdit={() => openEditEventModal(event)}
 							onDelete={() => handleDeleteEvent(event._id)}
 							deleteLoading={deleteLoading}
+							theme={theme}
 						/>
 					))}
 				</div>
