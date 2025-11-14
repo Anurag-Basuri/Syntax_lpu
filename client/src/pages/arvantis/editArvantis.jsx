@@ -36,26 +36,6 @@ import Toast from '../../components/arvantis/Toast';
 import StatCard from '../../components/arvantis/StatCard';
 import PartnerQuickAdd from '../../components/arvantis/PartnerQuickAdd';
 
-// Enhanced variants with premium styling
-const variants = {
-  default: 'bg-gradient-to-r from-gray-500/20 to-gray-600/20 text-gray-300 border border-gray-500/30 shadow-lg',
-  upcoming: 'bg-gradient-to-r from-blue-500/20 to-cyan-500/20 text-blue-300 border border-blue-500/30 shadow-lg shadow-blue-500/20',
-  ongoing: 'bg-gradient-to-r from-emerald-500/20 to-green-500/20 text-emerald-300 border border-emerald-500/30 shadow-lg shadow-emerald-500/20',
-  completed: 'bg-gradient-to-r from-purple-500/20 to-indigo-500/20 text-purple-300 border border-purple-500/30 shadow-lg shadow-purple-500/20',
-  cancelled: 'bg-gradient-to-r from-red-500/20 to-rose-500/20 text-red-300 border border-red-500/30 shadow-lg shadow-red-500/20',
-  postponed: 'bg-gradient-to-r from-amber-500/20 to-orange-500/20 text-amber-300 border border-amber-500/30 shadow-lg shadow-amber-500/20',
-  sponsor: 'bg-gradient-to-r from-amber-500/20 to-orange-500/20 text-amber-300 border border-amber-500/30 shadow-lg shadow-amber-500/25',
-  collaborator: 'bg-gradient-to-r from-blue-500/20 to-cyan-500/20 text-blue-300 border border-blue-500/30 shadow-lg shadow-blue-500/25',
-  premium: 'bg-gradient-to-r from-purple-500/20 to-pink-500/20 text-purple-300 border border-purple-500/30 shadow-lg shadow-purple-500/25',
-  gold: 'bg-gradient-to-r from-amber-400/20 to-yellow-500/20 text-amber-300 border border-amber-400/40 shadow-lg shadow-amber-500/30',
-};
-
-const sizes = {
-  sm: 'px-3 py-1.5 text-xs font-medium rounded-xl',
-  md: 'px-4 py-2 text-sm font-semibold rounded-2xl',
-  lg: 'px-5 py-2.5 text-base font-bold rounded-2xl'
-};
-
 const ArvantisTab = ({ setDashboardError = () => {} }) => {
   const [fests, setFests] = useState([]);
   const [loading, setLoading] = useState(true);
