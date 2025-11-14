@@ -15,6 +15,7 @@ const applyController = asyncHandler(async (req, res) => {
 		gender,
 		domains,
 		accommodation,
+		hostelName,
 		previousExperience,
 		anyotherorg,
 		bio,
@@ -35,6 +36,10 @@ const applyController = asyncHandler(async (req, res) => {
 	// Validate domains array
 	if (!Array.isArray(domains) || domains.length === 0) {
 		throw ApiError.BadRequest('At least one domain must be selected');
+	}
+	// Enforce max 2 domains
+	if (domains.length > 2) {
+		throw ApiError.BadRequest('You can select up to 2 domains only');
 	}
 
 	// Check for duplicate LPU ID
@@ -65,6 +70,7 @@ const applyController = asyncHandler(async (req, res) => {
 			gender,
 			domains,
 			accommodation,
+			hostelName: hostelName?.trim() || '',
 			previousExperience: previousExperience || false,
 			anyotherorg: anyotherorg || false,
 			bio: bio?.trim() || '',

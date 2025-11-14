@@ -60,9 +60,10 @@ const applySchema = new mongoose.Schema(
 			required: [true, 'At least one domain is required'],
 			validate: {
 				validator: function (v) {
-					return v.length > 0;
+					// allow 1 or 2 domains only
+					return Array.isArray(v) && v.length > 0 && v.length <= 2;
 				},
-				message: 'Domains cannot be empty',
+				message: 'Select between 1 and 2 domains',
 			},
 		},
 
@@ -72,15 +73,19 @@ const applySchema = new mongoose.Schema(
 			enum: ['hostler', 'non-hostler'],
 			required: [true, 'Accommodation type is required'],
 		},
+		// if hostler, specify hostel name
+		hostelName: {
+			type: String,
+			trim: true,
+			required: function () {
+				return this.accommodation === 'hostler';
+			},
+		},
 		previousExperience: {
 			type: Boolean,
 			default: false,
 		},
 		anyotherorg: {
-			type: Boolean,
-			default: false,
-		},
-		seen: {
 			type: Boolean,
 			default: false,
 		},
@@ -91,6 +96,10 @@ const applySchema = new mongoose.Schema(
 			maxlength: [500, 'Bio cannot exceed 500 characters'],
 		},
 
+		seen: {
+			type: Boolean,
+			default: false,
+		},
 		status: {
 			type: String,
 			enum: ['pending', 'approved', 'rejected'],

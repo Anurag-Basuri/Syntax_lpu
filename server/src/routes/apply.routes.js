@@ -26,12 +26,16 @@ router.post(
 		body('LpuId')
 			.notEmpty()
 			.withMessage('LPU ID is required')
-			.isLength({ min: 7, max: 10 })
-			.withMessage('LPU ID must be between 7 and 10 digits'),
+			.isLength({ min: 8, max: 8 })
+			.withMessage('LPU ID must be exactly 8 digits'),
 		body('email').isEmail().withMessage('Invalid email format'),
 		body('phone').notEmpty().withMessage('Phone number is required'),
 		body('course').notEmpty().withMessage('Course is required'),
-		body('domains').isArray({ min: 1 }).withMessage('At least one domain is required'),
+		body('domains')
+			.isArray({ min: 1 })
+			.withMessage('At least one domain is required')
+			.custom((arr) => Array.isArray(arr) && arr.length <= 2)
+			.withMessage('You can select up to 2 domains'),
 		body('accommodation').notEmpty().withMessage('Accommodation preference is required'),
 	]),
 	applyController
