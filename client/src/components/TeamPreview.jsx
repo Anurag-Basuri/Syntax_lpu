@@ -123,7 +123,7 @@ const TeamPreview = () => {
               Array.from({ length: PREVIEW_COUNT }).map((_, i) => (
                 <div key={i} className="rounded-lg p-3">
                   <div
-                    className="tp-card-inner rounded-lg p-4 flex flex-col justify-between items-center"
+                    className="tp-card-inner rounded-lg p-4 flex flex-col justify-start items-center gap-3"
                     style={{
                       background: CARD_BG,
                       minHeight: 180,
@@ -132,7 +132,7 @@ const TeamPreview = () => {
                     }}
                     aria-busy="true"
                   >
-                    <div className="w-16 h-16 rounded-full bg-slate-700/40 mb-4" />
+                    <div className="w-16 h-16 rounded-full bg-slate-700/40 mb-2" />
                     <div className="w-28 h-4 rounded bg-slate-700/40 mb-2" />
                     <div className="w-20 h-3 rounded bg-slate-700/40" />
                   </div>
@@ -163,7 +163,7 @@ const TeamPreview = () => {
                       style={{ background: 'transparent', border: 0, padding: 0 }}
                     >
                       <div
-                        className="tp-card-inner rounded-lg p-4 flex flex-col justify-between items-center"
+                        className="tp-card-inner rounded-lg p-4 flex flex-col justify-start items-center gap-3"
                         style={{
                           background: CARD_BG,
                           boxShadow: '0 8px 24px rgba(0,0,0,0.35)',
@@ -195,7 +195,7 @@ const TeamPreview = () => {
                           )}
                         </div>
 
-                        <div className="w-full text-center mt-3 px-2">
+                        <div className="w-full text-center mt-1 px-2">
                           <h3
                             className="text-sm sm:text-base font-semibold text-primary mb-1"
                             style={{
@@ -204,7 +204,8 @@ const TeamPreview = () => {
                               WebkitBoxOrient: 'vertical',
                               overflow: 'hidden',
                               textOverflow: 'ellipsis',
-                              lineHeight: '1.15rem',
+                              lineHeight: '1.2',
+                              marginBottom: '0.25rem', // ensure spacing between name and role
                             }}
                             title={name}
                           >
