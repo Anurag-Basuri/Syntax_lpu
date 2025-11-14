@@ -109,13 +109,44 @@ const EventsTab = ({
 	const handleCreateEvent = async () => {
 		setFormError('');
 		setActionError('');
+		// ensure eventFields includes posters when creating
 		const validation = validateFields(eventFields);
 		if (validation) {
 			setFormError(validation);
 			return;
 		}
+
+		// require posters on create
+		if (!eventFields.posters || !eventFields.posters.length) {
+			setFormError('At least one poster image is required.');
+			return;
+		}
+
 		try {
-			await createEvent(eventFields);
+			// Build FormData for multipart upload
+			const fd = new FormData();
+			fd.append('title', eventFields.title);
+			// name mapping: frontend 'date' -> backend 'eventDate'
+			fd.append('eventDate', eventFields.date);
+			fd.append('venue', eventFields.location);
+			fd.append('description', eventFields.description || '');
+			fd.append('organizer', eventFields.organizer || ''); // optional field
+			fd.append('category', eventFields.category || 'General');
+			fd.append('status', eventFields.status || 'upcoming');
+
+			// optional numeric fields if provided
+			if (typeof eventFields.totalSpots !== 'undefined')
+				fd.append('totalSpots', String(eventFields.totalSpots));
+			if (typeof eventFields.ticketPrice !== 'undefined')
+				fd.append('ticketPrice', String(eventFields.ticketPrice));
+			if (eventFields.tags) fd.append('tags', eventFields.tags);
+
+			// append posters (multiple)
+			for (const file of eventFields.posters) {
+				fd.append('posters', file);
+			}
+
+			await createEvent(fd);
 			resetForm();
 			setShowCreateEvent(false);
 			await getAllEvents?.();
