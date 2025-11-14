@@ -3,64 +3,98 @@
 /* ==========================================================================
    1. THEME & GLOBAL VARIABLES (ENHANCED FOR PERFECT VISIBILITY)
    ========================================================================== */
+   
    :root {
-     --accent-1: #ff6b6b; /* coral */
-     --accent-2: #ffb86b; /* warm amber */
-     --accent-glow: rgba(255,107,107,0.18);
-   
-     --bg-base: #fffaf8;
-     --bg-soft: #ffffff;
-     --bg-muted: #fff4ef;
-   
-     --nav-bg: rgba(255,255,255,0.94);
-     --nav-border: rgba(20,12,10,0.06);
-   
-     --text-primary: #0b1320;
-     --text-secondary: #3c3f45;
-     --text-muted: #6b6b6b;
-   
-     --card-bg: rgba(255,255,255,0.96);
-     --card-border: rgba(11,18,32,0.04);
-   
-     --button-primary-bg: linear-gradient(135deg, var(--accent-1), var(--accent-2));
-     --button-primary-hover: linear-gradient(135deg, #ff5252, #ff9f43);
-   
-     --input-bg: rgba(255,255,255,0.96);
-     --input-border: rgba(11,18,32,0.08);
-   
-     --focus-ring: 0 0 0 4px rgba(255,107,107,0.12);
-   }
-
-
-/* Light Theme: Crisp, clean, and high contrast */
-:root[data-theme='dark'], [data-theme='dark'] {
-  --accent-1: #ff7b6b;
-  --accent-2: #ffb86b;
-  --accent-glow: rgba(255,123,107,0.2);
-
-  --bg-base: #081018;
-  --bg-soft: #0b1418;
-  --bg-muted: #071018;
-
-  --nav-bg: rgba(8,10,12,0.6);
-  --nav-border: rgba(255,255,255,0.04);
-
-  --text-primary: #fff7f6;
-  --text-secondary: #ffdcd0;
-  --text-muted: #d9bfb4;
-
-  --card-bg: rgba(10,14,16,0.6);
-  --card-border: rgba(255,255,255,0.03);
-
-  --button-primary-bg: linear-gradient(135deg, var(--accent-1), var(--accent-2));
-  --button-primary-hover: linear-gradient(135deg,#ff6b6b,#ff9a43);
-
-  --input-bg: rgba(10,14,16,0.44);
-  --input-border: rgba(255,200,180,0.06);
-
-  --focus-ring: 0 0 0 4px rgba(255,107,107,0.08);
-}
-
+		/* Accent (primary gradient pair — same family as dark) */
+		--accent-1: #06b6d4; /* cyan-500 */
+		--accent-2: #14b8a6; /* teal-500 */
+		--accent-glow: rgba(6, 182, 212, 0.18);
+	  
+		/* Light backgrounds (clean, slightly warm white) */
+		--bg-base: #f7fbfc;
+		--bg-soft: #ffffff;
+		--bg-muted: #f1f8f9;
+	  
+		/* Nav / glass surfaces */
+		--nav-bg: rgba(255,255,255,0.92);
+		--nav-border: rgba(6, 22, 28, 0.06);
+		--glass-bg: rgba(255,255,255,0.9);
+		--glass-border: rgba(6,22,28,0.06);
+		--glass-hover: rgba(6,22,28,0.03);
+	  
+		/* Text */
+		--text-primary: #072028; /* headings */
+		--text-secondary: #18484d; /* body */
+		--text-muted: #476b6d;
+	  
+		/* Buttons & inputs */
+		--button-primary-bg: linear-gradient(135deg, var(--accent-1), var(--accent-2));
+		--button-primary-hover: linear-gradient(135deg, #0299c0, #0ea79e);
+		--button-secondary-bg: rgba(255,255,255,0.92);
+		--button-secondary-border: rgba(6,22,28,0.06);
+	  
+		--input-bg: rgba(255,255,255,0.96);
+		--input-border: rgba(6,22,28,0.08);
+		--input-border-focus: rgba(6, 182, 212, 0.36);
+	  
+		/* Cards */
+		--card-bg: rgba(255,255,255,0.96);
+		--card-border: rgba(6,22,28,0.04);
+		--card-hover-bg: rgba(248,250,250,0.98);
+	  
+		/* Focus & shadows */
+		--focus-ring: 0 0 0 4px rgba(6,182,212,0.12);
+		--nav-shadow-elevated: 0 8px 28px rgba(6,22,28,0.06);
+		--shadow-sm: 0 4px 12px rgba(6,22,28,0.06);
+		--shadow-md: 0 10px 30px rgba(6,22,28,0.08);
+		--shadow-xl: 0 24px 80px rgba(6,22,28,0.1);
+	  }
+	  
+	  :root[data-theme='dark'], [data-theme='dark'] {
+		/* Keep the same accent family; slightly brighter tones for dark */
+		--accent-1: #22d3ee; /* cyan-400 (brighter on dark) */
+		--accent-2: #06b6d4; /* cyan-500 */
+		--accent-glow: rgba(34,211,238,0.22);
+	  
+		/* Dark backgrounds */
+		--bg-base: #04121a; /* deep navy */
+		--bg-soft: #071826;
+		--bg-muted: #071a22;
+	  
+		/* Nav / glass surfaces */
+		--nav-bg: rgba(4,6,10,0.62);
+		--nav-border: rgba(255,255,255,0.04);
+		--glass-bg: rgba(6,10,14,0.56);
+		--glass-border: rgba(255,255,255,0.04);
+		--glass-hover: rgba(255,255,255,0.02);
+	  
+		/* Text */
+		--text-primary: #e7fbff;
+		--text-secondary: #aeeef6;
+		--text-muted: #7fbfc6;
+	  
+		/* Buttons & inputs */
+		--button-primary-bg: linear-gradient(135deg, var(--accent-1), var(--accent-2));
+		--button-primary-hover: linear-gradient(135deg, #12cfe9, #05b6c2);
+		--button-secondary-bg: rgba(10,14,18,0.52);
+		--button-secondary-border: rgba(255,255,255,0.04);
+	  
+		--input-bg: rgba(6,10,14,0.44);
+		--input-border: rgba(170,220,227,0.06);
+		--input-border-focus: rgba(34,211,238,0.28);
+	  
+		/* Cards */
+		--card-bg: rgba(6,10,14,0.6);
+		--card-border: rgba(255,255,255,0.03);
+		--card-hover-bg: rgba(6,10,14,0.68);
+	  
+		/* Focus & shadows */
+		--focus-ring: 0 0 0 4px rgba(34,211,238,0.06);
+		--nav-shadow-elevated: 0 8px 36px rgba(2,6,23,0.6);
+		--shadow-sm: 0 6px 18px rgba(2,6,23,0.45);
+		--shadow-md: 0 10px 30px rgba(2,6,23,0.5);
+		--shadow-xl: 0 24px 80px rgba(2,6,23,0.6);
+	  }
 
 
 /* ==========================================================================
