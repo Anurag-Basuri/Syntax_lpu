@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { submitApplication } from '../../services/applyServices.js';
 import { useNavigate } from 'react-router-dom';
 import { User, Mail, Phone, BookOpen, Users } from 'lucide-react';
@@ -91,17 +91,23 @@ const GradientButton = ({ children, isLoading, ...props }) => (
 	</button>
 );
 
-/* --- Domain options --- */
+/* --- Domain options (expanded) --- */
 const DOMAIN_OPTIONS = [
 	{ key: 'development', label: 'Development' },
 	{ key: 'design', label: 'Design' },
 	{ key: 'marketing', label: 'Marketing' },
 	{ key: 'content', label: 'Content' },
 	{ key: 'events', label: 'Events' },
+	{ key: 'ai', label: 'AI/ML' },
+	{ key: 'devops', label: 'DevOps' },
+	{ key: 'uiux', label: 'UI/UX' },
+	{ key: 'graphics', label: 'Graphics' },
+	{ key: 'qa', label: 'Quality Assurance' },
 ];
 
 const JoinPage = () => {
 	const navigate = useNavigate();
+	const hostelRef = useRef(null); // autofocus hostel input when needed
 	const [formData, setFormData] = useState({
 		fullName: '',
 		LpuId: '',
@@ -132,6 +138,17 @@ const JoinPage = () => {
 		return () => clearTimeout(t);
 	}, [successCountdown, serverMessage, navigate]);
 
+	useEffect(() => {
+		// Focus hostel name when accommodation becomes hostler
+		if (formData.accommodation === 'hostler' && hostelRef.current) {
+			hostelRef.current.focus();
+		}
+	}, [formData.accommodation]);
+
+	// bio length handling
+	const BIO_MAX = 500;
+	const bioRemaining = BIO_MAX - (formData.bio?.length || 0);
+
 	const validate = () => {
 		const newErrors = {};
 		if (!formData.fullName.trim()) newErrors.fullName = 'Full name is required.';
@@ -153,6 +170,16 @@ const JoinPage = () => {
 		if (!formData.bio.trim()) newErrors.bio = 'A short bio is required.';
 		setErrors(newErrors);
 		return Object.keys(newErrors).length === 0;
+	};
+
+	const parseServerError = (err) => {
+		const resp = err?.response?.data;
+		if (!resp) return err?.message || 'Unknown error';
+		// server may send { message, details }
+		if (Array.isArray(resp.details) && resp.details.length) {
+			return [resp.message, ...resp.details].join(' — ');
+		}
+		return resp.message || JSON.stringify(resp) || err.message || 'Request failed';
 	};
 
 	const handleChange = (e) => {
@@ -232,10 +259,10 @@ const JoinPage = () => {
 				type: 'success',
 				text: 'Application submitted — redirecting to login in 3s.',
 			});
-			// show countdown then redirect
 			setSuccessCountdown(3);
-			// clear form (keep small delay for UX)
-			setFormData({
+			// clear form
+			setFormData((prev) => ({
+				...prev,
 				fullName: '',
 				LpuId: '',
 				email: '',
@@ -248,16 +275,10 @@ const JoinPage = () => {
 				previousExperience: false,
 				anyotherorg: false,
 				bio: '',
-			});
+			}));
 			setErrors({});
 		} catch (err) {
-			// parse possible server payload
-			const msg =
-				err?.message ||
-				'Failed to submit application. Please check your entries and try again.';
-			setServerMessage({ type: 'error', text: msg });
-			// if server returned validation details in message, try to map them
-			// (submitApplication already surfaces server message)
+			setServerMessage({ type: 'error', text: parseServerError(err) });
 		} finally {
 			setLoading(false);
 		}
@@ -457,6 +478,7 @@ const JoinPage = () => {
 									<div className="mt-3">
 										<input
 											name="hostelName"
+											ref={hostelRef}
 											placeholder="Hostel name"
 											value={formData.hostelName}
 											onChange={handleChange}
@@ -469,6 +491,9 @@ const JoinPage = () => {
 												{errors.hostelName}
 											</p>
 										)}
+										<p className="mt-1 text-xs text-gray-400">
+											Please enter the name of your hostel.
+										</p>
 									</div>
 								)}
 
@@ -511,9 +536,16 @@ const JoinPage = () => {
 							name="bio"
 							placeholder="A short bio about your interests and skills (max 500 chars)"
 							value={formData.bio}
-							onChange={handleChange}
+							onChange={(e) => {
+								// prevent typing beyond limit
+								if (e.target.value.length > BIO_MAX) return;
+								handleChange(e);
+							}}
 							error={errors.bio}
 						/>
+						<div className="flex justify-end text-xs text-gray-400 mt-1">
+							{bioRemaining} characters left
+						</div>
 					</fieldset>
 
 					<div className="flex justify-end">
