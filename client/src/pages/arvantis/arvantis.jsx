@@ -23,53 +23,83 @@ const ArvantisPage = () => {
 	const [selectedEvent, setSelectedEvent] = useState(null);
 	const [selectedImage, setSelectedImage] = useState(null);
 
+	// Landing query (current or most recent fest)
 	const landingQuery = useQuery({
 		queryKey: ['arvantis', 'landing'],
 		queryFn: getArvantisLandingData,
 		staleTime: 60_000,
+		retry: 1,
 	});
 
+	// Editions list (past editions)
 	const editionsQuery = useQuery({
 		queryKey: ['arvantis', 'editions', { page: 1, limit: 12 }],
 		queryFn: () => getAllFests({ page: 1, limit: 12, sortBy: 'year', sortOrder: 'desc' }),
 		staleTime: 60_000,
+		retry: 1,
 	});
 
+	// Normalize editions array from possible server shapes
 	const editions = useMemo(() => {
 		const raw = editionsQuery.data;
-		// Handle possible shapes: { data: [...] } or { docs: [...] } or array
-		if (Array.isArray(raw?.data)) return raw.data;
-		if (Array.isArray(raw?.docs)) return raw.docs;
+		if (!raw) return [];
+		// server might return pagination shape or plain array
 		if (Array.isArray(raw)) return raw;
+		if (Array.isArray(raw.docs)) return raw.docs;
+		if (Array.isArray(raw.data)) return raw.data;
+		// fallback: try nested data
+		const payload = raw?.data ?? raw;
+		if (Array.isArray(payload)) return payload;
+		if (Array.isArray(payload?.docs)) return payload.docs;
 		return [];
 	}, [editionsQuery.data]);
 
+	// Initialize identifier from landing or editions (only once)
 	useEffect(() => {
-		// Set initial identifier from landing or first edition
 		if (identifier) return;
-		const l = landingQuery.data;
-		if (l?.slug || l?.year) {
-			setIdentifier(l.slug || String(l.year));
-		} else if (editions.length > 0) {
-			setIdentifier(editions[0].slug || String(editions[0].year));
+		// prefer landing if available
+		const landing = landingQuery.data;
+		if (landing) {
+			const id = landing.slug || String(landing.year || '');
+			if (id) {
+				console.debug('[ArvantisPage] set identifier from landing', id);
+				setIdentifier(id);
+				return;
+			}
+		}
+		// fallback to first edition from editions list
+		if (editions.length > 0) {
+			const first = editions[0];
+			const id = first?.slug || String(first?.year || '');
+			if (id) {
+				console.debug('[ArvantisPage] set identifier from editions', id);
+				setIdentifier(id);
+			}
 		}
 	}, [identifier, landingQuery.data, editions]);
 
+	// Details for selected identifier (only when identifier present)
 	const detailsQuery = useQuery({
 		queryKey: ['arvantis', 'details', identifier],
 		queryFn: () => getFestDetails(identifier),
 		enabled: !!identifier,
 		staleTime: 60_000,
+		retry: 1,
 	});
 
-	const fest = detailsQuery.data || landingQuery.data || null;
+	// Resolve the fest to display (details -> landing fallback)
+	const fest = useMemo(() => {
+		return detailsQuery.data ?? landingQuery.data ?? null;
+	}, [detailsQuery.data, landingQuery.data]);
 
+	// Stats for UI cards (defensive access)
 	const stats = useMemo(() => {
+		const safeFest = fest || {};
 		return [
-			{ icon: Layers3, label: 'Edition', value: fest?.year || '—' },
-			{ icon: Users, label: 'Partners', value: fest?.partners?.length || 0 },
-			{ icon: Calendar, label: 'Events', value: fest?.events?.length || 0 },
-			{ icon: ImageIcon, label: 'Gallery', value: fest?.gallery?.length || 0 },
+			{ icon: Layers3, label: 'Edition', value: safeFest?.year ?? '—' },
+			{ icon: Users, label: 'Partners', value: safeFest?.partners?.length ?? 0 },
+			{ icon: Calendar, label: 'Events', value: safeFest?.events?.length ?? 0 },
+			{ icon: ImageIcon, label: 'Gallery', value: safeFest?.gallery?.length ?? 0 },
 		];
 	}, [fest]);
 
@@ -78,12 +108,26 @@ const ArvantisPage = () => {
 		(!identifier && editionsQuery.isLoading) ||
 		detailsQuery.isLoading;
 
-	const isErrorOverall = landingQuery.isError || detailsQuery.isError;
+	const isErrorOverall = landingQuery.isError || detailsQuery.isError || editionsQuery.isError;
 	const errorMsg =
-		landingQuery.error?.message || detailsQuery.error?.message || 'Unknown error occurred.';
+		landingQuery.error?.message ||
+		detailsQuery.error?.message ||
+		editionsQuery.error?.message ||
+		'Unknown error occurred.';
 
 	const handleEventClick = useCallback((event) => {
-		setSelectedEvent(event);
+		// normalize event object if server returns different keys
+		const normalized = {
+			...event,
+			title: event.title ?? event.name ?? '',
+			eventDate: event.eventDate ?? event.date ?? null,
+			posters: Array.isArray(event.posters)
+				? event.posters
+				: event.posters
+				? [event.posters]
+				: [],
+		};
+		setSelectedEvent(normalized);
 	}, []);
 
 	const handleImageClick = useCallback((image) => {
@@ -95,6 +139,7 @@ const ArvantisPage = () => {
 		setSelectedImage(null);
 	}, []);
 
+	// Defensive UI: show loading / error / empty states
 	return (
 		<div className="min-h-screen bg-gray-900 text-gray-100">
 			<div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 sm:py-12">
@@ -125,17 +170,23 @@ const ArvantisPage = () => {
 					</div>
 				) : (
 					<div className="space-y-12">
+						{/* Poster / Hero */}
 						<PosterHero fest={fest} />
 
+						{/* Editions / selector */}
 						<EditionsStrip
 							editions={editions}
 							currentIdentifier={identifier}
 							onSelect={(id) => {
+								if (!id) return;
+								console.debug('[ArvantisPage] edition selected', id);
 								setIdentifier(id);
+								// scroll top for better UX
 								window.scrollTo({ top: 0, behavior: 'smooth' });
 							}}
 						/>
 
+						{/* Stats */}
 						<div className="bg-gray-900/50 rounded-2xl p-6">
 							<section className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-6">
 								{stats.map((s, idx) => (
@@ -150,14 +201,24 @@ const ArvantisPage = () => {
 							</section>
 						</div>
 
+						{/* Main content sections */}
 						<div className="space-y-12">
-							<EventsGrid events={fest?.events} onEventClick={handleEventClick} />
-							<PartnersGrid partners={fest?.partners} />
-							<GalleryGrid gallery={fest?.gallery} onImageClick={handleImageClick} />
+							<EventsGrid
+								events={Array.isArray(fest?.events) ? fest.events : []}
+								onEventClick={handleEventClick}
+							/>
+							<PartnersGrid
+								partners={Array.isArray(fest?.partners) ? fest.partners : []}
+							/>
+							<GalleryGrid
+								gallery={Array.isArray(fest?.gallery) ? fest.gallery : []}
+								onImageClick={handleImageClick}
+							/>
 						</div>
 					</div>
 				)}
 
+				{/* Modals */}
 				<AnimatePresence>
 					{selectedEvent && (
 						<EventDetailModal

@@ -23,5 +23,3 @@ const StatCard = ({ icon: Icon, label, value, index }) => (
 );
 
 export default StatCard;
-
-export default StatCard;
