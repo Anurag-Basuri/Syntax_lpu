@@ -1,9 +1,9 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { submitApplication } from '../../services/applyServices.js';
 import { useNavigate } from 'react-router-dom';
-import { User, Mail, Phone, BookOpen, Users } from 'lucide-react';
+import { User, Mail, Phone, BookOpen, Users, CheckCircle, XCircle, ArrowRight } from 'lucide-react';
 
-/* --- Small presentational bits kept local for this page --- */
+/* --- Enhanced presentational components --- */
 const InputField = ({
 	icon,
 	type = 'text',
@@ -14,9 +14,9 @@ const InputField = ({
 	error,
 	ariaLabel,
 }) => (
-	<div className="relative w-full">
+	<div className="relative w-full group">
 		{icon && (
-			<div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-4 text-muted">
+			<div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-4 text-gray-400 group-focus-within:text-purple-400 transition-colors">
 				{icon}
 			</div>
 		)}
@@ -27,46 +27,58 @@ const InputField = ({
 			placeholder={placeholder}
 			value={value}
 			onChange={onChange}
-			className={`auth-input pl-12 ${error ? 'border-red-500/50' : ''}`}
+			className={`w-full pl-12 pr-4 py-3 bg-white/5 border border-white/10 rounded-xl text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-500/50 focus:border-purple-500 transition-all duration-200 ${
+				error ? 'border-red-500/50 focus:ring-red-500/50' : ''
+			}`}
 		/>
 		{error && (
-			<p className="mt-1.5 text-sm text-red-400" role="alert">
-				{error}
+			<p className="mt-2 text-sm text-red-400 flex items-center gap-1" role="alert">
+				<XCircle size={14} /> {error}
 			</p>
 		)}
 	</div>
 );
 
-const TextAreaField = ({ name, placeholder, value, onChange, error }) => (
-	<div className="w-full">
+const TextAreaField = ({ name, placeholder, value, onChange, error, maxLength, remaining }) => (
+	<div className="w-full group">
 		<textarea
 			aria-label={name}
 			name={name}
 			placeholder={placeholder}
 			value={value}
 			onChange={onChange}
+			maxLength={maxLength}
 			rows={5}
-			className={`auth-input resize-y ${error ? 'border-red-500/50' : ''}`}
+			className={`w-full p-4 bg-white/5 border border-white/10 rounded-xl text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-500/50 focus:border-purple-500 resize-y transition-all duration-200 ${
+				error ? 'border-red-500/50 focus:ring-red-500/50' : ''
+			}`}
 		/>
-		{error && (
-			<p className="mt-1.5 text-sm text-red-400" role="alert">
-				{error}
-			</p>
-		)}
+		<div className="flex justify-between items-center mt-2">
+			{error && (
+				<p className="text-sm text-red-400 flex items-center gap-1" role="alert">
+					<XCircle size={14} /> {error}
+				</p>
+			)}
+			{remaining !== undefined && (
+				<p className={`text-xs ${remaining < 50 ? 'text-yellow-400' : 'text-gray-400'}`}>
+					{remaining} characters left
+				</p>
+			)}
+		</div>
 	</div>
 );
 
 const GradientButton = ({ children, isLoading, ...props }) => (
 	<button
 		type="submit"
-		className={`auth-button group flex items-center justify-center gap-3 ${
-			isLoading ? 'opacity-80 cursor-wait' : ''
+		className={`px-8 py-3 bg-gradient-to-r from-purple-600 to-pink-500 text-white font-semibold rounded-xl shadow-lg hover:shadow-purple-500/25 hover:scale-105 transition-all duration-200 flex items-center justify-center gap-2 ${
+			isLoading ? 'opacity-75 cursor-not-allowed' : ''
 		}`}
 		disabled={isLoading}
 		{...props}
 	>
 		{isLoading ? (
-			<span className="flex items-center gap-2">
+			<>
 				<svg className="animate-spin h-5 w-5" viewBox="0 0 24 24" fill="none">
 					<circle
 						cx="12"
@@ -84,11 +96,29 @@ const GradientButton = ({ children, isLoading, ...props }) => (
 					/>
 				</svg>
 				<span>Submitting...</span>
-			</span>
+			</>
 		) : (
-			children
+			<>
+				{children}
+				<ArrowRight size={18} />
+			</>
 		)}
 	</button>
+);
+
+const StepIndicator = ({ step, totalSteps, title }) => (
+	<div className="flex items-center gap-3 mb-4">
+		<div
+			className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold ${
+				step <= totalSteps
+					? 'bg-gradient-to-r from-purple-600 to-pink-500 text-white'
+					: 'bg-white/10 text-gray-400'
+			}`}
+		>
+			{step}
+		</div>
+		<h3 className="text-lg font-semibold text-white">{title}</h3>
+	</div>
 );
 
 /* --- Domain options (expanded) --- */
@@ -107,7 +137,7 @@ const DOMAIN_OPTIONS = [
 
 const JoinPage = () => {
 	const navigate = useNavigate();
-	const hostelRef = useRef(null); // autofocus hostel input when needed
+	const hostelRef = useRef(null);
 	const [formData, setFormData] = useState({
 		fullName: '',
 		LpuId: '',
@@ -132,27 +162,23 @@ const JoinPage = () => {
 		if (successCountdown > 0) {
 			t = setTimeout(() => setSuccessCountdown((c) => c - 1), 1000);
 		} else if (successCountdown === 0 && serverMessage.type === 'success') {
-			// redirect after countdown ends
 			navigate('/login');
 		}
 		return () => clearTimeout(t);
 	}, [successCountdown, serverMessage, navigate]);
 
 	useEffect(() => {
-		// Focus hostel name when accommodation becomes hostler
 		if (formData.accommodation === 'hostler' && hostelRef.current) {
 			hostelRef.current.focus();
 		}
 	}, [formData.accommodation]);
 
-	// bio length handling
 	const BIO_MAX = 500;
 	const bioRemaining = BIO_MAX - (formData.bio?.length || 0);
 
 	const validate = () => {
 		const newErrors = {};
 		if (!formData.fullName.trim()) newErrors.fullName = 'Full name is required.';
-		// server expects exact 8 digits
 		if (!/^\d{8}$/.test(formData.LpuId.trim()))
 			newErrors.LpuId = 'LPU ID must be exactly 8 digits.';
 		if (!/\S+@\S+\.\S+/.test(formData.email)) newErrors.email = 'A valid email is required.';
@@ -164,7 +190,6 @@ const JoinPage = () => {
 		if (Array.isArray(formData.domains) && formData.domains.length > 2)
 			newErrors.domains = 'You can select up to 2 domains.';
 		if (!formData.accommodation) newErrors.accommodation = 'Select accommodation preference.';
-		// hostelName required when hostler
 		if (formData.accommodation === 'hostler' && !formData.hostelName.trim())
 			newErrors.hostelName = 'Hostel name required for hostlers.';
 		if (!formData.bio.trim()) newErrors.bio = 'A short bio is required.';
@@ -175,7 +200,6 @@ const JoinPage = () => {
 	const parseServerError = (err) => {
 		const resp = err?.response?.data;
 		if (!resp) return err?.message || 'Unknown error';
-		// server may send { message, details }
 		if (Array.isArray(resp.details) && resp.details.length) {
 			return [resp.message, ...resp.details].join(' — ');
 		}
@@ -185,20 +209,17 @@ const JoinPage = () => {
 	const handleChange = (e) => {
 		const { name, value, type, checked } = e.target;
 
-		// boolean toggles
 		if (type === 'checkbox' && (name === 'previousExperience' || name === 'anyotherorg')) {
 			setFormData((prev) => ({ ...prev, [name]: checked }));
 			setErrors((prev) => ({ ...prev, [name]: '' }));
 			return;
 		}
 
-		// domain checkboxes: enforce max 2 and disable other checkboxes when 2 selected
 		if (type === 'checkbox' && name === 'domains') {
 			setFormData((prev) => {
 				const next = new Set(prev.domains || []);
 				if (checked) {
 					if (next.size >= 2) {
-						// show gentle inline hint
 						setErrors((prevErr) => ({
 							...prevErr,
 							domains: 'You can select up to 2 domains only.',
@@ -209,7 +230,6 @@ const JoinPage = () => {
 				} else {
 					next.delete(value);
 				}
-				// clear domains error when changed appropriately
 				setErrors((prevErr) => ({
 					...prevErr,
 					domains: next.size <= 2 ? '' : prevErr.domains,
@@ -219,7 +239,6 @@ const JoinPage = () => {
 			return;
 		}
 
-		// numeric-only LPU input: strip non-digits
 		if (name === 'LpuId') {
 			const digits = value.replace(/\D/g, '').slice(0, 8);
 			setFormData((prev) => ({ ...prev, LpuId: digits }));
@@ -260,9 +279,7 @@ const JoinPage = () => {
 				text: 'Application submitted — redirecting to login in 3s.',
 			});
 			setSuccessCountdown(3);
-			// clear form
-			setFormData((prev) => ({
-				...prev,
+			setFormData({
 				fullName: '',
 				LpuId: '',
 				email: '',
@@ -275,7 +292,7 @@ const JoinPage = () => {
 				previousExperience: false,
 				anyotherorg: false,
 				bio: '',
-			}));
+			});
 			setErrors({});
 		} catch (err) {
 			setServerMessage({ type: 'error', text: parseServerError(err) });
@@ -284,41 +301,45 @@ const JoinPage = () => {
 		}
 	};
 
-	/* helper: whether domain checkboxes should be disabled when 2 selected */
 	const domainsSelectedCount = formData.domains.length;
 	const disableMoreDomains = domainsSelectedCount >= 2;
 
 	return (
-		<div className="max-w-3xl mx-auto p-6">
-			<div className="auth-card">
-				<header className="text-center mb-4">
-					<h1 className="text-3xl font-bold text-primary">Become a Syntax Builder</h1>
-					<p className="mt-2 text-secondary">
-						Join a community of creators, innovators and developers. (Select up to 2
-						domains)
+		<div className="min-h-screen bg-gradient-to-br from-[#0a0e17] via-[#0f172a] to-[#1e1b4b] flex items-center justify-center p-4">
+			<div className="w-full max-w-4xl bg-white/5 backdrop-blur-xl border border-white/10 rounded-3xl shadow-2xl p-8">
+				<header className="text-center mb-8">
+					<h1 className="text-4xl font-bold bg-gradient-to-r from-purple-400 to-pink-400 bg-clip-text text-transparent">
+						Become a Syntax Builder
+					</h1>
+					<p className="mt-3 text-gray-300 text-lg">
+						Join a community of creators, innovators, and developers. Select up to 2
+						domains.
 					</p>
 				</header>
 
 				{serverMessage.text && (
 					<div
-						className={`mt-4 text-center p-3 rounded-lg border ${
+						className={`mb-6 p-4 rounded-xl border flex items-center gap-3 ${
 							serverMessage.type === 'success'
-								? 'text-emerald-400 bg-emerald-500/6 border-emerald-500/12'
-								: 'text-rose-400 bg-rose-500/6 border-rose-500/12'
+								? 'text-emerald-400 bg-emerald-500/10 border-emerald-500/20'
+								: 'text-red-400 bg-red-500/10 border-red-500/20'
 						}`}
 						role="status"
 					>
-						{serverMessage.text}
+						{serverMessage.type === 'success' ? (
+							<CheckCircle size={20} />
+						) : (
+							<XCircle size={20} />
+						)}
+						<span>{serverMessage.text}</span>
 					</div>
 				)}
 
-				<form onSubmit={handleSubmit} className="mt-6 grid gap-6" noValidate>
+				<form onSubmit={handleSubmit} className="space-y-8" noValidate>
 					{/* Personal */}
-					<fieldset className="auth-fieldset">
-						<legend className="auth-legend">
-							<span className="auth-legend-step">1</span> Personal
-						</legend>
-						<div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+					<div className="space-y-4">
+						<StepIndicator step={1} totalSteps={4} title="Personal Information" />
+						<div className="grid grid-cols-1 md:grid-cols-2 gap-6">
 							<InputField
 								icon={<User size={18} />}
 								name="fullName"
@@ -337,14 +358,12 @@ const JoinPage = () => {
 								error={errors.email}
 							/>
 						</div>
-					</fieldset>
+					</div>
 
 					{/* Academic */}
-					<fieldset className="auth-fieldset">
-						<legend className="auth-legend">
-							<span className="auth-legend-step">2</span> Academic
-						</legend>
-						<div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+					<div className="space-y-4">
+						<StepIndicator step={2} totalSteps={4} title="Academic Details" />
+						<div className="grid grid-cols-1 md:grid-cols-2 gap-6">
 							<InputField
 								icon={<User size={18} />}
 								name="LpuId"
@@ -372,7 +391,7 @@ const JoinPage = () => {
 								error={errors.phone}
 							/>
 							<div className="relative w-full">
-								<div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-4 text-muted">
+								<div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-4 text-gray-400">
 									<Users size={18} />
 								</div>
 								<select
@@ -380,8 +399,10 @@ const JoinPage = () => {
 									name="gender"
 									value={formData.gender}
 									onChange={handleChange}
-									className={`auth-input pl-12 ${
-										errors.gender ? 'border-red-500/50' : ''
+									className={`w-full pl-12 pr-4 py-3 bg-white/5 border border-white/10 rounded-xl text-white focus:outline-none focus:ring-2 focus:ring-purple-500/50 focus:border-purple-500 transition-all duration-200 ${
+										errors.gender
+											? 'border-red-500/50 focus:ring-red-500/50'
+											: ''
 									}`}
 								>
 									<option value="" disabled>
@@ -391,36 +412,41 @@ const JoinPage = () => {
 									<option value="female">Female</option>
 								</select>
 								{errors.gender && (
-									<p className="mt-1.5 text-sm text-red-400" role="alert">
-										{errors.gender}
+									<p
+										className="mt-2 text-sm text-red-400 flex items-center gap-1"
+										role="alert"
+									>
+										<XCircle size={14} /> {errors.gender}
 									</p>
 								)}
 							</div>
 						</div>
-					</fieldset>
+					</div>
 
 					{/* Preferences */}
-					<fieldset className="auth-fieldset">
-						<legend className="auth-legend">
-							<span className="auth-legend-step">3</span> Preferences & Domains
-						</legend>
-						<div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+					<div className="space-y-4">
+						<StepIndicator step={3} totalSteps={4} title="Preferences & Domains" />
+						<div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
 							<div>
-								<label className="block text-sm font-medium text-gray-300 mb-2">
+								<label className="block text-sm font-medium text-gray-300 mb-3">
 									Select domains{' '}
 									<span className="text-xs text-gray-400">
 										({domainsSelectedCount}/2)
 									</span>
 								</label>
-								<div className="grid grid-cols-2 gap-2">
+								<div className="grid grid-cols-2 gap-3">
 									{DOMAIN_OPTIONS.map((opt) => {
 										const checked = formData.domains.includes(opt.key);
 										const disabled = !checked && disableMoreDomains;
 										return (
 											<label
 												key={opt.key}
-												className={`inline-flex items-center gap-2 cursor-pointer ${
-													disabled ? 'opacity-60 cursor-not-allowed' : ''
+												className={`flex items-center gap-3 p-3 rounded-lg border cursor-pointer transition-all ${
+													checked
+														? 'bg-purple-500/20 border-purple-500/50 text-purple-300'
+														: disabled
+														? 'bg-white/5 border-white/10 text-gray-500 cursor-not-allowed'
+														: 'bg-white/5 border-white/10 hover:bg-white/10 hover:border-white/20 text-gray-200'
 												}`}
 											>
 												<input
@@ -433,72 +459,70 @@ const JoinPage = () => {
 													className="form-checkbox"
 													aria-checked={checked}
 												/>
-												<span className="text-sm text-gray-200">
-													{opt.label}
-												</span>
+												<span className="text-sm">{opt.label}</span>
 											</label>
 										);
 									})}
 								</div>
-								{errors.domains ? (
-									<p className="mt-1.5 text-sm text-red-400">{errors.domains}</p>
-								) : (
-									<p className="mt-1 text-xs text-gray-400">
-										Pick 1 or 2 domains that best match your interests.
+								{errors.domains && (
+									<p className="mt-3 text-sm text-red-400 flex items-center gap-1">
+										<XCircle size={14} /> {errors.domains}
 									</p>
 								)}
 							</div>
 
-							<div>
-								<label className="block text-sm font-medium text-gray-300 mb-2">
-									Accommodation
-								</label>
-								<select
-									name="accommodation"
-									value={formData.accommodation}
-									onChange={handleChange}
-									className={`auth-input ${
-										errors.accommodation ? 'border-red-500/50' : ''
-									}`}
-								>
-									<option value="" disabled>
-										Select accommodation
-									</option>
-									<option value="hostler">Hostler</option>
-									<option value="non-hostler">Non-Hostler</option>
-								</select>
-								{errors.accommodation && (
-									<p className="mt-1.5 text-sm text-red-400">
-										{errors.accommodation}
-									</p>
-								)}
+							<div className="space-y-4">
+								<div>
+									<label className="block text-sm font-medium text-gray-300 mb-2">
+										Accommodation
+									</label>
+									<select
+										name="accommodation"
+										value={formData.accommodation}
+										onChange={handleChange}
+										className={`w-full p-3 bg-white/5 border border-white/10 rounded-xl text-white focus:outline-none focus:ring-2 focus:ring-purple-500/50 focus:border-purple-500 transition-all duration-200 ${
+											errors.accommodation
+												? 'border-red-500/50 focus:ring-red-500/50'
+												: ''
+										}`}
+									>
+										<option value="" disabled>
+											Select accommodation
+										</option>
+										<option value="hostler">Hostler</option>
+										<option value="non-hostler">Non-Hostler</option>
+									</select>
+									{errors.accommodation && (
+										<p className="mt-2 text-sm text-red-400 flex items-center gap-1">
+											<XCircle size={14} /> {errors.accommodation}
+										</p>
+									)}
+								</div>
 
-								{/* show hostel name if hostler */}
 								{formData.accommodation === 'hostler' && (
-									<div className="mt-3">
+									<div>
 										<input
 											name="hostelName"
 											ref={hostelRef}
 											placeholder="Hostel name"
 											value={formData.hostelName}
 											onChange={handleChange}
-											className={`auth-input ${
-												errors.hostelName ? 'border-red-500/50' : ''
+											className={`w-full p-3 bg-white/5 border border-white/10 rounded-xl text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-500/50 focus:border-purple-500 transition-all duration-200 ${
+												errors.hostelName
+													? 'border-red-500/50 focus:ring-red-500/50'
+													: ''
 											}`}
 										/>
 										{errors.hostelName && (
-											<p className="mt-1.5 text-sm text-red-400">
-												{errors.hostelName}
+											<p className="mt-2 text-sm text-red-400 flex items-center gap-1">
+												<XCircle size={14} /> {errors.hostelName}
 											</p>
 										)}
-										<p className="mt-1 text-xs text-gray-400">
-											Please enter the name of your hostel.
-										</p>
 									</div>
 								)}
 
-								<div className="mt-4 space-y-2">
-									<label className="inline-flex items-center gap-2">
+								<div className="space-y-3">
+									<label className="flex items-center gap-3 cursor-pointer">
 										<input
 											type="checkbox"
 											name="previousExperience"
@@ -510,7 +534,7 @@ const JoinPage = () => {
 											Previous experience
 										</span>
 									</label>
-									<label className="inline-flex items-center gap-2">
+									<label className="flex items-center gap-3 cursor-pointer">
 										<input
 											type="checkbox"
 											name="anyotherorg"
@@ -525,39 +549,35 @@ const JoinPage = () => {
 								</div>
 							</div>
 						</div>
-					</fieldset>
+					</div>
 
 					{/* About */}
-					<fieldset className="auth-fieldset">
-						<legend className="auth-legend">
-							<span className="auth-legend-step">4</span> About you
-						</legend>
+					<div className="space-y-4">
+						<StepIndicator step={4} totalSteps={4} title="About You" />
 						<TextAreaField
 							name="bio"
-							placeholder="A short bio about your interests and skills (max 500 chars)"
+							placeholder="A short bio about your interests and skills"
 							value={formData.bio}
 							onChange={(e) => {
-								// prevent typing beyond limit
 								if (e.target.value.length > BIO_MAX) return;
 								handleChange(e);
 							}}
 							error={errors.bio}
+							maxLength={BIO_MAX}
+							remaining={bioRemaining}
 						/>
-						<div className="flex justify-end text-xs text-gray-400 mt-1">
-							{bioRemaining} characters left
-						</div>
-					</fieldset>
+					</div>
 
-					<div className="flex justify-end">
-						<GradientButton isLoading={loading}>Submit application</GradientButton>
+					<div className="flex justify-end pt-4">
+						<GradientButton isLoading={loading}>Submit Application</GradientButton>
 					</div>
 				</form>
 
-				<footer className="mt-6 text-center text-sm text-secondary">
+				<footer className="mt-8 text-center text-sm text-gray-400">
 					Already a member?{' '}
 					<button
 						onClick={() => navigate('/login')}
-						className="font-semibold text-accent-1 hover:underline"
+						className="font-semibold text-purple-400 hover:text-purple-300 transition-colors"
 					>
 						Login
 					</button>
