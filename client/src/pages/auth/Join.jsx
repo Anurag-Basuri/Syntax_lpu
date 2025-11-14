@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
-import { publicClient } from '../../services/api.js';
+import { submitApplication } from '../../services/applyServices.js';
 import { useNavigate } from 'react-router-dom';
-import { User, Mail, Phone, BookOpen, Users, Info } from 'lucide-react';
+import { User, Mail, Phone, BookOpen, Users } from 'lucide-react';
 
 // Reusable, lightweight form components
 const InputField = ({ icon, type = 'text', name, placeholder, value, onChange, error }) => (
@@ -96,12 +96,12 @@ const JoinPage = () => {
 	const validate = () => {
 		const newErrors = {};
 		if (!formData.fullName) newErrors.fullName = 'Full name is required.';
-		if (!/^\d{8}$/.test(formData.LpuId))
-			newErrors.LpuId = 'A valid 8-digit LPU ID is required.';
+		// Align client-side LPU validation with backend: allow 7-10 digits
+		if (!/^\d{7,10}$/.test(formData.LpuId))
+			newErrors.LpuId = 'A valid LPU ID (7-10 digits) is required.';
 		if (!/\S+@\S+\.\S+/.test(formData.email)) newErrors.email = 'A valid email is required.';
 		if (!formData.phone) newErrors.phone = 'Phone number is required.';
 		if (!formData.course) newErrors.course = 'Your course is required.';
-		// Only allow male/female to match server model enum
 		if (!formData.gender) newErrors.gender = 'Please select a gender.';
 		if (!Array.isArray(formData.domains) || formData.domains.length === 0)
 			newErrors.domains = 'Select at least one domain.';
@@ -160,8 +160,8 @@ const JoinPage = () => {
 		};
 
 		try {
-			// Server route: POST /api/v1/apply
-			await publicClient.post('/api/v1/apply', payload);
+			// Use client service which matches backend route and error shapes
+			await submitApplication(payload);
 			setServerMessage({
 				type: 'success',
 				text: 'Application submitted! Check your email for next steps.',
@@ -182,19 +182,9 @@ const JoinPage = () => {
 			});
 			setErrors({});
 		} catch (err) {
-			// Prefer server message; if server returned validation details, show first meaningful one
-			const serverMsg = err?.response?.data?.message;
-			const details = err?.response?.data?.details;
-			const detailText =
-				Array.isArray(details) && details.length ? details.join('; ') : details || '';
-			setServerMessage({
-				type: 'error',
-				text:
-					serverMsg ||
-					detailText ||
-					err?.message ||
-					'An error occurred. Please try again.',
-			});
+			// applyServices throws an Error with a helpful message (server or fallback)
+			const message = err?.message || 'An error occurred. Please try again.';
+			setServerMessage({ type: 'error', text: message });
 		} finally {
 			setLoading(false);
 		}
@@ -260,7 +250,7 @@ const JoinPage = () => {
 							<InputField
 								icon={<User size={18} />}
 								name="LpuId"
-								placeholder="LPU ID (8 digits)"
+								placeholder="LPU ID (7-10 digits)"
 								value={formData.LpuId}
 								onChange={handleChange}
 								error={errors.LpuId}
