@@ -67,35 +67,88 @@ const upload = multer({
 });
 
 /**
- * Middleware factory to handle multiple file uploads for a single field.
+ * Middleware factory to handle file uploads for a single field.
  *
  * @param {string} fieldName - The name of the field in the form-data.
+ * @param {{ multiple?: boolean; maxCount?: number }} options
  * @returns {Function} Express middleware.
  */
-export const uploadFile = (fieldName) => (req, res, next) => {
-	// Use upload.array() to handle multiple files
-	upload.array(fieldName, MAX_FILE_COUNT)(req, res, (err) => {
-		// If an error occurred and files were uploaded, delete them
-		if (err && req.files && req.files.length > 0) {
-			req.files.forEach((file) => {
-				try {
-					fs.unlinkSync(file.path);
-				} catch (deleteErr) {
-					console.error('Error deleting file after upload error:', deleteErr);
+export const uploadFile = (fieldName, options = {}) => {
+	const { multiple = false, maxCount = MAX_FILE_COUNT } = options;
+
+	return (req, res, next) => {
+		// Choose the proper multer handler
+		const handler = multiple ? upload.array(fieldName, maxCount) : upload.single(fieldName);
+
+		console.log(
+			`[MULTER] starting upload handler for field="${fieldName}" multiple=${multiple}`
+		);
+
+		handler(req, res, (err) => {
+			// Normalize multer outputs and log
+			if (!multiple) {
+				// multer.single sets req.file (single) and may set req.files undefined
+				if (req.file) {
+					console.log(
+						`[MULTER] received single file: field="${req.file.fieldname}" filename="${req.file.filename}" size=${req.file.size}`
+					);
+				} else {
+					console.log('[MULTER] no single file received');
 				}
-			});
-		}
-
-		if (err instanceof multer.MulterError) {
-			if (err.code === 'LIMIT_UNEXPECTED_FILE') {
-				return next(new ApiError(400, `Too many files. Maximum is ${MAX_FILE_COUNT}.`));
+			} else {
+				// multer.array sets req.files (array)
+				const files = req.files || [];
+				console.log(`[MULTER] received ${files.length} file(s) for field="${fieldName}"`);
+				files.forEach((f) => {
+					console.log(`[MULTER]  - ${f.filename} (${f.mimetype}, ${f.size} bytes)`);
+				});
 			}
-			return next(new ApiError(400, `File upload error: ${err.message}`));
-		} else if (err) {
-			return next(new ApiError(400, `File upload error: ${err.message}`));
-		}
 
-		// req.files is now correctly populated by upload.array()
-		next();
-	});
+			// Clean up any saved files if an error occurred
+			if (err) {
+				const toDelete = [];
+				if (req.file) toDelete.push(req.file);
+				if (req.files && req.files.length) toDelete.push(...req.files);
+
+				if (toDelete.length > 0) {
+					toDelete.forEach((file) => {
+						try {
+							fs.unlinkSync(file.path);
+							console.log(
+								`[MULTER] deleted uploaded file due to error: ${file.path}`
+							);
+						} catch (e) {
+							console.error('[MULTER] error deleting file after upload error:', e);
+						}
+					});
+				}
+			}
+
+			// Handle multer errors and convert to ApiError
+			if (err instanceof multer.MulterError) {
+				if (err.code === 'LIMIT_UNEXPECTED_FILE') {
+					return next(
+						new ApiError(
+							400,
+							`Too many files for field '${fieldName}'. Maximum is ${maxCount}.`
+						)
+					);
+				}
+				return next(new ApiError(400, `File upload error: ${err.message}`));
+			} else if (err) {
+				return next(new ApiError(400, `File upload error: ${err.message}`));
+			}
+
+			// Final normalization:
+			// - for single: ensure req.files is an array with zero or one item (useful for downstream code that expects arrays)
+			// - for multiple: req.files is already an array
+			if (!multiple) {
+				req.files = req.file ? [req.file] : [];
+			} else {
+				req.file = undefined; // ensure single slot isn't set for arrays
+			}
+
+			next();
+		});
+	};
 };

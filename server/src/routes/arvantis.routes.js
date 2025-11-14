@@ -94,7 +94,15 @@ router.delete(
 // Add a new partner (sponsor or collaborator) to a fest
 router.post(
 	'/:identifier/partners',
-	uploadFile('logo'),
+	// lightweight debug middleware for uploads
+	(req, res, next) => {
+		console.log('[ROUTE] POST /:identifier/partners', {
+			identifier: req.params.identifier,
+			contentType: req.headers['content-type'],
+		});
+		next();
+	},
+	uploadFile('logo', { multiple: false, maxCount: 1 }),
 	validate([
 		param('identifier').notEmpty().withMessage('Fest identifier is required'),
 		body('name').notEmpty().trim().withMessage('Partner name is required'),
@@ -143,14 +151,28 @@ router.delete(
 // --- Media Management ---
 router.patch(
 	'/:identifier/poster',
-	uploadFile('poster'), // Correctly use the uploadFile middleware factory
+	(req, res, next) => {
+		console.log('[ROUTE] PATCH /:identifier/poster', {
+			identifier: req.params.identifier,
+			contentType: req.headers['content-type'],
+		});
+		next();
+	},
+	uploadFile('poster', { multiple: false, maxCount: 1 }), // single poster file
 	validate([param('identifier').notEmpty().withMessage('Fest identifier is required')]),
 	updateFestPoster
 );
 
 router.post(
 	'/:identifier/gallery',
-	uploadFile('media'), // Correctly use the uploadFile middleware factory
+	(req, res, next) => {
+		console.log('[ROUTE] POST /:identifier/gallery', {
+			identifier: req.params.identifier,
+			contentType: req.headers['content-type'],
+		});
+		next();
+	},
+	uploadFile('media', { multiple: true, maxCount: 10 }), // allow multiple gallery items
 	validate([param('identifier').notEmpty().withMessage('Fest identifier is required')]),
 	addGalleryMedia
 );
