@@ -37,11 +37,22 @@ router.get('/landing', getLandingPageData);
 // Get a paginated list of all fests (summary view)
 router.get('/', getAllFests);
 
+// ---------------------------------------------------------------------------------
+// Public detail route (must be registered BEFORE admin auth middleware)
+// Registering here ensures anyone can fetch fest details without auth.
+// ---------------------------------------------------------------------------------
+router.get(
+	'/:identifier',
+	validate([param('identifier').notEmpty().withMessage('Fest identifier is required')]),
+	getFestDetails
+);
+
 //================================================================================
 // --- Admin-Only Routes ---
 // All subsequent routes are protected and require admin privileges.
 //================================================================================
 
+// Protect everything below
 router.use(protect, authorize('admin'));
 
 // --- Admin Analytics & Reports ---

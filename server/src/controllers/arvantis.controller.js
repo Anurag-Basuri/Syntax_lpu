@@ -51,7 +51,7 @@ const getLandingPageData = asyncHandler(async (req, res) => {
 	fest = await Arvantis.findOne({
 		year: currentYear,
 		status: { $in: ['upcoming', 'ongoing'] },
-	}).select('name year slug description status poster gallery');
+	}).select('name year slug description status partners poster gallery');
 
 	// 2. If not found, find the most recent 'completed' fest
 	if (!fest) {
