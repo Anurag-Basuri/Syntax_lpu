@@ -4,7 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import { User, Mail, Phone, BookOpen, Users, Info } from 'lucide-react';
 
 // Reusable, lightweight form components
-const InputField = ({ icon, type, name, placeholder, value, onChange, error }) => (
+const InputField = ({ icon, type = 'text', name, placeholder, value, onChange, error }) => (
 	<div className="relative w-full">
 		{icon && (
 			<div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-4 text-muted">
@@ -19,6 +19,20 @@ const InputField = ({ icon, type, name, placeholder, value, onChange, error }) =
 			value={value}
 			onChange={onChange}
 			className={`auth-input ${error ? 'border-red-500/50' : ''}`}
+		/>
+		{error && <p className="mt-1.5 text-sm text-red-400">{error}</p>}
+	</div>
+);
+
+const TextAreaField = ({ name, placeholder, value, onChange, error }) => (
+	<div className="w-full">
+		<textarea
+			name={name}
+			placeholder={placeholder}
+			value={value}
+			onChange={onChange}
+			rows={4}
+			className={`auth-input resize-none ${error ? 'border-red-500/50' : ''}`}
 		/>
 		{error && <p className="mt-1.5 text-sm text-red-400">{error}</p>}
 	</div>
@@ -52,6 +66,14 @@ const GradientButton = ({ children, isLoading, ...props }) => (
 	</button>
 );
 
+const DOMAIN_OPTIONS = [
+	{ key: 'development', label: 'Development' },
+	{ key: 'design', label: 'Design' },
+	{ key: 'marketing', label: 'Marketing' },
+	{ key: 'content', label: 'Content' },
+	{ key: 'events', label: 'Events' },
+];
+
 const JoinPage = () => {
 	const navigate = useNavigate();
 	const [formData, setFormData] = useState({
@@ -61,6 +83,10 @@ const JoinPage = () => {
 		phone: '',
 		course: '',
 		gender: '',
+		domains: [],
+		accommodation: '',
+		previousExperience: false,
+		anyotherorg: false,
 		bio: '',
 	});
 	const [errors, setErrors] = useState({});
@@ -75,14 +101,38 @@ const JoinPage = () => {
 		if (!/\S+@\S+\.\S+/.test(formData.email)) newErrors.email = 'A valid email is required.';
 		if (!formData.phone) newErrors.phone = 'Phone number is required.';
 		if (!formData.course) newErrors.course = 'Your course is required.';
+		// Only allow male/female to match server model enum
 		if (!formData.gender) newErrors.gender = 'Please select a gender.';
+		if (!Array.isArray(formData.domains) || formData.domains.length === 0)
+			newErrors.domains = 'Select at least one domain.';
+		if (!formData.accommodation) newErrors.accommodation = 'Select accommodation preference.';
 		if (!formData.bio) newErrors.bio = 'A short bio is required.';
 		setErrors(newErrors);
 		return Object.keys(newErrors).length === 0;
 	};
 
 	const handleChange = (e) => {
-		const { name, value } = e.target;
+		const { name, value, type, checked } = e.target;
+
+		// handle boolean toggles
+		if (type === 'checkbox' && (name === 'previousExperience' || name === 'anyotherorg')) {
+			setFormData((prev) => ({ ...prev, [name]: checked }));
+			if (errors[name]) setErrors((prev) => ({ ...prev, [name]: '' }));
+			return;
+		}
+
+		// handle domain checkboxes
+		if (type === 'checkbox' && name === 'domains') {
+			setFormData((prev) => {
+				const next = new Set(prev.domains || []);
+				if (checked) next.add(value);
+				else next.delete(value);
+				return { ...prev, domains: Array.from(next) };
+			});
+			if (errors.domains) setErrors((prev) => ({ ...prev, domains: '' }));
+			return;
+		}
+
 		setFormData((prev) => ({ ...prev, [name]: value }));
 		if (errors[name]) setErrors((prev) => ({ ...prev, [name]: '' }));
 		if (serverMessage.text) setServerMessage({ type: '', text: '' });
@@ -93,12 +143,30 @@ const JoinPage = () => {
 		if (!validate()) return;
 		setLoading(true);
 		setServerMessage({ type: '', text: '' });
+
+		// Prepare payload exactly as server expects
+		const payload = {
+			fullName: formData.fullName.trim(),
+			LpuId: formData.LpuId.trim(),
+			email: formData.email.trim(),
+			phone: formData.phone.trim(),
+			course: formData.course.trim(),
+			gender: formData.gender, // 'male' or 'female'
+			domains: formData.domains,
+			accommodation: formData.accommodation, // 'hostler' or 'non-hostler'
+			previousExperience: !!formData.previousExperience,
+			anyotherorg: !!formData.anyotherorg,
+			bio: formData.bio.trim(),
+		};
+
 		try {
-			await publicClient.post('/api/apply/apply', formData);
+			// Server route: POST /api/v1/apply
+			await publicClient.post('/api/v1/apply', payload);
 			setServerMessage({
 				type: 'success',
 				text: 'Application submitted! Check your email for next steps.',
 			});
+			// reset
 			setFormData({
 				fullName: '',
 				LpuId: '',
@@ -106,12 +174,26 @@ const JoinPage = () => {
 				phone: '',
 				course: '',
 				gender: '',
+				domains: [],
+				accommodation: '',
+				previousExperience: false,
+				anyotherorg: false,
 				bio: '',
 			});
+			setErrors({});
 		} catch (err) {
+			// Prefer server message; if server returned validation details, show first meaningful one
+			const serverMsg = err?.response?.data?.message;
+			const details = err?.response?.data?.details;
+			const detailText =
+				Array.isArray(details) && details.length ? details.join('; ') : details || '';
 			setServerMessage({
 				type: 'error',
-				text: err?.response?.data?.message || 'An error occurred. Please try again.',
+				text:
+					serverMsg ||
+					detailText ||
+					err?.message ||
+					'An error occurred. Please try again.',
 			});
 		} finally {
 			setLoading(false);
@@ -140,7 +222,7 @@ const JoinPage = () => {
 					</div>
 				)}
 
-				<form onSubmit={handleSubmit} className="mt-8 flex flex-col gap-10" noValidate>
+				<form onSubmit={handleSubmit} className="mt-8 flex flex-col gap-8" noValidate>
 					{/* Step 1: Personal Info */}
 					<fieldset className="auth-fieldset">
 						<legend className="auth-legend">
@@ -178,7 +260,7 @@ const JoinPage = () => {
 							<InputField
 								icon={<User size={18} />}
 								name="LpuId"
-								placeholder="LPU ID (e.g., 12345678)"
+								placeholder="LPU ID (8 digits)"
 								value={formData.LpuId}
 								onChange={handleChange}
 								error={errors.LpuId}
@@ -217,7 +299,6 @@ const JoinPage = () => {
 									</option>
 									<option value="male">Male</option>
 									<option value="female">Female</option>
-									<option value="other">Other</option>
 								</select>
 								{errors.gender && (
 									<p className="mt-1.5 text-sm text-red-400">{errors.gender}</p>
@@ -226,14 +307,104 @@ const JoinPage = () => {
 						</div>
 					</fieldset>
 
-					{/* Step 3: About You */}
+					{/* Step 3: Preferences */}
 					<fieldset className="auth-fieldset">
 						<legend className="auth-legend">
 							<span className="auth-legend-step">3</span>
+							Preferences & Domains
+						</legend>
+
+						<div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+							<div>
+								<label className="block text-sm font-medium text-gray-300 mb-2">
+									Select Domains (pick one or more)
+								</label>
+								<div className="grid grid-cols-2 gap-2">
+									{DOMAIN_OPTIONS.map((opt) => (
+										<label
+											key={opt.key}
+											className="inline-flex items-center gap-2 cursor-pointer"
+										>
+											<input
+												type="checkbox"
+												name="domains"
+												value={opt.key}
+												checked={formData.domains.includes(opt.key)}
+												onChange={handleChange}
+												className="form-checkbox"
+											/>
+											<span className="text-sm text-gray-200">
+												{opt.label}
+											</span>
+										</label>
+									))}
+								</div>
+								{errors.domains && (
+									<p className="mt-1.5 text-sm text-red-400">{errors.domains}</p>
+								)}
+							</div>
+
+							<div>
+								<label className="block text-sm font-medium text-gray-300 mb-2">
+									Accommodation
+								</label>
+								<select
+									name="accommodation"
+									value={formData.accommodation}
+									onChange={handleChange}
+									className={`auth-input ${
+										errors.accommodation ? 'border-red-500/50' : ''
+									}`}
+								>
+									<option value="" disabled>
+										Select Accommodation
+									</option>
+									<option value="hostler">Hostler</option>
+									<option value="non-hostler">Non-Hostler</option>
+								</select>
+								{errors.accommodation && (
+									<p className="mt-1.5 text-sm text-red-400">
+										{errors.accommodation}
+									</p>
+								)}
+
+								<div className="mt-4 space-y-2">
+									<label className="inline-flex items-center gap-2">
+										<input
+											type="checkbox"
+											name="previousExperience"
+											checked={formData.previousExperience}
+											onChange={handleChange}
+											className="form-checkbox"
+										/>
+										<span className="text-sm text-gray-200">
+											Previous experience
+										</span>
+									</label>
+									<label className="inline-flex items-center gap-2">
+										<input
+											type="checkbox"
+											name="anyotherorg"
+											checked={formData.anyotherorg}
+											onChange={handleChange}
+											className="form-checkbox"
+										/>
+										<span className="text-sm text-gray-200">
+											Associated with other org
+										</span>
+									</label>
+								</div>
+							</div>
+						</div>
+					</fieldset>
+
+					{/* Step 4: About You */}
+					<fieldset className="auth-fieldset">
+						<legend className="auth-legend">
+							<span className="auth-legend-step">4</span>
 							About You
 						</legend>
-						<InputField
-							icon={<Info size={18} />}
+						<TextAreaField
 							name="bio"
 							placeholder="A short bio about your interests and skills..."
 							value={formData.bio}
