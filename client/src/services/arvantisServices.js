@@ -61,7 +61,7 @@ const extractError = (err, fallback = 'Request failed') =>
 export const getArvantisLandingData = async () => {
 	try {
 		const response = await publicClient.get('/api/v1/arvantis/landing');
-		return response.data.data;
+		return response.data?.data ?? null;
 	} catch (error) {
 		throw new Error(extractError(error, 'Failed to fetch landing page data.'));
 	}
@@ -76,7 +76,8 @@ export const getAllFests = async (params = {}, options = { admin: false }) => {
 	try {
 		const client = options.admin ? apiClient : publicClient;
 		const response = await client.get('/api/v1/arvantis', { params });
-		return normalizePagination(response);
+		// pass server payload (response.data) into normalizer
+		return normalizePagination(response.data);
 	} catch (error) {
 		throw new Error(extractError(error, 'Failed to fetch fests.'));
 	}
@@ -86,7 +87,7 @@ export const getFestDetails = async (identifier, options = { admin: false }) => 
 	try {
 		const client = options.admin ? apiClient : publicClient;
 		const response = await client.get(`/api/v1/arvantis/${identifier}`);
-		return response.data.data;
+		return response.data?.data ?? null;
 	} catch (error) {
 		throw new Error(extractError(error, 'Failed to fetch fest details.'));
 	}
@@ -179,18 +180,11 @@ export const unlinkEventFromFest = async (identifier, eventId) => {
 
 export const updateFestPoster = async (identifier, formData) => {
 	try {
-		// Debug to ensure FormData arrives
 		console.log('[SERVICE] updateFestPoster', {
 			identifier,
 			isFormData: formData instanceof FormData,
 		});
-
-		// Let axios set Content-Type for FormData (do NOT force application/json)
-		const response = await apiClient.patch(
-			`/api/v1/arvantis/${identifier}/poster`,
-			formData
-			// no headers override here
-		);
+		const response = await apiClient.patch(`/api/v1/arvantis/${identifier}/poster`, formData);
 		return response.data.data;
 	} catch (error) {
 		throw new Error(extractError(error, 'Failed to update poster.'));
