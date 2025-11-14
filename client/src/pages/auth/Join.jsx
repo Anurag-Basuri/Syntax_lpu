@@ -1,10 +1,19 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { submitApplication } from '../../services/applyServices.js';
 import { useNavigate } from 'react-router-dom';
 import { User, Mail, Phone, BookOpen, Users } from 'lucide-react';
 
-// Reusable, lightweight form components
-const InputField = ({ icon, type = 'text', name, placeholder, value, onChange, error }) => (
+/* --- Small presentational bits kept local for this page --- */
+const InputField = ({
+	icon,
+	type = 'text',
+	name,
+	placeholder,
+	value,
+	onChange,
+	error,
+	ariaLabel,
+}) => (
 	<div className="relative w-full">
 		{icon && (
 			<div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-4 text-muted">
@@ -12,50 +21,66 @@ const InputField = ({ icon, type = 'text', name, placeholder, value, onChange, e
 			</div>
 		)}
 		<input
+			aria-label={ariaLabel || name}
 			type={type}
 			name={name}
 			placeholder={placeholder}
-			required
 			value={value}
 			onChange={onChange}
-			className={`auth-input ${error ? 'border-red-500/50' : ''}`}
+			className={`auth-input pl-12 ${error ? 'border-red-500/50' : ''}`}
 		/>
-		{error && <p className="mt-1.5 text-sm text-red-400">{error}</p>}
+		{error && (
+			<p className="mt-1.5 text-sm text-red-400" role="alert">
+				{error}
+			</p>
+		)}
 	</div>
 );
 
 const TextAreaField = ({ name, placeholder, value, onChange, error }) => (
 	<div className="w-full">
 		<textarea
+			aria-label={name}
 			name={name}
 			placeholder={placeholder}
 			value={value}
 			onChange={onChange}
-			rows={4}
-			className={`auth-input resize-none ${error ? 'border-red-500/50' : ''}`}
+			rows={5}
+			className={`auth-input resize-y ${error ? 'border-red-500/50' : ''}`}
 		/>
-		{error && <p className="mt-1.5 text-sm text-red-400">{error}</p>}
+		{error && (
+			<p className="mt-1.5 text-sm text-red-400" role="alert">
+				{error}
+			</p>
+		)}
 	</div>
 );
 
 const GradientButton = ({ children, isLoading, ...props }) => (
-	<button type="submit" className="auth-button group" disabled={isLoading} {...props}>
-		<span className="auth-button-sheen" />
+	<button
+		type="submit"
+		className={`auth-button group flex items-center justify-center gap-3 ${
+			isLoading ? 'opacity-80 cursor-wait' : ''
+		}`}
+		disabled={isLoading}
+		{...props}
+	>
 		{isLoading ? (
-			<span className="flex items-center justify-center gap-2">
-				<svg className="animate-spin h-5 w-5" fill="none" viewBox="0 0 24 24">
+			<span className="flex items-center gap-2">
+				<svg className="animate-spin h-5 w-5" viewBox="0 0 24 24" fill="none">
 					<circle
-						className="opacity-25"
 						cx="12"
 						cy="12"
 						r="10"
 						stroke="currentColor"
-						strokeWidth="4"
+						strokeWidth="3"
+						className="opacity-25"
 					/>
 					<path
+						d="M4 12a8 8 0 018-8"
+						stroke="currentColor"
+						strokeWidth="3"
 						className="opacity-75"
-						fill="currentColor"
-						d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"
 					/>
 				</svg>
 				<span>Submitting...</span>
@@ -66,6 +91,7 @@ const GradientButton = ({ children, isLoading, ...props }) => (
 	</button>
 );
 
+/* --- Domain options --- */
 const DOMAIN_OPTIONS = [
 	{ key: 'development', label: 'Development' },
 	{ key: 'design', label: 'Design' },
@@ -85,6 +111,7 @@ const JoinPage = () => {
 		gender: '',
 		domains: [],
 		accommodation: '',
+		hostelName: '',
 		previousExperience: false,
 		anyotherorg: false,
 		bio: '',
@@ -92,24 +119,38 @@ const JoinPage = () => {
 	const [errors, setErrors] = useState({});
 	const [loading, setLoading] = useState(false);
 	const [serverMessage, setServerMessage] = useState({ type: '', text: '' });
+	const [successCountdown, setSuccessCountdown] = useState(0);
+
+	useEffect(() => {
+		let t;
+		if (successCountdown > 0) {
+			t = setTimeout(() => setSuccessCountdown((c) => c - 1), 1000);
+		} else if (successCountdown === 0 && serverMessage.type === 'success') {
+			// redirect after countdown ends
+			navigate('/login');
+		}
+		return () => clearTimeout(t);
+	}, [successCountdown, serverMessage, navigate]);
 
 	const validate = () => {
 		const newErrors = {};
-		if (!formData.fullName) newErrors.fullName = 'Full name is required.';
-		// LPU must be exactly 8 digits to match backend model
-		if (!/^\d{8}$/.test(formData.LpuId))
-			newErrors.LpuId = 'A valid LPU ID (8 digits) is required.';
+		if (!formData.fullName.trim()) newErrors.fullName = 'Full name is required.';
+		// server expects exact 8 digits
+		if (!/^\d{8}$/.test(formData.LpuId.trim()))
+			newErrors.LpuId = 'LPU ID must be exactly 8 digits.';
 		if (!/\S+@\S+\.\S+/.test(formData.email)) newErrors.email = 'A valid email is required.';
-		if (!formData.phone) newErrors.phone = 'Phone number is required.';
-		if (!formData.course) newErrors.course = 'Your course is required.';
+		if (!formData.phone.trim()) newErrors.phone = 'Phone number is required.';
+		if (!formData.course.trim()) newErrors.course = 'Your course is required.';
 		if (!formData.gender) newErrors.gender = 'Please select a gender.';
 		if (!Array.isArray(formData.domains) || formData.domains.length === 0)
 			newErrors.domains = 'Select at least one domain.';
-		// enforce max 2 domains client-side
 		if (Array.isArray(formData.domains) && formData.domains.length > 2)
-			newErrors.domains = 'You can select up to 2 domains';
+			newErrors.domains = 'You can select up to 2 domains.';
 		if (!formData.accommodation) newErrors.accommodation = 'Select accommodation preference.';
-		if (!formData.bio) newErrors.bio = 'A short bio is required.';
+		// hostelName required when hostler
+		if (formData.accommodation === 'hostler' && !formData.hostelName.trim())
+			newErrors.hostelName = 'Hostel name required for hostlers.';
+		if (!formData.bio.trim()) newErrors.bio = 'A short bio is required.';
 		setErrors(newErrors);
 		return Object.keys(newErrors).length === 0;
 	};
@@ -117,36 +158,45 @@ const JoinPage = () => {
 	const handleChange = (e) => {
 		const { name, value, type, checked } = e.target;
 
-		// handle boolean toggles
+		// boolean toggles
 		if (type === 'checkbox' && (name === 'previousExperience' || name === 'anyotherorg')) {
 			setFormData((prev) => ({ ...prev, [name]: checked }));
-			if (errors[name]) setErrors((prev) => ({ ...prev, [name]: '' }));
+			setErrors((prev) => ({ ...prev, [name]: '' }));
 			return;
 		}
 
-		// handle domain checkboxes (limit to 2)
+		// domain checkboxes: enforce max 2 and disable other checkboxes when 2 selected
 		if (type === 'checkbox' && name === 'domains') {
 			setFormData((prev) => {
 				const next = new Set(prev.domains || []);
 				if (checked) {
-					// prevent selecting more than 2
 					if (next.size >= 2) {
+						// show gentle inline hint
 						setErrors((prevErr) => ({
 							...prevErr,
-							domains: 'You can select up to 2 domains only',
+							domains: 'You can select up to 2 domains only.',
 						}));
-						return prev; // no change
+						return prev;
 					}
 					next.add(value);
 				} else {
 					next.delete(value);
 				}
-				// clear domain error when within limit
-				if (next.size <= 2 && errors.domains) {
-					setErrors((prevErr) => ({ ...prevErr, domains: '' }));
-				}
+				// clear domains error when changed appropriately
+				setErrors((prevErr) => ({
+					...prevErr,
+					domains: next.size <= 2 ? '' : prevErr.domains,
+				}));
 				return { ...prev, domains: Array.from(next) };
 			});
+			return;
+		}
+
+		// numeric-only LPU input: strip non-digits
+		if (name === 'LpuId') {
+			const digits = value.replace(/\D/g, '').slice(0, 8);
+			setFormData((prev) => ({ ...prev, LpuId: digits }));
+			if (errors.LpuId) setErrors((prev) => ({ ...prev, LpuId: '' }));
 			return;
 		}
 
@@ -161,29 +211,30 @@ const JoinPage = () => {
 		setLoading(true);
 		setServerMessage({ type: '', text: '' });
 
-		// Prepare payload exactly as server expects
 		const payload = {
 			fullName: formData.fullName.trim(),
 			LpuId: formData.LpuId.trim(),
 			email: formData.email.trim(),
 			phone: formData.phone.trim(),
 			course: formData.course.trim(),
-			gender: formData.gender, // 'male' or 'female'
+			gender: formData.gender,
 			domains: formData.domains,
-			accommodation: formData.accommodation, // 'hostler' or 'non-hostler'
+			accommodation: formData.accommodation,
+			hostelName: formData.hostelName?.trim() || '',
 			previousExperience: !!formData.previousExperience,
 			anyotherorg: !!formData.anyotherorg,
 			bio: formData.bio.trim(),
 		};
 
 		try {
-			// Use client service which matches backend route and error shapes
 			await submitApplication(payload);
 			setServerMessage({
 				type: 'success',
-				text: 'Application submitted! Check your email for next steps.',
+				text: 'Application submitted — redirecting to login in 3s.',
 			});
-			// reset
+			// show countdown then redirect
+			setSuccessCountdown(3);
+			// clear form (keep small delay for UX)
 			setFormData({
 				fullName: '',
 				LpuId: '',
@@ -193,54 +244,64 @@ const JoinPage = () => {
 				gender: '',
 				domains: [],
 				accommodation: '',
+				hostelName: '',
 				previousExperience: false,
 				anyotherorg: false,
 				bio: '',
 			});
 			setErrors({});
 		} catch (err) {
-			// applyServices throws an Error with a helpful message (server or fallback)
-			const message = err?.message || 'An error occurred. Please try again.';
-			setServerMessage({ type: 'error', text: message });
+			// parse possible server payload
+			const msg =
+				err?.message ||
+				'Failed to submit application. Please check your entries and try again.';
+			setServerMessage({ type: 'error', text: msg });
+			// if server returned validation details in message, try to map them
+			// (submitApplication already surfaces server message)
 		} finally {
 			setLoading(false);
 		}
 	};
 
+	/* helper: whether domain checkboxes should be disabled when 2 selected */
+	const domainsSelectedCount = formData.domains.length;
+	const disableMoreDomains = domainsSelectedCount >= 2;
+
 	return (
 		<div className="max-w-3xl mx-auto p-6">
 			<div className="auth-card">
-				<div className="text-center">
+				<header className="text-center mb-4">
 					<h1 className="text-3xl font-bold text-primary">Become a Syntax Builder</h1>
 					<p className="mt-2 text-secondary">
-						Join a community of creators, innovators, and developers.
+						Join a community of creators, innovators and developers. (Select up to 2
+						domains)
 					</p>
-				</div>
+				</header>
 
 				{serverMessage.text && (
 					<div
-						className={`mt-6 text-center p-3 rounded-lg border ${
+						className={`mt-4 text-center p-3 rounded-lg border ${
 							serverMessage.type === 'success'
-								? 'text-green-400 bg-green-500/10 border-green-500/20'
-								: 'text-red-400 bg-red-500/10 border-red-500/20'
+								? 'text-emerald-400 bg-emerald-500/6 border-emerald-500/12'
+								: 'text-rose-400 bg-rose-500/6 border-rose-500/12'
 						}`}
+						role="status"
 					>
 						{serverMessage.text}
 					</div>
 				)}
 
-				<form onSubmit={handleSubmit} className="mt-8 flex flex-col gap-8" noValidate>
-					{/* Step 1: Personal Info */}
+				<form onSubmit={handleSubmit} className="mt-6 grid gap-6" noValidate>
+					{/* Personal */}
 					<fieldset className="auth-fieldset">
 						<legend className="auth-legend">
-							<span className="auth-legend-step">1</span>
-							Personal Information
+							<span className="auth-legend-step">1</span> Personal
 						</legend>
-						<div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+						<div className="grid grid-cols-1 md:grid-cols-2 gap-4">
 							<InputField
 								icon={<User size={18} />}
 								name="fullName"
-								placeholder="Full Name"
+								placeholder="Full name"
 								value={formData.fullName}
 								onChange={handleChange}
 								error={errors.fullName}
@@ -249,7 +310,7 @@ const JoinPage = () => {
 								icon={<Mail size={18} />}
 								type="email"
 								name="email"
-								placeholder="Email Address"
+								placeholder="Email address"
 								value={formData.email}
 								onChange={handleChange}
 								error={errors.email}
@@ -257,25 +318,25 @@ const JoinPage = () => {
 						</div>
 					</fieldset>
 
-					{/* Step 2: Academic Info */}
+					{/* Academic */}
 					<fieldset className="auth-fieldset">
 						<legend className="auth-legend">
-							<span className="auth-legend-step">2</span>
-							Academic Details
+							<span className="auth-legend-step">2</span> Academic
 						</legend>
-						<div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+						<div className="grid grid-cols-1 md:grid-cols-2 gap-4">
 							<InputField
 								icon={<User size={18} />}
 								name="LpuId"
-								placeholder="LPU ID (7-10 digits)"
+								placeholder="LPU ID (8 digits)"
 								value={formData.LpuId}
 								onChange={handleChange}
 								error={errors.LpuId}
+								ariaLabel="LPU ID"
 							/>
 							<InputField
 								icon={<BookOpen size={18} />}
 								name="course"
-								placeholder="Your Course (e.g., B.Tech CSE)"
+								placeholder="Course (e.g., B.Tech CSE)"
 								value={formData.course}
 								onChange={handleChange}
 								error={errors.course}
@@ -284,7 +345,7 @@ const JoinPage = () => {
 								icon={<Phone size={18} />}
 								type="tel"
 								name="phone"
-								placeholder="Phone Number"
+								placeholder="Phone number"
 								value={formData.phone}
 								onChange={handleChange}
 								error={errors.phone}
@@ -294,60 +355,76 @@ const JoinPage = () => {
 									<Users size={18} />
 								</div>
 								<select
+									aria-label="gender"
 									name="gender"
 									value={formData.gender}
 									onChange={handleChange}
-									className={`auth-input ${
+									className={`auth-input pl-12 ${
 										errors.gender ? 'border-red-500/50' : ''
 									}`}
 								>
 									<option value="" disabled>
-										Select Gender
+										Select gender
 									</option>
 									<option value="male">Male</option>
 									<option value="female">Female</option>
 								</select>
 								{errors.gender && (
-									<p className="mt-1.5 text-sm text-red-400">{errors.gender}</p>
+									<p className="mt-1.5 text-sm text-red-400" role="alert">
+										{errors.gender}
+									</p>
 								)}
 							</div>
 						</div>
 					</fieldset>
 
-					{/* Step 3: Preferences */}
+					{/* Preferences */}
 					<fieldset className="auth-fieldset">
 						<legend className="auth-legend">
-							<span className="auth-legend-step">3</span>
-							Preferences & Domains
+							<span className="auth-legend-step">3</span> Preferences & Domains
 						</legend>
-
-						<div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+						<div className="grid grid-cols-1 md:grid-cols-2 gap-4">
 							<div>
 								<label className="block text-sm font-medium text-gray-300 mb-2">
-									Select Domains (pick one or more)
+									Select domains{' '}
+									<span className="text-xs text-gray-400">
+										({domainsSelectedCount}/2)
+									</span>
 								</label>
 								<div className="grid grid-cols-2 gap-2">
-									{DOMAIN_OPTIONS.map((opt) => (
-										<label
-											key={opt.key}
-											className="inline-flex items-center gap-2 cursor-pointer"
-										>
-											<input
-												type="checkbox"
-												name="domains"
-												value={opt.key}
-												checked={formData.domains.includes(opt.key)}
-												onChange={handleChange}
-												className="form-checkbox"
-											/>
-											<span className="text-sm text-gray-200">
-												{opt.label}
-											</span>
-										</label>
-									))}
+									{DOMAIN_OPTIONS.map((opt) => {
+										const checked = formData.domains.includes(opt.key);
+										const disabled = !checked && disableMoreDomains;
+										return (
+											<label
+												key={opt.key}
+												className={`inline-flex items-center gap-2 cursor-pointer ${
+													disabled ? 'opacity-60 cursor-not-allowed' : ''
+												}`}
+											>
+												<input
+													type="checkbox"
+													name="domains"
+													value={opt.key}
+													checked={checked}
+													onChange={handleChange}
+													disabled={disabled}
+													className="form-checkbox"
+													aria-checked={checked}
+												/>
+												<span className="text-sm text-gray-200">
+													{opt.label}
+												</span>
+											</label>
+										);
+									})}
 								</div>
-								{errors.domains && (
+								{errors.domains ? (
 									<p className="mt-1.5 text-sm text-red-400">{errors.domains}</p>
+								) : (
+									<p className="mt-1 text-xs text-gray-400">
+										Pick 1 or 2 domains that best match your interests.
+									</p>
 								)}
 							</div>
 
@@ -364,7 +441,7 @@ const JoinPage = () => {
 									}`}
 								>
 									<option value="" disabled>
-										Select Accommodation
+										Select accommodation
 									</option>
 									<option value="hostler">Hostler</option>
 									<option value="non-hostler">Non-Hostler</option>
@@ -373,6 +450,26 @@ const JoinPage = () => {
 									<p className="mt-1.5 text-sm text-red-400">
 										{errors.accommodation}
 									</p>
+								)}
+
+								{/* show hostel name if hostler */}
+								{formData.accommodation === 'hostler' && (
+									<div className="mt-3">
+										<input
+											name="hostelName"
+											placeholder="Hostel name"
+											value={formData.hostelName}
+											onChange={handleChange}
+											className={`auth-input ${
+												errors.hostelName ? 'border-red-500/50' : ''
+											}`}
+										/>
+										{errors.hostelName && (
+											<p className="mt-1.5 text-sm text-red-400">
+												{errors.hostelName}
+											</p>
+										)}
+									</div>
 								)}
 
 								<div className="mt-4 space-y-2">
@@ -405,25 +502,26 @@ const JoinPage = () => {
 						</div>
 					</fieldset>
 
-					{/* Step 4: About You */}
+					{/* About */}
 					<fieldset className="auth-fieldset">
 						<legend className="auth-legend">
-							<span className="auth-legend-step">4</span>
-							About You
+							<span className="auth-legend-step">4</span> About you
 						</legend>
 						<TextAreaField
 							name="bio"
-							placeholder="A short bio about your interests and skills..."
+							placeholder="A short bio about your interests and skills (max 500 chars)"
 							value={formData.bio}
 							onChange={handleChange}
 							error={errors.bio}
 						/>
 					</fieldset>
 
-					<GradientButton isLoading={loading}>Submit Application</GradientButton>
+					<div className="flex justify-end">
+						<GradientButton isLoading={loading}>Submit application</GradientButton>
+					</div>
 				</form>
 
-				<div className="mt-8 text-center text-sm text-secondary">
+				<footer className="mt-6 text-center text-sm text-secondary">
 					Already a member?{' '}
 					<button
 						onClick={() => navigate('/login')}
@@ -431,7 +529,7 @@ const JoinPage = () => {
 					>
 						Login
 					</button>
-				</div>
+				</footer>
 			</div>
 		</div>
 	);
