@@ -9,7 +9,7 @@ import { isLeadershipRole } from '../constants/team.js';
 const ErrorBlock = ({ message, onRetry }) => (
 	<div className="flex flex-col items-center justify-center text-center py-24 px-4">
 		<div className="text-5xl mb-4">⚠️</div>
-		<h2 className="text-xl font-semibold mb-2" style={{ color: 'var(--accent-error)' }}>
+		<h2 className="text-xl font-semibold mb-2" style={{ color: 'var(--accent-1)' }}>
 			Failed to load team
 		</h2>
 		<p className="text-sm mb-6 max-w-md" style={{ color: 'var(--text-secondary)' }}>
@@ -166,6 +166,7 @@ const TeamsPage = () => {
 						e.stopPropagation();
 						setShowMobileFilters(false);
 					}}
+					aria-hidden="true"
 				/>
 			)}
 
@@ -193,7 +194,7 @@ const TeamsPage = () => {
 							<X size={18} />
 						</button>
 					</div>
-					<nav className="filter-nav">
+					<nav className="filter-nav" aria-label="Departments">
 						{departments.map((dept) => (
 							<button
 								key={dept}
@@ -203,6 +204,7 @@ const TeamsPage = () => {
 									setActiveFilter(dept);
 									setShowMobileFilters(false);
 								}}
+								aria-pressed={activeFilter === dept}
 							>
 								{dept === 'Leadership' && <Star size={16} />}
 								{dept !== 'Leadership' && dept !== 'All' && <Briefcase size={16} />}
@@ -215,7 +217,7 @@ const TeamsPage = () => {
 
 			{/* Main Content */}
 			<main className="team-main-content">
-				<header>
+				<header className="mb-6">
 					<h1 className="text-xl xs:text-2xl sm:text-3xl md:text-4xl lg:text-5xl font-bold tracking-tight mb-2 sm:mb-3 brand-text">
 						Our Team
 					</h1>
@@ -233,107 +235,109 @@ const TeamsPage = () => {
 					</p>
 				</header>
 
-				{/* Controls */}
-				<div className="team-controls">
-					<div className="search-bar-wrapper">
-						<Search className="search-icon" style={{ color: 'var(--text-muted)' }} />
-						<input
-							value={query}
-							onChange={(e) => setQuery(e.target.value)}
-							placeholder="Search by name, role, or skill…"
-							className="search-input"
-							aria-label="Search team members"
-							type="search"
-						/>
-						{query && (
-							<button
-								type="button"
-								aria-label="Clear search"
-								onClick={() => setQuery('')}
-								className="clear-search-button touch-manipulation"
-							>
-								<X size={16} />
-							</button>
-						)}
-					</div>
-
-					<div className="controls-right">
-						{/* Mobile Sort Dropdown */}
-						<div className="lg:hidden relative mobile-sort-container">
-							<button
-								onClick={(e) => {
-									e.stopPropagation();
-									setShowMobileSort(!showMobileSort);
-									setShowMobileFilters(false);
-								}}
-								className="flex items-center justify-between gap-2 px-3 py-2.5 rounded-lg border-2 border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-sm font-medium text-gray-700 dark:text-gray-300 min-w-[110px] max-w-[140px] touch-manipulation"
-								aria-label="Sort team members"
-								aria-expanded={showMobileSort}
-							>
-								<span className="truncate">
-									{sortBy === 'name'
-										? 'Name'
-										: sortBy === 'role'
-										? 'Role'
-										: 'Dept'}
-								</span>
-								<ChevronDown
-									size={14}
-									className={`flex-shrink-0 transition-transform ${
-										showMobileSort ? 'rotate-180' : ''
-									}`}
-								/>
-							</button>
-							{showMobileSort && (
-								<div className="mobile-sort-dropdown absolute top-full left-0 right-0 mt-1 bg-white dark:bg-gray-800 border-2 border-gray-200 dark:border-gray-700 rounded-lg shadow-xl z-[10000] overflow-hidden min-w-[140px]">
-									{['name', 'role', 'dept'].map((option) => (
-										<button
-											key={option}
-											onClick={(e) => {
-												e.stopPropagation();
-												setSortBy(option);
-												setShowMobileSort(false);
-											}}
-											className={`w-full text-left px-3 py-2.5 text-sm hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors touch-manipulation ${
-												sortBy === option
-													? 'bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 font-medium'
-													: 'text-gray-700 dark:text-gray-300'
-											}`}
-										>
-											{option === 'name'
-												? 'Name'
-												: option === 'role'
-												? 'Role'
-												: 'Department'}
-										</button>
-									))}
-								</div>
+				{/* Controls - sticky for quick access */}
+				<div className="team-controls sticky top-[var(--navbar-height,4.5rem)] z-40 backdrop-blur-sm py-3 -mx-4 sm:-mx-6 px-4 sm:px-6 rounded-b-2xl">
+					<div className="max-w-8xl mx-auto flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+						<div className="search-bar-wrapper relative flex-1 max-w-xl">
+							<Search
+								className="search-icon absolute left-3 top-1/2 -translate-y-1/2 text-[var(--text-muted)]"
+								aria-hidden="true"
+							/>
+							<input
+								value={query}
+								onChange={(e) => setQuery(e.target.value)}
+								placeholder="Search by name, role, or skill…"
+								className="search-input pl-10 pr-10 w-full"
+								aria-label="Search team members"
+								type="search"
+							/>
+							{query && (
+								<button
+									type="button"
+									aria-label="Clear search"
+									onClick={() => setQuery('')}
+									className="clear-search-button absolute right-2 top-1/2 -translate-y-1/2 touch-manipulation"
+								>
+									<X size={16} />
+								</button>
 							)}
 						</div>
 
-						{/* Desktop Sort */}
-						<div className="hidden lg:flex control-field">
-							<label htmlFor="sort-select" className="control-label">
-								Sort
-							</label>
-							<select
-								id="sort-select"
-								className="control-select"
-								value={sortBy}
-								onChange={(e) => setSortBy(e.target.value)}
-								aria-label="Sort team members"
-							>
-								<option value="name">Name</option>
-								<option value="role">Role</option>
-								<option value="dept">Department</option>
-							</select>
-						</div>
-						<div className="result-count" aria-live="polite" aria-atomic="true">
-							{isLoading
-								? '—'
-								: `${filteredMembers.length} result${
-										filteredMembers.length !== 1 ? 's' : ''
-								  }`}
+						<div className="controls-right flex items-center gap-3">
+							{/* Desktop Sort */}
+							<div className="hidden lg:flex items-center gap-2">
+								<label htmlFor="sort-select" className="control-label text-sm">
+									Sort
+								</label>
+								<select
+									id="sort-select"
+									className="control-select text-sm"
+									value={sortBy}
+									onChange={(e) => setSortBy(e.target.value)}
+									aria-label="Sort team members"
+								>
+									<option value="name">Name</option>
+									<option value="role">Role</option>
+									<option value="dept">Department</option>
+								</select>
+							</div>
+
+							{/* Mobile Sort Dropdown */}
+							<div className="lg:hidden relative mobile-sort-container">
+								<button
+									onClick={(e) => {
+										e.stopPropagation();
+										setShowMobileSort(!showMobileSort);
+										setShowMobileFilters(false);
+									}}
+									className="flex items-center justify-between gap-2 px-3 py-2.5 rounded-lg border-2 border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-sm font-medium text-gray-700 dark:text-gray-300 min-w-[110px] max-w-[140px] touch-manipulation"
+									aria-label="Sort team members"
+									aria-expanded={showMobileSort}
+								>
+									<span className="truncate">
+										{sortBy === 'name'
+											? 'Name'
+											: sortBy === 'role'
+											? 'Role'
+											: 'Dept'}
+									</span>
+									<ChevronDown
+										size={14}
+										className={`flex-shrink-0 transition-transform ${
+											showMobileSort ? 'rotate-180' : ''
+										}`}
+									/>
+								</button>
+								{showMobileSort && (
+									<div className="mobile-sort-dropdown absolute top-full left-0 right-0 mt-1 bg-white dark:bg-gray-800 border-2 border-gray-200 dark:border-gray-700 rounded-lg shadow-xl z-[10000] overflow-hidden min-w-[140px]">
+										{['name', 'role', 'dept'].map((option) => (
+											<button
+												key={option}
+												onClick={(e) => {
+													e.stopPropagation();
+													setSortBy(option);
+													setShowMobileSort(false);
+												}}
+												className={`w-full text-left px-3 py-2.5 text-sm hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors touch-manipulation ${
+													sortBy === option
+														? 'bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 font-medium'
+														: 'text-gray-700 dark:text-gray-300'
+												}`}
+											>
+												{option === 'name'
+													? 'Name'
+													: option === 'role'
+													? 'Role'
+													: 'Department'}
+											</button>
+										))}
+									</div>
+								)}
+							</div>
+
+							<div className="result-count text-sm text-[var(--text-secondary)]" aria-live="polite">
+								{isLoading ? '—' : `${filteredMembers.length} result${filteredMembers.length !== 1 ? 's' : ''}`}
+							</div>
 						</div>
 					</div>
 				</div>
