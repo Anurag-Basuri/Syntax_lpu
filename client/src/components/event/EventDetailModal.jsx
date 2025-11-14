@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 
 // Handles invalid or missing dates gracefully
@@ -20,6 +20,18 @@ const safeFormatDate = (dateInput) => {
 
 const EventDetailModal = ({ event, isOpen, onClose }) => {
 	const [currentImageIndex, setCurrentImageIndex] = useState(0);
+	const closeBtnRef = useRef(null);
+
+	useEffect(() => {
+		if (!isOpen) return;
+		// focus close button for keyboard users
+		closeBtnRef.current?.focus();
+		const onKey = (e) => {
+			if (e.key === 'Escape') onClose();
+		};
+		window.addEventListener('keydown', onKey);
+		return () => window.removeEventListener('keydown', onKey);
+	}, [isOpen, onClose]);
 
 	if (!isOpen || !event) return null;
 
@@ -52,6 +64,7 @@ const EventDetailModal = ({ event, isOpen, onClose }) => {
 				exit={{ opacity: 0 }}
 				className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4"
 				onClick={onClose}
+				role="presentation"
 			>
 				<motion.div
 					initial={{ opacity: 0, scale: 0.95 }}
@@ -59,11 +72,18 @@ const EventDetailModal = ({ event, isOpen, onClose }) => {
 					exit={{ opacity: 0, scale: 0.95 }}
 					className="glass-card rounded-2xl max-w-4xl w-full max-h-[90vh] overflow-y-auto relative"
 					onClick={(e) => e.stopPropagation()}
+					role="dialog"
+					aria-modal="true"
+					aria-labelledby="event-modal-title"
+					tabIndex={-1}
 				>
 					{/* Close Button */}
 					<button
+						ref={closeBtnRef}
 						onClick={onClose}
 						className="absolute top-3 right-3 z-20 bg-red-500/80 text-white p-2 rounded-full"
+						aria-label="Close event details"
+						type="button"
 					>
 						<svg
 							className="w-5 h-5"
@@ -86,8 +106,12 @@ const EventDetailModal = ({ event, isOpen, onClose }) => {
 							<img
 								key={currentImageIndex}
 								src={event.posters[currentImageIndex].url}
-								alt={`${event.title} poster`}
+								alt={
+									event.posters[currentImageIndex].caption ||
+									`${event.title} poster`
+								}
 								className="w-full h-full object-contain"
+								loading="lazy"
 							/>
 						) : (
 							<div className="w-full h-full flex items-center justify-center text-6xl opacity-20">
@@ -98,7 +122,9 @@ const EventDetailModal = ({ event, isOpen, onClose }) => {
 							<>
 								<button
 									onClick={prevImage}
+									type="button"
 									className="absolute left-2 top-1/2 -translate-y-1/2 bg-black/50 text-white p-2 rounded-full"
+									aria-label="Previous image"
 								>
 									<svg
 										className="w-6 h-6"
@@ -116,7 +142,9 @@ const EventDetailModal = ({ event, isOpen, onClose }) => {
 								</button>
 								<button
 									onClick={nextImage}
+									type="button"
 									className="absolute right-2 top-1/2 -translate-y-1/2 bg-black/50 text-white p-2 rounded-full"
+									aria-label="Next image"
 								>
 									<svg
 										className="w-6 h-6"
@@ -138,7 +166,9 @@ const EventDetailModal = ({ event, isOpen, onClose }) => {
 
 					{/* Content */}
 					<div className="p-6 space-y-4">
-						<h2 className="text-2xl font-bold text-white">{event.title}</h2>
+						<h2 id="event-modal-title" className="text-2xl font-bold text-white">
+							{event.title}
+						</h2>
 						<div className="flex flex-wrap gap-4 text-sm">
 							<div className="flex items-center gap-2 text-blue-300">
 								<svg
@@ -154,27 +184,28 @@ const EventDetailModal = ({ event, isOpen, onClose }) => {
 										d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"
 									/>
 								</svg>
-								{/* FIX: Use the safe formatter */}
 								<span className="font-medium">
 									{safeFormatDate(event.eventDate)}
 								</span>
 							</div>
-							<div className="flex items-center gap-2 text-cyan-300">
-								<svg
-									className="w-5 h-5"
-									fill="none"
-									stroke="currentColor"
-									viewBox="0 0 24 24"
-								>
-									<path
-										strokeLinecap="round"
-										strokeLinejoin="round"
-										strokeWidth={2}
-										d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"
-									/>
-								</svg>
-								<span className="font-medium">{event.venue}</span>
-							</div>
+							{event.venue && (
+								<div className="flex items-center gap-2 text-cyan-300">
+									<svg
+										className="w-5 h-5"
+										fill="none"
+										stroke="currentColor"
+										viewBox="0 0 24 24"
+									>
+										<path
+											strokeLinecap="round"
+											strokeLinejoin="round"
+											strokeWidth={2}
+											d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"
+										/>
+									</svg>
+									<span className="font-medium">{event.venue}</span>
+								</div>
+							)}
 						</div>
 						<p className="text-gray-300 leading-relaxed">{event.description}</p>
 						{event.tags?.length > 0 && (
