@@ -9,74 +9,55 @@ import {
 	removeEventPoster,
 	getEventStats,
 	getEventRegistrations,
+	getPublicEventDetails,
 } from '../controllers/event.controller.js';
 import { authMiddleware } from '../middlewares/auth.middleware.js';
 import { validate } from '../middlewares/validator.middleware.js';
 import { uploadFile } from '../middlewares/multer.middleware.js';
-import { body, param } from 'express-validator';
+import { body, param, query } from 'express-validator';
 import normalizeEventPayload from '../middlewares/normalizeEvent.middleware.js';
-import { registerForEvent } from '../controllers/ticket.controller.js';
 
 const router = Router();
 const { protect, authorize } = authMiddleware;
 
-//================================================================================
-// --- Public Routes ---
-//================================================================================
+// --------------------- Public routes ---------------------
 
-// Get all events with filtering, sorting, and pagination
-router.get('/', getAllEvents);
+router.get(
+	'/',
+	validate([
+		query('page').optional().isInt({ min: 1 }).toInt(),
+		query('limit').optional().isInt({ min: 1 }).toInt(),
+	]),
+	getAllEvents
+);
 
-// Get a single event by its ID
+// Get a single event by its ID (public, sanitized)
 router.get(
 	'/:id',
 	validate([param('id').isMongoId().withMessage('Invalid event ID')]),
 	getEventById
 );
 
-// Register (internal) - public
-router.post(
-	'/:id/register',
-	validate([
-		param('id').isMongoId().withMessage('Invalid event ID'),
-		body('fullName').trim().isLength({ min: 2 }).withMessage('Full name is required'),
-		body('email').isEmail().withMessage('Valid email is required'),
-		body('phone').notEmpty().withMessage('Phone is required'),
-		body('lpuId').notEmpty().withMessage('LPU ID is required'),
-		body('gender')
-			.isIn(['Male', 'Female', 'Other', 'Prefer not to say'])
-			.withMessage('Invalid gender'),
-		body('course').notEmpty().withMessage('Course is required'),
-		body('hosteler').optional().isBoolean(),
-		body('hostel')
-			.optional()
-			.if(body('hosteler').equals('true'))
-			.notEmpty()
-			.withMessage('Hostel is required for hosteler attendees'),
-	]),
-	registerForEvent
+// Public sanitized details (explicit endpoint)
+router.get(
+	'/:id/public',
+	validate([param('id').isMongoId().withMessage('Invalid event ID')]),
+	getPublicEventDetails
 );
 
-//================================================================================
-// --- Admin-Only Routes ---
-//================================================================================
-
+// --------------------- Admin routes ---------------------
 router.use(protect, authorize('admin'));
 
-// --- Analytics & Reports ---
+// Analytics & admin reports
 router.get('/admin/statistics', getEventStats);
 
-router.get(
-	'/:id/registrations',
-	validate([param('id').isMongoId().withMessage('Invalid event ID')]),
-	getEventRegistrations
-);
+router.get('/:id/registrations', validate([param('id').isMongoId()]), getEventRegistrations);
 
-// --- Core Event Management ---
+// Core event management
 router.post(
 	'/',
-	uploadFile('posters'), // Handles multiple poster uploads via the custom middleware
-	normalizeEventPayload, // normalize frontend aliases before validation
+	uploadFile('posters', { multiple: true, maxCount: 5 }),
+	normalizeEventPayload,
 	validate([
 		body('title').notEmpty().trim().withMessage('Title is required'),
 		body('description').notEmpty().trim().withMessage('Description is required'),
@@ -85,7 +66,7 @@ router.post(
 			.withMessage('Event date is required')
 			.bail()
 			.isISO8601()
-			.withMessage('Event date must be a valid ISO-8601 date/time'),
+			.withMessage('eventDate must be ISO-8601'),
 		body('venue').notEmpty().trim().withMessage('Venue is required'),
 		body('category').notEmpty().trim().withMessage('Category is required'),
 		body('tags').optional().isArray().withMessage('Tags must be an array'),
@@ -105,7 +86,7 @@ router.post(
 
 router.patch(
 	'/:id/details',
-	normalizeEventPayload, // map date/location aliases before validation
+	normalizeEventPayload,
 	validate([
 		param('id').isMongoId().withMessage('Invalid event ID'),
 		body('eventDate').optional().isISO8601().withMessage('Invalid date format'),
@@ -127,21 +108,19 @@ router.delete(
 	deleteEvent
 );
 
-// --- Poster Management ---
+// Poster endpoints
 router.post(
 	'/:id/posters',
-	uploadFile('poster'), // Handles a single poster upload
-	validate([param('id').isMongoId().withMessage('Invalid event ID')]),
+	uploadFile('poster', { multiple: false }),
+	validate([param('id').isMongoId()]),
 	addEventPoster
 );
-
 router.delete(
 	'/:id/posters/:publicId',
-	validate([
-		param('id').isMongoId().withMessage('Invalid event ID'),
-		param('publicId').notEmpty().withMessage('Poster public ID is required'),
-	]),
+	validate([param('id').isMongoId(), param('publicId').notEmpty()]),
 	removeEventPoster
 );
+
+// Keep ticket-specific admin endpoints in ticket.routes.js (do not duplicate here)
 
 export default router;
