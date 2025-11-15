@@ -100,11 +100,10 @@ const EventsTab = ({
 		return (events || [])
 			.filter((event) => {
 				if (!q) return true;
-				return (
-					(event.title || '').toLowerCase().includes(q) ||
-					(event.location || '').toLowerCase().includes(q) ||
-					(event.description || '').toLowerCase().includes(q)
-				);
+				const title = (event.title || '').toLowerCase();
+				const location = (event.venue || event.location || '').toLowerCase(); // <-- use venue from backend
+				const description = (event.description || '').toLowerCase();
+				return title.includes(q) || location.includes(q) || description.includes(q);
 			})
 			.filter((event) => (statusFilter === 'all' ? true : event.status === statusFilter));
 	}, [events, searchTerm, statusFilter]);
@@ -125,8 +124,10 @@ const EventsTab = ({
 		if (!fields.date) {
 			return 'Date & time are required.';
 		}
-		// basic datetime check
-		const dt = new Date(fields.date);
+		// robust datetime check: convert datetime-local to ISO then validate
+		const iso = datetimeLocalToISO(fields.date);
+		if (!iso) return 'Please provide a valid date & time.';
+		const dt = new Date(iso);
 		if (Number.isNaN(dt.getTime())) return 'Please provide a valid date & time.';
 		if (!fields.location || fields.location.trim().length < 2) {
 			return 'Location is required.';
