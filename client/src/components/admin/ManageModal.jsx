@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Plus, Trash2, Users, ImageIcon, User, BookOpen } from 'lucide-react';
+import { Plus, Trash2, Users, User } from 'lucide-react';
 import {
 	addEventPartner,
 	removeEventPartner,
@@ -14,6 +14,7 @@ import {
 	removeEventPoster,
 } from '../../services/eventServices.js';
 import formatApiError from '../../utils/formatApiError.js';
+import { toast } from 'react-hot-toast';
 
 const TABS = ['partners', 'speakers', 'resources', 'coOrganizers', 'posters'];
 
@@ -22,7 +23,7 @@ const ManageModal = ({ open = true, event, onClose, onDone, setParentError }) =>
 	const [loading, setLoading] = useState(false);
 	const [error, setError] = useState('');
 	const [partnerForm, setPartnerForm] = useState({ name: '', website: '', logo: null });
-	const [speakerForm, setSpeakerForm] = useState({ name: '', title: '', bio: '' });
+	const [speakerForm, setSpeakerForm] = useState({ name: '', title: '', bio: '', photo: null });
 	const [resourceForm, setResourceForm] = useState({ title: '', url: '' });
 	const [coName, setCoName] = useState('');
 	const [posterFile, setPosterFile] = useState(null);
@@ -30,7 +31,7 @@ const ManageModal = ({ open = true, event, onClose, onDone, setParentError }) =>
 	useEffect(() => {
 		setError('');
 		setPartnerForm({ name: '', website: '', logo: null });
-		setSpeakerForm({ name: '', title: '', bio: '' });
+		setSpeakerForm({ name: '', title: '', bio: '', photo: null });
 		setResourceForm({ title: '', url: '' });
 		setCoName('');
 		setPosterFile(null);
@@ -40,11 +41,13 @@ const ManageModal = ({ open = true, event, onClose, onDone, setParentError }) =>
 		const msg = formatApiError(err);
 		setError(msg);
 		setParentError?.(msg);
+		toast.error(msg);
 	};
 
 	// Partners
 	const handleAddPartner = async () => {
 		if (!partnerForm.name || !partnerForm.name.trim()) return setError('Name required');
+		setError('');
 		setLoading(true);
 		try {
 			let payload;
@@ -58,6 +61,7 @@ const ManageModal = ({ open = true, event, onClose, onDone, setParentError }) =>
 			}
 			await addEventPartner(event._id, payload);
 			setPartnerForm({ name: '', website: '', logo: null });
+			toast.success('Partner added');
 			onDone && onDone();
 		} catch (err) {
 			handleApiError(err);
@@ -68,9 +72,11 @@ const ManageModal = ({ open = true, event, onClose, onDone, setParentError }) =>
 
 	const handleRemovePartner = async (ident) => {
 		if (!ident) return;
+		if (!window.confirm('Remove partner?')) return;
 		setLoading(true);
 		try {
 			await removeEventPartner(event._id, ident);
+			toast.success('Partner removed');
 			onDone && onDone();
 		} catch (err) {
 			handleApiError(err);
@@ -82,6 +88,7 @@ const ManageModal = ({ open = true, event, onClose, onDone, setParentError }) =>
 	// Speakers
 	const handleAddSpeaker = async () => {
 		if (!speakerForm.name || !speakerForm.name.trim()) return setError('Name required');
+		setError('');
 		setLoading(true);
 		try {
 			let payload;
@@ -90,7 +97,6 @@ const ManageModal = ({ open = true, event, onClose, onDone, setParentError }) =>
 				payload.append('name', speakerForm.name.trim());
 				if (speakerForm.title) payload.append('title', speakerForm.title.trim());
 				if (speakerForm.bio) payload.append('bio', speakerForm.bio.trim());
-				// photo field name is 'photo' in server multer
 				payload.append('photo', speakerForm.photo);
 			} else {
 				payload = {
@@ -100,7 +106,8 @@ const ManageModal = ({ open = true, event, onClose, onDone, setParentError }) =>
 				};
 			}
 			await addEventSpeaker(event._id, payload);
-			setSpeakerForm({ name: '', title: '', bio: '' });
+			setSpeakerForm({ name: '', title: '', bio: '', photo: null });
+			toast.success('Speaker added');
 			onDone && onDone();
 		} catch (err) {
 			handleApiError(err);
@@ -110,9 +117,11 @@ const ManageModal = ({ open = true, event, onClose, onDone, setParentError }) =>
 	};
 
 	const handleRemoveSpeaker = async (index) => {
+		if (!window.confirm('Remove speaker?')) return;
 		setLoading(true);
 		try {
 			await removeEventSpeaker(event._id, index);
+			toast.success('Speaker removed');
 			onDone && onDone();
 		} catch (err) {
 			handleApiError(err);
@@ -124,10 +133,12 @@ const ManageModal = ({ open = true, event, onClose, onDone, setParentError }) =>
 	// Resources
 	const handleAddResource = async () => {
 		if (!resourceForm.title || !resourceForm.url) return setError('Title and URL required');
+		setError('');
 		setLoading(true);
 		try {
 			await addEventResource(event._id, resourceForm);
 			setResourceForm({ title: '', url: '' });
+			toast.success('Resource added');
 			onDone && onDone();
 		} catch (err) {
 			handleApiError(err);
@@ -137,9 +148,11 @@ const ManageModal = ({ open = true, event, onClose, onDone, setParentError }) =>
 	};
 
 	const handleRemoveResource = async (index) => {
+		if (!window.confirm('Remove resource?')) return;
 		setLoading(true);
 		try {
 			await removeEventResource(event._id, index);
+			toast.success('Resource removed');
 			onDone && onDone();
 		} catch (err) {
 			handleApiError(err);
@@ -151,10 +164,12 @@ const ManageModal = ({ open = true, event, onClose, onDone, setParentError }) =>
 	// Co-organizers
 	const handleAddCo = async () => {
 		if (!coName || !coName.trim()) return setError('Name required');
+		setError('');
 		setLoading(true);
 		try {
 			await addEventCoOrganizer(event._id, { name: coName.trim() });
 			setCoName('');
+			toast.success('Co-organizer added');
 			onDone && onDone();
 		} catch (err) {
 			handleApiError(err);
@@ -164,9 +179,11 @@ const ManageModal = ({ open = true, event, onClose, onDone, setParentError }) =>
 	};
 
 	const handleRemoveCoIndex = async (idx) => {
+		if (!window.confirm('Remove co-organizer?')) return;
 		setLoading(true);
 		try {
 			await removeEventCoOrganizerByIndex(event._id, idx);
+			toast.success('Co-organizer removed');
 			onDone && onDone();
 		} catch (err) {
 			handleApiError(err);
@@ -177,9 +194,11 @@ const ManageModal = ({ open = true, event, onClose, onDone, setParentError }) =>
 
 	const handleRemoveCoName = async (name) => {
 		if (!name) return;
+		if (!window.confirm(`Remove co-organizer "${name}"?`)) return;
 		setLoading(true);
 		try {
 			await removeEventCoOrganizerByName(event._id, name);
+			toast.success('Co-organizer removed');
 			onDone && onDone();
 		} catch (err) {
 			handleApiError(err);
@@ -191,12 +210,14 @@ const ManageModal = ({ open = true, event, onClose, onDone, setParentError }) =>
 	// Posters
 	const handleAddPoster = async () => {
 		if (!posterFile) return setError('Select a poster file first.');
+		setError('');
 		setLoading(true);
 		try {
 			const fd = new FormData();
 			fd.append('poster', posterFile);
 			await addEventPoster(event._id, fd);
 			setPosterFile(null);
+			toast.success('Poster uploaded');
 			onDone && onDone();
 		} catch (err) {
 			handleApiError(err);
@@ -207,9 +228,11 @@ const ManageModal = ({ open = true, event, onClose, onDone, setParentError }) =>
 
 	const handleRemovePoster = async (publicId) => {
 		if (!publicId) return;
+		if (!window.confirm('Remove poster?')) return;
 		setLoading(true);
 		try {
 			await removeEventPoster(event._id, publicId);
+			toast.success('Poster removed');
 			onDone && onDone();
 		} catch (err) {
 			handleApiError(err);
@@ -616,7 +639,7 @@ const ManageModal = ({ open = true, event, onClose, onDone, setParentError }) =>
 										disabled={loading}
 										className="px-3 py-2 bg-blue-600 rounded text-white"
 									>
-										<Plus className="inline-block mr-2 h-4 w-4" /> Upload
+										<Plus className="inline-block mr-2 h-4 w-4" /> Add
 									</button>
 								</div>
 							</div>
