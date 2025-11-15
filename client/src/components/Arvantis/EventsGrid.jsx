@@ -13,21 +13,16 @@ const formatDate = (date) => {
 const EventsGrid = ({ events = [], onEventClick }) => {
 	if (!events?.length) return (
 		<section aria-labelledby="arvantis-events">
-			<h3 id="arvantis-events" className="text-2xl font-bold mb-4 text-white">Events</h3>
-			<div className="py-10 text-center text-gray-400">No events available.</div>
+			<h3 id="arvantis-events" className="text-2xl font-bold mb-4" style={{ color: 'var(--text-primary)' }}>Events</h3>
+			<div className="py-10 text-center" style={{ color: 'var(--text-secondary)' }}>No events available.</div>
 		</section>
 	);
 
-	const handleClick = useCallback(
-		(e) => {
-			if (onEventClick) onEventClick(e);
-		},
-		[onEventClick]
-	);
+	const handleClick = useCallback((e) => { if (onEventClick) onEventClick(e); }, [onEventClick]);
 
 	return (
 		<section aria-labelledby="arvantis-events" id="events">
-			<h3 id="arvantis-events" className="text-2xl font-bold mb-6 text-white">Events</h3>
+			<h3 id="arvantis-events" className="text-2xl font-bold mb-6" style={{ color: 'var(--text-primary)' }}>Events</h3>
 			<div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
 				{events.map((ev, index) => {
 					const idKey = ev?._id || ev?.id || `${ev?.name || 'event'}-${index}`;
@@ -40,7 +35,8 @@ const EventsGrid = ({ events = [], onEventClick }) => {
 							initial={{ opacity: 0, y: 18 }}
 							animate={{ opacity: 1, y: 0 }}
 							transition={{ delay: 0.04 * index, duration: 0.45 }}
-							className="rounded-2xl overflow-hidden bg-white/4 border border-white/6 shadow-lg"
+							className="rounded-2xl overflow-hidden shadow-lg"
+							style={{ background: 'var(--card-bg)', border: '1px solid var(--card-border)' }}
 						>
 							<button
 								type="button"
@@ -48,32 +44,32 @@ const EventsGrid = ({ events = [], onEventClick }) => {
 								className="w-full text-left group"
 								aria-label={`View details for ${title}`}
 							>
-								<div className="relative h-44 md:h-48 w-full overflow-hidden bg-gray-700">
+								<div className="relative h-44 md:h-48 w-full overflow-hidden">
 									{poster ? (
 										<img src={poster} alt={title} className="w-full h-full object-cover transform group-hover:scale-105 transition-transform duration-500" loading="lazy" />
 									) : (
-										<div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-gray-700 to-gray-800 text-gray-200">No image</div>
+										<div className="w-full h-full flex items-center justify-center" style={{ background: 'linear-gradient(135deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01))', color: 'var(--text-secondary)' }}>No image</div>
 									)}
-									<div className="absolute left-4 top-4 inline-flex items-center gap-2 px-3 py-1 rounded-full bg-black/40 text-sm text-gray-200 backdrop-blur-sm">
-										<Calendar size={14} aria-hidden />
-										<span>{formatDate(ev?.eventDate)}</span>
+									<div className="absolute left-4 top-4 inline-flex items-center gap-2 px-3 py-1 rounded-full" style={{ background: 'rgba(0,0,0,0.36)', color: 'var(--text-primary)' }}>
+										<Calendar size={14} />
+										<span style={{ fontSize: 13 }}>{formatDate(ev?.eventDate)}</span>
 									</div>
 								</div>
 
 								<div className="p-5">
 									<div className="flex items-start justify-between gap-3">
 										<div className="min-w-0">
-											<h4 className="font-semibold text-lg text-white truncate">{title}</h4>
-											<p className="text-sm text-gray-300 mt-1 line-clamp-2">{desc}</p>
+											<h4 className="font-semibold text-lg truncate" style={{ color: 'var(--text-primary)' }}>{title}</h4>
+											<p className="text-sm mt-1 line-clamp-2" style={{ color: 'var(--text-secondary)' }}>{desc}</p>
 										</div>
-										<div className="ml-3 flex-shrink-0 text-cyan-300">
+										<div className="ml-3 flex-shrink-0" style={{ color: 'var(--accent-1)' }}>
 											<ArrowRight size={20} className="opacity-90 group-hover:translate-x-1 transform transition-transform" />
 										</div>
 									</div>
 
-									<div className="mt-4 flex items-center gap-3 text-sm text-gray-300">
-										<span className="px-2 py-1 rounded-md bg-white/6">{ev?.type || 'General'}</span>
-										<span className="text-xs text-gray-400 ml-auto">{ev?.location || ''}</span>
+									<div className="mt-4 flex items-center gap-3 text-sm" style={{ color: 'var(--text-secondary)' }}>
+										<span style={{ padding: '0.25rem 0.5rem', background: 'rgba(255,255,255,0.02)', borderRadius: 6 }}>{ev?.type || 'General'}</span>
+										<span className="ml-auto" style={{ color: 'var(--text-muted)', fontSize: 13 }}>{ev?.location || ''}</span>
 									</div>
 								</div>
 							</button>
