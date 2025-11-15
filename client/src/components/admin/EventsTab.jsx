@@ -10,7 +10,7 @@ import {
 	List,
 } from 'lucide-react';
 import { useCreateEvent, useUpdateEvent, useDeleteEvent } from '../../hooks/useEvents.js';
-import { addEventPoster, removeEventPoster, addEventCoOrganizer, removeEventCoOrganizerByName, removeEventCoOrganizerByIndex, addEventResource, removeEventResource, addEventPartner, removeEventPartner, addEventSpeaker, removeEventSpeaker } from '../../services/eventServices.js';
+import { addEventPoster, removeEventPoster } from '../../services/eventServices.js';
 import LoadingSpinner from './LoadingSpinner.jsx';
 import ErrorMessage from './ErrorMessage.jsx';
 import EventModal from './EventModal.jsx';
@@ -109,7 +109,6 @@ const EventsTab = ({
 	// UI/errors
 	const [formError, setFormError] = useState('');
 	const [actionError, setActionError] = useState('');
-	const [isFilteringOpen, setIsFilteringOpen] = useState(false);
 	const [showManageModal, setShowManageModal] = useState(false);
 	const [manageTargetEvent, setManageTargetEvent] = useState(null);
 
@@ -547,121 +546,6 @@ const EventsTab = ({
 		setShowManageModal(false);
 		setManageTargetEvent(null);
 		await getAllEvents?.();
-	};
-
-	// Manage actions: small prompt-driven manager using services
-	const handleManageEvent = async (event) => {
-		setActionError('');
-		if (!event || !event._id) return;
-		/* eslint-disable no-alert */
-		const action = window.prompt(
-			'Action for event "' +
-				(event.title || '') +
-				'":\n' +
-				'Options: add-coorg, remove-coorg-name, remove-coorg-index,\n' +
-				'add-resource, remove-resource-index,\n' +
-				'add-partner, remove-partner,\n' +
-				'add-speaker, remove-speaker-index,\n' +
-				'add-poster, remove-poster\n\n' +
-				'Enter action key:'
-		);
-		if (!action) return;
-		try {
-			switch (action.trim()) {
-				case 'add-coorg': {
-					const name = window.prompt('Co-organizer name:');
-					if (!name) throw new Error('Name required');
-					await addEventCoOrganizer(event._id, { name });
-					await getAllEvents?.();
-					break;
-				}
-				case 'remove-coorg-name': {
-					const name = window.prompt('Co-organizer name to remove:');
-					if (!name) throw new Error('Name required');
-					await removeEventCoOrganizerByName(event._id, name);
-					await getAllEvents?.();
-					break;
-				}
-				case 'remove-coorg-index': {
-					const idx = window.prompt('Co-organizer index to remove (0-based):');
-					if (idx === null) throw new Error('Index required');
-					await removeEventCoOrganizerByIndex(event._id, Number(idx));
-					await getAllEvents?.();
-					break;
-				}
-				case 'add-resource': {
-					const title = window.prompt('Resource title:');
-					const url = window.prompt('Resource url:');
-					if (!title || !url) throw new Error('Title and url required');
-					await addEventResource(event._id, { title, url });
-					await getAllEvents?.();
-					break;
-				}
-				case 'remove-resource-index': {
-					const idx = window.prompt('Resource index to remove (0-based):');
-					if (idx === null) throw new Error('Index required');
-					await removeEventResource(event._id, Number(idx));
-					await getAllEvents?.();
-					break;
-				}
-				case 'add-partner': {
-					const name = window.prompt('Partner name:');
-					const website = window.prompt('Partner website (optional):') || undefined;
-					if (!name) throw new Error('Partner name required');
-					// simple object payload; for logo upload use a FormData flow elsewhere
-					await addEventPartner(event._id, { name, website });
-					await getAllEvents?.();
-					break;
-				}
-				case 'remove-partner': {
-					const ident = window.prompt('Partner identifier (publicId or name):');
-					if (!ident) throw new Error('Identifier required');
-					await removeEventPartner(event._id, ident);
-					await getAllEvents?.();
-					break;
-				}
-				case 'add-speaker': {
-					const name = window.prompt('Speaker name:');
-					const title = window.prompt('Speaker title (optional):') || undefined;
-					const bio = window.prompt('Speaker bio (optional):') || undefined;
-					if (!name) throw new Error('Speaker name required');
-					await addEventSpeaker(event._id, { name, title, bio });
-					await getAllEvents?.();
-					break;
-				}
-				case 'remove-speaker-index': {
-					const idx = window.prompt('Speaker index to remove (0-based):');
-					if (idx === null) throw new Error('Index required');
-					await removeEventSpeaker(event._id, Number(idx));
-					await getAllEvents?.();
-					break;
-				}
-				case 'add-poster': {
-					// small helper: ask for image URL (convenience) — best to use upload UI in future
-					const url = window.prompt(
-						'Poster image URL (server expects uploads; this will call partner/patch endpoints if allowed):'
-					);
-					if (!url) throw new Error('URL required');
-					// create FormData with a blob fetch fallback is complex here; reject to prompt using real upload
-					throw new Error(
-						'Poster upload via URL not supported from this prompt. Use the Create/Edit modal to upload files.'
-					);
-				}
-				case 'remove-poster': {
-					const pub = window.prompt('Poster publicId to remove:');
-					if (!pub) throw new Error('publicId required');
-					await removeEventPoster(event._id, pub);
-					await getAllEvents?.();
-					break;
-				}
-				default:
-					throw new Error('Unknown action');
-			}
-		} catch (err) {
-			const msg = formatApiError(err);
-			setActionError(msg);
-			setDashboardError?.(msg);
-		}
 	};
 
 	// small responsive helpers
