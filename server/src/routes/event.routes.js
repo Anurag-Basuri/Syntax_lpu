@@ -208,8 +208,9 @@ router.delete(
 // Poster endpoints
 router.post(
 	'/:id/posters',
-	validate([param('id').isMongoId().withMessage('Invalid event ID')]),
+	// multer must run before validators when the request is multipart/form-data
 	uploadFile('poster', { multiple: false }),
+	validate([param('id').isMongoId().withMessage('Invalid event ID')]),
 	addEventPoster
 );
 router.delete(
@@ -221,11 +222,12 @@ router.delete(
 // Partner endpoints (admin)
 router.post(
 	'/:id/partners',
+	// run multer first so req.body (and files) are available to validators/controller
+	uploadFile('logo', { multiple: false }),
 	validate([
 		param('id').isMongoId().withMessage('Invalid event ID'),
 		body('name').notEmpty().trim().withMessage('Partner name is required'),
 	]),
-	uploadFile('logo', { multiple: false }),
 	addEventPartner
 );
 router.delete(
@@ -237,11 +239,12 @@ router.delete(
 // Speaker endpoints (admin)
 router.post(
 	'/:id/speakers',
+	// multer before validation to allow name + optional photo in multipart payload
+	uploadFile('photo', { multiple: false }),
 	validate([
 		param('id').isMongoId().withMessage('Invalid event ID'),
 		body('name').notEmpty().trim().withMessage('Speaker name is required'),
 	]),
-	uploadFile('photo', { multiple: false }),
 	addEventSpeaker
 );
 router.delete(
