@@ -1,23 +1,22 @@
-import { useState, useMemo, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import {
-	CalendarDays,
-	Plus,
 	Search,
-	ChevronDown,
-	AlertCircle,
 	RefreshCw,
+	ChevronDown,
 	Grid,
 	List,
+	Plus,
+	AlertCircle,
+	CalendarDays,
 } from 'lucide-react';
-import { useCreateEvent, useUpdateEvent, useDeleteEvent } from '../../hooks/useEvents.js';
-import { addEventPoster, removeEventPoster } from '../../services/eventServices.js';
-import LoadingSpinner from './LoadingSpinner.jsx';
-import ErrorMessage from './ErrorMessage.jsx';
-import EventModal from './EventModal.jsx';
-import EventCard from './EventCard.jsx';
-import ManageModal from './ManageModal.jsx';
 import { useTheme } from '../../hooks/useTheme.js';
-import formatApiError from '../../utils/formatApiError.js';
+import ErrorMessage from './ErrorMessage.jsx';
+import LoadingSpinner from './LoadingSpinner.jsx';
+import EventCard from './EventCard.jsx';
+import EventModal from './EventModal.jsx';
+import ManageModal from './ManageModal.jsx';
+import { useCreateEvent, useUpdateEvent, useDeleteEvent } from '../../hooks/useEvents.js';
+import { formatApiError } from '../../utils/formatApiError.js';
 
 // Converts a Date/string to <input type="datetime-local"> value
 const toDatetimeLocalInput = (value) => {
@@ -67,7 +66,7 @@ const initialEventFields = {
 	totalSpots: '',
 	ticketPrice: '',
 	tags: [],
-	posters: [],
+	posters: [], // File objects for new uploads
 	registrationMode: 'none',
 	externalUrl: '',
 	allowGuests: true,
@@ -75,6 +74,8 @@ const initialEventFields = {
 	registrationOpenDate: '',
 	registrationCloseDate: '',
 };
+
+const MAX_POSTERS = 5;
 
 const EventsTab = ({
 	events = [],
@@ -127,7 +128,7 @@ const EventsTab = ({
 		}
 	}, [eventsError, setDashboardError]);
 
-	// debounce search for better UX
+	// debounce search
 	useEffect(() => {
 		if (searchTimer.current) clearTimeout(searchTimer.current);
 		searchTimer.current = setTimeout(() => {
@@ -142,67 +143,55 @@ const EventsTab = ({
 	const totalCount = (events || []).length;
 	const upcomingCount = (events || []).filter((e) => e.status === 'upcoming').length;
 
-	// improved filtering + sorting
+	// filtering + sorting
 	const filteredEvents = useMemo(() => {
 		const q = debouncedSearch || '';
 		let list = Array.isArray(events) ? events.slice() : [];
 
-		// search across multiple fields
 		if (q) {
-			list = list.filter((event) => {
-				const title = (event.title || '').toLowerCase();
-				const location = (event.venue || event.location || '').toLowerCase();
-				const description = (event.description || '').toLowerCase();
-				const organizer = (event.organizer || '').toLowerCase();
-				const tags = (event.tags || []).join(',').toLowerCase();
-				return (
-					title.includes(q) ||
-					location.includes(q) ||
-					description.includes(q) ||
-					organizer.includes(q) ||
-					tags.includes(q)
-				);
+			list = list.filter((ev) => {
+				const combined = [
+					ev.title,
+					ev.venue || ev.location,
+					ev.description,
+					ev.organizer,
+					(ev.tags || []).join(','),
+				]
+					.filter(Boolean)
+					.join(' ')
+					.toLowerCase();
+				return combined.includes(q);
 			});
 		}
 
-		// status
 		if (statusFilter !== 'all') {
 			list = list.filter((e) => e.status === statusFilter);
 		}
 
-		// sort
 		list.sort((a, b) => {
-			const aVal = a[sortBy];
-			const bVal = b[sortBy];
+			const dir = sortOrder === 'asc' ? 1 : -1;
 			if (sortBy === 'eventDate') {
-				const da = new Date(aVal || a.eventDate || a.date || 0).getTime();
-				const db = new Date(bVal || b.eventDate || b.date || 0).getTime();
-				return sortOrder === 'asc' ? da - db : db - da;
+				const ad = new Date(a.eventDate || a.date || 0).getTime();
+				const bd = new Date(b.eventDate || b.date || 0).getTime();
+				return (ad - bd) * dir;
 			}
-			// fallback string compare
-			const sa = String(aVal ?? '').toLowerCase();
-			const sb = String(bVal ?? '').toLowerCase();
-			if (sa < sb) return sortOrder === 'asc' ? -1 : 1;
-			if (sa > sb) return sortOrder === 'asc' ? 1 : -1;
+			const sa = String(a[sortBy] ?? '').toLowerCase();
+			const sb = String(b[sortBy] ?? '').toLowerCase();
+			if (sa < sb) return -1 * dir;
+			if (sa > sb) return 1 * dir;
 			return 0;
 		});
 
 		return list;
 	}, [events, debouncedSearch, statusFilter, sortBy, sortOrder]);
 
-	// reset form
 	const resetForm = () => setEventFields(initialEventFields);
 
-	// validation (aligned with backend requirements)
+	// validate util aligned with backend rules (short, returns string error or empty)
 	const isValidUrl = (u) => {
 		if (!u) return false;
 		try {
-			// accept both with and without protocol (server validator allows optional protocol)
-			// but new URL requires protocol, so try to add if missing
-			if (!/^[a-zA-Z][a-zA-Z\d+\-.]*:/.test(u)) {
-				// assume https if protocol missing for client-side check
-				u = `https://${u}`;
-			}
+			/* eslint-disable no-new */
 			new URL(u);
 			return true;
 		} catch {
@@ -213,21 +202,20 @@ const EventsTab = ({
 	const validateFields = (fields, forEdit = false) => {
 		// Title
 		if (!fields.title || typeof fields.title !== 'string' || fields.title.trim().length < 3)
-			return 'Title is required (min 3 characters).';
+			return 'Title must be at least 3 characters.';
 		if (fields.title.trim().length > 150) return 'Title cannot exceed 150 characters.';
 
-		// Date -> eventDate (client uses date field, normalized to ISO)
-		if (!fields.date) return 'Event date and time are required.';
+		// Date (client uses datetime-local in 'date' field)
+		if (!fields.date) return 'Event date is required.';
 		const iso = datetimeLocalToISO(fields.date);
-		if (!iso) return 'Please provide a valid date & time.';
+		if (!iso) return 'Invalid event date.';
 		const dt = new Date(iso);
-		if (Number.isNaN(dt.getTime())) return 'Please provide a valid date & time.';
-		// Server allows a 60s leeway; enforce same rule client-side
+		if (Number.isNaN(dt.getTime())) return 'Invalid event date.';
+		// server allows 60s leeway
 		if (dt.getTime() < Date.now() - 60_000) return 'Event date cannot be in the past.';
 
 		// Venue
-		if (!fields.location || fields.location.trim().length < 2)
-			return 'Venue is required (min 2 characters).';
+		if (!fields.location || fields.location.trim().length < 2) return 'Venue is required.';
 		if (fields.location.trim().length > 150) return 'Venue cannot exceed 150 characters.';
 
 		// Category
@@ -239,70 +227,146 @@ const EventsTab = ({
 			typeof fields.description !== 'string' ||
 			fields.description.trim().length < 10
 		)
-			return 'Description is required (min 10 characters).';
+			return 'Description must be at least 10 characters.';
 		if (fields.description.trim().length > 2000)
 			return 'Description cannot exceed 2000 characters.';
 
-		// Numeric constraints
+		// Numeric constraints (totalSpots)
 		if (
-			fields.totalSpots !== undefined &&
 			fields.totalSpots !== '' &&
+			typeof fields.totalSpots !== 'undefined' &&
 			fields.totalSpots !== null
 		) {
 			const n = Number(fields.totalSpots);
-			if (Number.isNaN(n) || !Number.isFinite(n) || n < 0)
-				return 'Total spots must be a non-negative number.';
+			if (Number.isNaN(n) || !Number.isInteger(n) || n < 0)
+				return 'Total spots must be a non-negative integer.';
 		}
+
+		// ticketPrice
 		if (
-			fields.ticketPrice !== undefined &&
 			fields.ticketPrice !== '' &&
+			typeof fields.ticketPrice !== 'undefined' &&
 			fields.ticketPrice !== null
 		) {
 			const p = Number(fields.ticketPrice);
-			if (Number.isNaN(p) || !Number.isFinite(p) || p < 0)
-				return 'Ticket price cannot be negative.';
-		}
-		if (
-			fields.registration &&
-			typeof fields.registration.capacityOverride !== 'undefined' &&
-			fields.registration.capacityOverride !== '' &&
-			fields.registration.capacityOverride !== null
-		) {
-			const c = Number(fields.registration.capacityOverride);
-			if (Number.isNaN(c) || !Number.isFinite(c) || c < 0)
-				return 'Capacity override cannot be negative.';
+			if (Number.isNaN(p) || p < 0) return 'Ticket price must be a non-negative number.';
 		}
 
-		// Registration external URL rule (backend requires externalUrl when mode=external)
+		// capacityOverride (registration)
+		if (
+			typeof fields.capacityOverride !== 'undefined' &&
+			fields.capacityOverride !== '' &&
+			fields.capacityOverride !== null
+		) {
+			const c = Number(fields.capacityOverride);
+			if (Number.isNaN(c) || !Number.isInteger(c) || c < 0)
+				return 'Capacity override must be a non-negative integer.';
+		}
+
+		// registration external URL rule
 		const mode =
 			(fields.registration && fields.registration.mode) || fields.registrationMode || 'none';
 		const externalUrl =
 			(fields.registration && fields.registration.externalUrl) || fields.externalUrl || '';
-		if (mode === 'external') {
-			if (!externalUrl || String(externalUrl).trim() === '')
-				return 'External registration URL is required when registration mode is "external".';
-			if (!isValidUrl(externalUrl)) return 'External registration URL is not a valid URL.';
-		}
+		if (mode === 'external' && !externalUrl)
+			return 'External registration mode requires an external URL.';
+		if (externalUrl && !isValidUrl(externalUrl)) return 'External registration URL is invalid.';
 
-		// Registration window ordering
+		// registration window ordering
 		const open = fields.registrationOpenDate || '';
 		const close = fields.registrationCloseDate || '';
 		if (open && close) {
-			const oIso = datetimeLocalToISO(open);
-			const cIso = datetimeLocalToISO(close);
-			if (!oIso || !cIso) return 'Registration open/close must be valid dates.';
-			if (new Date(oIso).getTime() > new Date(cIso).getTime())
-				return 'Registration open date cannot be after the close date.';
+			const o = new Date(datetimeLocalToISO(open)).getTime();
+			const c = new Date(datetimeLocalToISO(close)).getTime();
+			if (Number.isNaN(o) || Number.isNaN(c)) return 'Invalid registration open/close dates.';
+			if (o > c) return 'Registration open date cannot be after close date.';
 		}
 
-		// Posters count client-side guard (server allows up to 5)
-		if (Array.isArray(fields.posters) && fields.posters.length > 5)
-			return 'You can upload a maximum of 5 posters.';
+		// Posters client-side guard
+		if (Array.isArray(fields.posters) && fields.posters.length > MAX_POSTERS) {
+			return `You can upload a maximum of ${MAX_POSTERS} posters.`;
+		}
 
 		return '';
 	};
 
-	// create
+	// Build payload for create/update: if posters (File objects) present, use FormData and field name "posters"
+	const buildPayload = (fields) => {
+		// If there are File objects in fields.posters, create FormData
+		const hasFiles =
+			Array.isArray(fields.posters) && fields.posters.some((f) => f instanceof File);
+		if (hasFiles) {
+			const fd = new FormData();
+			// fields mapping - flattened keys are accepted and normalized by server middleware
+			fd.append('title', fields.title.trim());
+			fd.append('description', fields.description.trim());
+			fd.append('date', datetimeLocalToISO(fields.date)); // normalized server-side -> eventDate
+			if (fields.eventTime) fd.append('eventTime', fields.eventTime);
+			fd.append('location', fields.location.trim());
+			if (fields.room) fd.append('room', fields.room.trim());
+			if (fields.organizer) fd.append('organizer', fields.organizer.trim());
+			fd.append('category', fields.category.trim());
+			if (fields.subcategory) fd.append('subcategory', fields.subcategory.trim());
+			if (fields.totalSpots !== '') fd.append('totalSpots', String(fields.totalSpots));
+			if (fields.ticketPrice !== '') fd.append('ticketPrice', String(fields.ticketPrice));
+			fd.append('status', fields.status || 'upcoming');
+			// registration fields (flattened)
+			fd.append('registrationMode', fields.registrationMode || 'none');
+			if (fields.externalUrl) fd.append('externalUrl', fields.externalUrl);
+			if (typeof fields.allowGuests !== 'undefined')
+				fd.append('allowGuests', fields.allowGuests ? 'true' : 'false');
+			if (fields.capacityOverride !== '')
+				fd.append('capacityOverride', String(fields.capacityOverride));
+			if (fields.registrationOpenDate)
+				fd.append('registrationOpenDate', datetimeLocalToISO(fields.registrationOpenDate));
+			if (fields.registrationCloseDate)
+				fd.append(
+					'registrationCloseDate',
+					datetimeLocalToISO(fields.registrationCloseDate)
+				);
+			// tags as JSON or comma string
+			if (Array.isArray(fields.tags)) {
+				fd.append('tags', JSON.stringify(fields.tags));
+			} else if (typeof fields.tags === 'string') {
+				fd.append('tags', fields.tags);
+			}
+			// files under "posters" (server expects field name "posters" for create)
+			(fields.posters || []).forEach((f) => {
+				if (f instanceof File) fd.append('posters', f);
+			});
+			return fd;
+		}
+
+		// Otherwise return plain JSON object (server's normalize middleware handles flattened fields)
+		const obj = {
+			title: fields.title.trim(),
+			description: fields.description.trim(),
+			date: datetimeLocalToISO(fields.date),
+			eventTime: fields.eventTime || undefined,
+			location: fields.location.trim(),
+			room: fields.room?.trim(),
+			organizer: fields.organizer?.trim(),
+			category: fields.category?.trim(),
+			subcategory: fields.subcategory?.trim(),
+			totalSpots: fields.totalSpots === '' ? undefined : Number(fields.totalSpots),
+			ticketPrice: fields.ticketPrice === '' ? undefined : Number(fields.ticketPrice),
+			status: fields.status || 'upcoming',
+			registrationMode: fields.registrationMode || 'none',
+			externalUrl: fields.externalUrl || undefined,
+			allowGuests: typeof fields.allowGuests === 'boolean' ? fields.allowGuests : undefined,
+			capacityOverride:
+				fields.capacityOverride === '' ? undefined : Number(fields.capacityOverride),
+			registrationOpenDate: fields.registrationOpenDate
+				? datetimeLocalToISO(fields.registrationOpenDate)
+				: undefined,
+			registrationCloseDate: fields.registrationCloseDate
+				? datetimeLocalToISO(fields.registrationCloseDate)
+				: undefined,
+		};
+		if (Array.isArray(fields.tags)) obj.tags = fields.tags;
+		return obj;
+	};
+
 	const handleCreateEvent = async () => {
 		setFormError('');
 		setActionError('');
@@ -311,68 +375,19 @@ const EventsTab = ({
 			setFormError(validation);
 			return;
 		}
+		const payload = buildPayload(eventFields);
 		try {
-			const fd = new FormData();
-			fd.append('title', eventFields.title.trim());
-			const iso = eventFields.date ? datetimeLocalToISO(eventFields.date) : '';
-			if (iso) fd.append('eventDate', iso);
-			if (eventFields.eventTime) fd.append('eventTime', eventFields.eventTime);
-			// backend expects 'venue'
-			fd.append('venue', eventFields.location.trim());
-			if (eventFields.room) fd.append('room', eventFields.room.trim());
-			fd.append('description', eventFields.description.trim());
-			if (eventFields.organizer) fd.append('organizer', eventFields.organizer.trim());
-			fd.append('category', eventFields.category.trim());
-			if (eventFields.subcategory) fd.append('subcategory', eventFields.subcategory.trim());
-			fd.append('status', eventFields.status || 'upcoming');
-
-			if (eventFields.totalSpots !== '' && typeof eventFields.totalSpots !== 'undefined')
-				fd.append('totalSpots', String(eventFields.totalSpots));
-			if (eventFields.ticketPrice !== '' && typeof eventFields.ticketPrice !== 'undefined')
-				fd.append('ticketPrice', String(eventFields.ticketPrice));
-
-			// Tags: server normalize middleware will convert comma-string to array
-			if (eventFields.tags) {
-				if (Array.isArray(eventFields.tags)) fd.append('tags', eventFields.tags.join(','));
-				else fd.append('tags', String(eventFields.tags));
-			}
-
-			for (const file of eventFields.posters || []) {
-				fd.append('posters', file);
-			}
-
-			// Registration fields (flattened keys are handled by normalizeEventPayload on server)
-			fd.append('registrationMode', eventFields.registrationMode || 'none');
-			if (eventFields.externalUrl) fd.append('externalUrl', eventFields.externalUrl);
-			fd.append('allowGuests', String(eventFields.allowGuests !== false));
-			if (
-				typeof eventFields.capacityOverride !== 'undefined' &&
-				eventFields.capacityOverride !== ''
-			)
-				fd.append('capacityOverride', String(eventFields.capacityOverride));
-			if (eventFields.registrationOpenDate)
-				fd.append(
-					'registrationOpenDate',
-					datetimeLocalToISO(eventFields.registrationOpenDate)
-				);
-			if (eventFields.registrationCloseDate)
-				fd.append(
-					'registrationCloseDate',
-					datetimeLocalToISO(eventFields.registrationCloseDate)
-				);
-
-			await createEvent(fd);
-			resetForm();
+			await createEvent(payload);
 			setShowCreateEvent(false);
-			await getAllEvents?.();
+			resetForm();
+			// refresh
+			if (getAllEvents) await getAllEvents();
 		} catch (err) {
 			const msg = formatApiError(err);
 			setActionError(msg);
-			setDashboardError?.(msg);
 		}
 	};
 
-	// edit
 	const handleEditEvent = async () => {
 		setFormError('');
 		setActionError('');
@@ -382,107 +397,37 @@ const EventsTab = ({
 			return;
 		}
 		if (!editEventId) {
-			setActionError('Missing event id to update.');
+			setActionError('No event selected for editing.');
 			return;
 		}
+		const payload = buildPayload(eventFields);
 		try {
-			const updatePayload = {
-				title: eventFields.title?.trim(),
-				description: eventFields.description?.trim(),
-				eventDate: eventFields.date ? datetimeLocalToISO(eventFields.date) : undefined,
-				eventTime: eventFields.eventTime || undefined,
-				venue: eventFields.location?.trim(),
-				room: eventFields.room?.trim(),
-				organizer: eventFields.organizer?.trim(),
-				category: eventFields.category?.trim(),
-				subcategory: eventFields.subcategory?.trim(),
-				status: eventFields.status,
-				totalSpots:
-					eventFields.totalSpots !== '' ? Number(eventFields.totalSpots) : undefined,
-				ticketPrice:
-					eventFields.ticketPrice !== '' ? Number(eventFields.ticketPrice) : undefined,
-				tags: eventFields.tags,
-				registrationOpenDate: eventFields.registrationOpenDate
-					? datetimeLocalToISO(eventFields.registrationOpenDate)
-					: undefined,
-				registrationCloseDate: eventFields.registrationCloseDate
-					? datetimeLocalToISO(eventFields.registrationCloseDate)
-					: undefined,
-				registration: {
-					mode: eventFields.registrationMode || 'none',
-					externalUrl: eventFields.externalUrl || undefined,
-					allowGuests: !!eventFields.allowGuests,
-					capacityOverride:
-						eventFields.capacityOverride !== ''
-							? Number(eventFields.capacityOverride)
-							: undefined,
-				},
-			};
-			// Update details first (posters must be managed via dedicated endpoints)
-			await updateEvent(editEventId, updatePayload);
-
-			// If user selected new poster files during edit, upload them via addEventPoster (single 'poster' field)
-			if (Array.isArray(eventFields.posters) && eventFields.posters.length > 0) {
-				for (const file of eventFields.posters) {
-					try {
-						const fd = new FormData();
-						fd.append('poster', file); // server expects single field 'poster'
-						const added = await addEventPoster(editEventId, fd);
-						// update local existing posters list to include newly added poster(s)
-						if (Array.isArray(added)) {
-							// addEventPoster returns ev.posters (array) per controller; merge conservatively
-							setEditExistingPosters((prev) => {
-								// avoid duplicates by publicId
-								const combined = [...(prev || [])];
-								(added || []).forEach((p) => {
-									const id = p.publicId || p.public_id;
-									if (!combined.some((x) => (x.publicId || x.public_id) === id)) {
-										combined.push(p);
-									}
-								});
-								return combined;
-							});
-						} else if (added) {
-							setEditExistingPosters((prev) => [...(prev || []), added]);
-						}
-					} catch (posterErr) {
-						const msg = formatApiError(posterErr);
-						// surface error but continue with other uploads
-						setActionError((prev) => (prev ? `${prev}; ${msg}` : msg));
-					}
-				}
-			}
-
-			resetForm();
+			// updateEvent in hook expects (id, data) wrapper
+			await updateEvent(editEventId, payload);
 			setShowEditEvent(false);
+			resetForm();
 			setEditEventId(null);
-			setEditExistingPosters([]);
-			await getAllEvents?.();
+			if (getAllEvents) await getAllEvents();
 		} catch (err) {
 			const msg = formatApiError(err);
 			setActionError(msg);
-			setDashboardError?.(msg);
 		}
 	};
 
-	// Remove an existing poster (calls service and updates local editExistingPosters)
-	const handleRemoveExistingPoster = async (publicId) => {
-		if (!editEventId || !publicId) return;
+	const handleDeleteEvent = async (id) => {
+		setActionError('');
+		if (!window.confirm('Delete this event? This action cannot be undone.')) return;
 		try {
-			await removeEventPoster(editEventId, publicId);
-			setEditExistingPosters((prev) =>
-				(prev || []).filter((p) => (p.publicId || p.public_id) !== publicId)
-			);
+			await deleteEvent(id);
+			if (getAllEvents) await getAllEvents();
 		} catch (err) {
 			const msg = formatApiError(err);
 			setActionError(msg);
-			setDashboardError?.(msg);
 		}
 	};
 
 	const openEditEventModal = (event) => {
 		setEditEventId(event._id);
-		setEditExistingPosters(event.posters || []);
 		setEventFields({
 			title: event.title || '',
 			date: toDatetimeLocalInput(event.eventDate || event.date),
@@ -497,7 +442,7 @@ const EventsTab = ({
 			totalSpots: event.totalSpots ?? '',
 			ticketPrice: event.ticketPrice ?? '',
 			tags: event.tags || [],
-			posters: [], // user can add poster files for upload while editing
+			posters: [], // new uploads only
 			registrationMode: event.registration?.mode || 'none',
 			externalUrl: event.registration?.externalUrl || '',
 			allowGuests:
@@ -512,40 +457,42 @@ const EventsTab = ({
 				? toDatetimeLocalInput(event.registrationCloseDate)
 				: '',
 		});
+		setEditExistingPosters(event.posters || []);
 		setFormError('');
 		setActionError('');
 		setShowEditEvent(true);
 	};
 
-	// Add missing delete handler
-	const handleDeleteEvent = async (eventId) => {
-		setActionError('');
-		if (!eventId) {
-			setActionError('Missing event id to delete.');
-			return;
-		}
+	const handleRemoveExistingPoster = async (publicId) => {
+		// Note: this will be called from EventModal via onRemovePoster prop
+		if (!publicId) return;
+		if (!editEventId) return setActionError('Missing event id for poster removal.');
+		if (!window.confirm('Remove poster?')) return;
 		try {
-			await deleteEvent(eventId);
-			await getAllEvents?.();
+			await import('../../services/eventServices.js').then((m) =>
+				m.removeEventPoster(editEventId, publicId)
+			);
+			// update local state
+			setEditExistingPosters((prev) =>
+				prev.filter((p) => (p.publicId || p.public_id) !== publicId)
+			);
+			if (getAllEvents) await getAllEvents();
 		} catch (err) {
 			const msg = formatApiError(err);
 			setActionError(msg);
-			setDashboardError?.(msg);
 		}
 	};
 
-	// open manage modal
 	const handleManageEventOpen = (event) => {
 		setManageTargetEvent(event);
-		setActionError('');
 		setShowManageModal(true);
 	};
 
-	// close / after action callback
 	const onManageDone = async () => {
 		setShowManageModal(false);
 		setManageTargetEvent(null);
-		await getAllEvents?.();
+		// refresh list
+		if (getAllEvents) await getAllEvents();
 	};
 
 	// small responsive helpers
@@ -584,7 +531,6 @@ const EventsTab = ({
 						</div>
 						<button
 							onClick={() => {
-								// quick refresh
 								getAllEvents?.();
 							}}
 							title="Refresh"
@@ -651,7 +597,6 @@ const EventsTab = ({
 							</button>
 						</div>
 
-						{/* create */}
 						<button
 							className="flex items-center gap-2 px-3 py-2 rounded-lg bg-blue-600 hover:bg-blue-500 text-white"
 							onClick={() => {
@@ -791,7 +736,7 @@ const EventsTab = ({
 					setEventFields={setEventFields}
 					onSubmit={handleCreateEvent}
 					loading={createLoading}
-					existingPosters={[]} // none for create
+					existingPosters={[]}
 					onRemovePoster={null}
 				/>
 			)}
@@ -801,8 +746,8 @@ const EventsTab = ({
 					open={showEditEvent}
 					onClose={() => {
 						setShowEditEvent(false);
-						// keep editExistingPosters cleared when closing
-						setEditExistingPosters([]);
+						setEditEventId(null);
+						resetForm();
 					}}
 					eventFields={eventFields}
 					setEventFields={setEventFields}
@@ -812,7 +757,7 @@ const EventsTab = ({
 					onRemovePoster={handleRemoveExistingPoster}
 				/>
 			)}
-			{/* manage modal */}
+
 			{showManageModal && manageTargetEvent && (
 				<ManageModal
 					open={showManageModal}
