@@ -10,21 +10,7 @@ import {
 	List,
 } from 'lucide-react';
 import { useCreateEvent, useUpdateEvent, useDeleteEvent } from '../../hooks/useEvents.js';
-import {
-	getEventStats,
-	getEventRegistrations,
-	addEventPoster,
-	removeEventPoster,
-	addEventPartner,
-	removeEventPartner,
-	addEventCoOrganizer,
-	removeEventCoOrganizerByIndex,
-	removeEventCoOrganizerByName,
-	addEventSpeaker,
-	removeEventSpeaker,
-	addEventResource,
-	removeEventResource,
-} from '../../services/eventServices.js';
+import { addEventPoster, removeEventPoster, addEventCoOrganizer, removeEventCoOrganizerByName, removeEventCoOrganizerByIndex, addEventResource, removeEventResource, addEventPartner, removeEventPartner, addEventSpeaker, removeEventSpeaker } from '../../services/eventServices.js';
 import LoadingSpinner from './LoadingSpinner.jsx';
 import ErrorMessage from './ErrorMessage.jsx';
 import EventModal from './EventModal.jsx';
@@ -549,7 +535,7 @@ const EventsTab = ({
 		}
 	};
 
-	// open manage modal (replaces prompt flow)
+	// open manage modal
 	const handleManageEventOpen = (event) => {
 		setManageTargetEvent(event);
 		setActionError('');
@@ -855,6 +841,7 @@ const EventsTab = ({
 										onClick={() => handleManageEventOpen(event)}
 										title="Manage event (partners, speakers, resources, co-organizers)"
 										className="absolute right-3 top-3 z-10 px-2 py-1 rounded bg-black/40 text-xs text-white hover:bg-black/60"
+										aria-label={`Manage ${event.title}`}
 									>
 										Manage
 									</button>
