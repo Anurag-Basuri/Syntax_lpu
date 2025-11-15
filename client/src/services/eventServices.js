@@ -63,9 +63,7 @@ export const getEventById = async (id) => {
 // NOTE: when uploading posters, use the field name "posters" (array) to match the server multer config.
 export const createEvent = async (formData) => {
 	try {
-		const response = await apiClient.post('/api/v1/events', formData, {
-			headers: { 'Content-Type': 'multipart/form-data' },
-		});
+		const response = await apiClient.post('/api/v1/events', formData);
 		return response.data?.data ?? null;
 	} catch (error) {
 		throw new Error(error.response?.data?.message || 'Failed to create event.');
@@ -124,9 +122,8 @@ export const getEventRegistrations = async (id) => {
 export const addEventPoster = async (id, formData) => {
 	if (!id) throw new Error('Event id is required');
 	try {
-		const response = await apiClient.post(`/api/v1/events/${id}/posters`, formData, {
-			headers: { 'Content-Type': 'multipart/form-data' },
-		});
+		// Let axios set multipart Content-Type
+		const response = await apiClient.post(`/api/v1/events/${id}/posters`, formData);
 		return response.data?.data ?? null;
 	} catch (error) {
 		throw new Error(error.response?.data?.message || 'Failed to add poster.');

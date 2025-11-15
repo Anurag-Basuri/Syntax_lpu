@@ -7,6 +7,17 @@ import EventModal from './EventModal.jsx';
 import EventCard from './EventCard.jsx';
 import { useTheme } from '../../hooks/useTheme.js';
 
+// helper: convert a Date/string into a value suitable for <input type="datetime-local">
+const toDatetimeLocalInput = (value) => {
+	if (!value) return '';
+	const d = new Date(value);
+	if (Number.isNaN(d.getTime())) return '';
+	// adjust to local time and format YYYY-MM-DDTHH:mm
+	const tzOffsetMs = d.getTimezoneOffset() * 60000;
+	const local = new Date(d.getTime() - tzOffsetMs);
+	return local.toISOString().slice(0, 16);
+};
+
 const statusOptions = [
 	{ value: 'all', label: 'All Statuses' },
 	{ value: 'upcoming', label: 'Upcoming' },
@@ -134,8 +145,9 @@ const EventsTab = ({
 			// Build FormData for multipart upload
 			const fd = new FormData();
 			fd.append('title', eventFields.title);
-			// name mapping: frontend 'date' -> backend 'eventDate'
-			fd.append('eventDate', eventFields.date);
+			// send full ISO string to backend (ISO-8601)
+			const iso = eventFields.date ? new Date(eventFields.date).toISOString() : '';
+			if (iso) fd.append('eventDate', iso);
 			fd.append('venue', eventFields.location);
 			fd.append('description', eventFields.description || '');
 			fd.append('organizer', eventFields.organizer || ''); // optional field
@@ -147,7 +159,12 @@ const EventsTab = ({
 				fd.append('totalSpots', String(eventFields.totalSpots));
 			if (typeof eventFields.ticketPrice !== 'undefined')
 				fd.append('ticketPrice', String(eventFields.ticketPrice));
-			if (eventFields.tags) fd.append('tags', eventFields.tags);
+
+			// tags: if array -> join by comma so backend normalize middleware can parse
+			if (eventFields.tags) {
+				if (Array.isArray(eventFields.tags)) fd.append('tags', eventFields.tags.join(','));
+				else fd.append('tags', String(eventFields.tags));
+			}
 
 			// append posters (multiple)
 			for (const file of eventFields.posters) {
@@ -225,11 +242,8 @@ const EventsTab = ({
 		setEditEventId(event._id);
 		setEventFields({
 			title: event.title || '',
-			// prefer event.eventDate, fallback to event.date
-			date:
-				event.eventDate || event.date
-					? new Date(event.eventDate || event.date).toISOString().slice(0, 16)
-					: '',
+			// convert to datetime-local local value
+			date: toDatetimeLocalInput(event.eventDate || event.date),
 			location: event.venue || event.location || '',
 			description: event.description || '',
 			status: event.status || 'upcoming',
