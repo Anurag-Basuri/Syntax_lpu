@@ -29,6 +29,7 @@ import LoadingSpinner from './LoadingSpinner.jsx';
 import ErrorMessage from './ErrorMessage.jsx';
 import EventModal from './EventModal.jsx';
 import EventCard from './EventCard.jsx';
+import ManageModal from './ManageModal.jsx';
 import { useTheme } from '../../hooks/useTheme.js';
 import formatApiError from '../../utils/formatApiError.js';
 
@@ -123,6 +124,8 @@ const EventsTab = ({
 	const [formError, setFormError] = useState('');
 	const [actionError, setActionError] = useState('');
 	const [isFilteringOpen, setIsFilteringOpen] = useState(false);
+	const [showManageModal, setShowManageModal] = useState(false);
+	const [manageTargetEvent, setManageTargetEvent] = useState(null);
 
 	const searchTimer = useRef(null);
 
@@ -546,6 +549,20 @@ const EventsTab = ({
 		}
 	};
 
+	// open manage modal (replaces prompt flow)
+	const handleManageEventOpen = (event) => {
+		setManageTargetEvent(event);
+		setActionError('');
+		setShowManageModal(true);
+	};
+
+	// close / after action callback
+	const onManageDone = async () => {
+		setShowManageModal(false);
+		setManageTargetEvent(null);
+		await getAllEvents?.();
+	};
+
 	// Manage actions: small prompt-driven manager using services
 	const handleManageEvent = async (event) => {
 		setActionError('');
@@ -835,7 +852,7 @@ const EventsTab = ({
 									/>
 									{/* Manage button */}
 									<button
-										onClick={() => handleManageEvent(event)}
+										onClick={() => handleManageEventOpen(event)}
 										title="Manage event (partners, speakers, resources, co-organizers)"
 										className="absolute right-3 top-3 z-10 px-2 py-1 rounded bg-black/40 text-xs text-white hover:bg-black/60"
 									>
@@ -880,7 +897,7 @@ const EventsTab = ({
 											Delete
 										</button>
 										<button
-											onClick={() => handleManageEvent(event)}
+											onClick={() => handleManageEventOpen(event)}
 											className="px-3 py-1 rounded bg-black/40 text-white text-sm"
 										>
 											Manage
@@ -922,6 +939,16 @@ const EventsTab = ({
 					loading={updateLoading}
 					existingPosters={editExistingPosters}
 					onRemovePoster={handleRemoveExistingPoster}
+				/>
+			)}
+			{/* manage modal */}
+			{showManageModal && manageTargetEvent && (
+				<ManageModal
+					open={showManageModal}
+					event={manageTargetEvent}
+					onClose={() => setShowManageModal(false)}
+					onDone={onManageDone}
+					setParentError={setDashboardError}
 				/>
 			)}
 		</div>
