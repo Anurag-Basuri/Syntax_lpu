@@ -31,7 +31,6 @@ const createEvent = asyncHandler(async (req, res) => {
 		ticketPrice = 0,
 		registrationOpenDate,
 		registrationCloseDate,
-		// registration fields may come either as registration.* or top level for convenience
 	} = req.body;
 
 	// Defensive check (multer should populate req.files)
