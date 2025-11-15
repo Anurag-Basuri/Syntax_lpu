@@ -7,29 +7,26 @@ import EventModal from './EventModal.jsx';
 import EventCard from './EventCard.jsx';
 import { useTheme } from '../../hooks/useTheme.js';
 
-// helper: convert a Date/string into a value suitable for <input type="datetime-local">
+// Converts a Date/string to <input type="datetime-local"> value
 const toDatetimeLocalInput = (value) => {
 	if (!value) return '';
 	const d = new Date(value);
 	if (Number.isNaN(d.getTime())) return '';
-	// adjust to local time and format YYYY-MM-DDTHH:mm
 	const tzOffsetMs = d.getTimezoneOffset() * 60000;
 	const local = new Date(d.getTime() - tzOffsetMs);
 	return local.toISOString().slice(0, 16);
 };
 
-// NEW helper: convert a datetime-local input value (YYYY-MM-DDTHH:mm or with seconds) into an ISO string
+// Converts datetime-local input to ISO string
 const datetimeLocalToISO = (localValue) => {
 	if (!localValue) return '';
-	// localValue may be "YYYY-MM-DDTHH:mm" or "YYYY-MM-DDTHH:mm:ss"
 	const [datePart, timePart = '00:00:00'] = localValue.split('T');
 	if (!datePart) return '';
-	const [year, month, day] = datePart.split('-').map((n) => Number(n));
-	const timeParts = timePart.split(':').map((n) => Number(n));
+	const [year, month, day] = datePart.split('-').map(Number);
+	const timeParts = timePart.split(':').map(Number);
 	const hour = timeParts[0] ?? 0;
 	const minute = timeParts[1] ?? 0;
 	const second = timeParts[2] ?? 0;
-	// Construct a Date in local timezone explicitly
 	const dt = new Date(year, (month || 1) - 1, day || 1, hour, minute, second);
 	if (Number.isNaN(dt.getTime())) return '';
 	return dt.toISOString();
@@ -40,6 +37,8 @@ const statusOptions = [
 	{ value: 'upcoming', label: 'Upcoming' },
 	{ value: 'ongoing', label: 'Ongoing' },
 	{ value: 'completed', label: 'Completed' },
+	{ value: 'cancelled', label: 'Cancelled' },
+	{ value: 'postponed', label: 'Postponed' },
 ];
 
 const formatApiError = (err) => {
@@ -49,11 +48,34 @@ const formatApiError = (err) => {
 	);
 };
 
+const initialEventFields = {
+	title: '',
+	date: '',
+	eventTime: '',
+	location: '',
+	room: '',
+	description: '',
+	status: 'upcoming',
+	organizer: '',
+	category: '',
+	subcategory: '',
+	totalSpots: '',
+	ticketPrice: '',
+	tags: [],
+	posters: [],
+	registrationMode: 'none',
+	externalUrl: '',
+	allowGuests: true,
+	capacityOverride: '',
+	registrationOpenDate: '',
+	registrationCloseDate: '',
+};
+
 const EventsTab = ({
 	events = [],
 	eventsLoading = false,
 	eventsError = null,
-	token, // kept for API hooks that may need it later
+	token,
 	setDashboardError,
 	getAllEvents,
 }) => {
@@ -66,13 +88,7 @@ const EventsTab = ({
 
 	const [showCreateEvent, setShowCreateEvent] = useState(false);
 	const [showEditEvent, setShowEditEvent] = useState(false);
-	const [eventFields, setEventFields] = useState({
-		title: '',
-		date: '',
-		location: '',
-		description: '',
-		status: 'upcoming',
-	});
+	const [eventFields, setEventFields] = useState(initialEventFields);
 	const [editEventId, setEditEventId] = useState(null);
 	const [searchTerm, setSearchTerm] = useState('');
 	const [statusFilter, setStatusFilter] = useState('all');
@@ -83,7 +99,6 @@ const EventsTab = ({
 	const { updateEvent, loading: updateLoading } = useUpdateEvent();
 	const { deleteEvent, loading: deleteLoading } = useDeleteEvent();
 
-	// keep dashboard-level error in sync
 	useEffect(() => {
 		if (eventsError) {
 			const msg = formatApiError(eventsError);
@@ -101,93 +116,88 @@ const EventsTab = ({
 			.filter((event) => {
 				if (!q) return true;
 				const title = (event.title || '').toLowerCase();
-				const location = (event.venue || event.location || '').toLowerCase(); // <-- use venue from backend
+				const location = (event.venue || event.location || '').toLowerCase();
 				const description = (event.description || '').toLowerCase();
 				return title.includes(q) || location.includes(q) || description.includes(q);
 			})
 			.filter((event) => (statusFilter === 'all' ? true : event.status === statusFilter));
 	}, [events, searchTerm, statusFilter]);
 
-	const resetForm = () =>
-		setEventFields({
-			title: '',
-			date: '',
-			location: '',
-			description: '',
-			status: 'upcoming',
-		});
+	const resetForm = () => setEventFields(initialEventFields);
 
 	const validateFields = (fields) => {
-		if (!fields.title || fields.title.trim().length < 3) {
+		if (!fields.title || fields.title.trim().length < 3)
 			return 'Title is required (min 3 characters).';
-		}
-		if (!fields.date) {
-			return 'Date & time are required.';
-		}
-		// robust datetime check: convert datetime-local to ISO then validate
+		if (!fields.date) return 'Date & time are required.';
 		const iso = datetimeLocalToISO(fields.date);
 		if (!iso) return 'Please provide a valid date & time.';
 		const dt = new Date(iso);
 		if (Number.isNaN(dt.getTime())) return 'Please provide a valid date & time.';
-		if (!fields.location || fields.location.trim().length < 2) {
-			return 'Location is required.';
-		}
-		// new: organizer required (server validates this)
-		if (!fields.organizer || fields.organizer.trim().length < 2) {
+		if (!fields.location || fields.location.trim().length < 2) return 'Location is required.';
+		if (!fields.organizer || fields.organizer.trim().length < 2)
 			return 'Organizer is required (min 2 characters).';
-		}
-		// new: description required (server validates this)
-		if (!fields.description || fields.description.trim().length < 10) {
+		if (!fields.category || fields.category.trim().length < 2) return 'Category is required.';
+		if (!fields.description || fields.description.trim().length < 10)
 			return 'Description is required (min 10 characters).';
-		}
+		if (!showEditEvent && (!fields.posters || !fields.posters.length))
+			return 'At least one poster image is required.';
+		if (fields.registrationMode === 'external' && !fields.externalUrl)
+			return 'External registration URL is required for external mode.';
 		return '';
 	};
 
 	const handleCreateEvent = async () => {
 		setFormError('');
 		setActionError('');
-		// ensure eventFields includes posters when creating
 		const validation = validateFields(eventFields);
 		if (validation) {
 			setFormError(validation);
 			return;
 		}
-
-		// require posters on create
-		if (!eventFields.posters || !eventFields.posters.length) {
-			setFormError('At least one poster image is required.');
-			return;
-		}
-
 		try {
-			// Build FormData for multipart upload
 			const fd = new FormData();
 			fd.append('title', eventFields.title);
-			// send full ISO string to backend (ISO-8601)
 			const iso = eventFields.date ? datetimeLocalToISO(eventFields.date) : '';
 			if (iso) fd.append('eventDate', iso);
+			if (eventFields.eventTime) fd.append('eventTime', eventFields.eventTime);
 			fd.append('venue', eventFields.location);
-			fd.append('description', eventFields.description || '');
-			fd.append('organizer', eventFields.organizer || ''); // optional field
-			fd.append('category', eventFields.category || 'General');
-			fd.append('status', eventFields.status || 'upcoming');
+			if (eventFields.room) fd.append('room', eventFields.room);
+			fd.append('description', eventFields.description);
+			fd.append('organizer', eventFields.organizer);
+			fd.append('category', eventFields.category);
+			if (eventFields.subcategory) fd.append('subcategory', eventFields.subcategory);
+			fd.append('status', eventFields.status);
 
-			// optional numeric fields if provided
-			if (typeof eventFields.totalSpots !== 'undefined')
+			if (eventFields.totalSpots !== '')
 				fd.append('totalSpots', String(eventFields.totalSpots));
-			if (typeof eventFields.ticketPrice !== 'undefined')
+			if (eventFields.ticketPrice !== '')
 				fd.append('ticketPrice', String(eventFields.ticketPrice));
 
-			// tags: if array -> join by comma so backend normalize middleware can parse
 			if (eventFields.tags) {
 				if (Array.isArray(eventFields.tags)) fd.append('tags', eventFields.tags.join(','));
 				else fd.append('tags', String(eventFields.tags));
 			}
 
-			// append posters (multiple)
 			for (const file of eventFields.posters) {
 				fd.append('posters', file);
 			}
+
+			// Registration fields
+			fd.append('registrationMode', eventFields.registrationMode || 'none');
+			if (eventFields.externalUrl) fd.append('externalUrl', eventFields.externalUrl);
+			fd.append('allowGuests', String(eventFields.allowGuests));
+			if (eventFields.capacityOverride !== '')
+				fd.append('capacityOverride', String(eventFields.capacityOverride));
+			if (eventFields.registrationOpenDate)
+				fd.append(
+					'registrationOpenDate',
+					datetimeLocalToISO(eventFields.registrationOpenDate)
+				);
+			if (eventFields.registrationCloseDate)
+				fd.append(
+					'registrationCloseDate',
+					datetimeLocalToISO(eventFields.registrationCloseDate)
+				);
 
 			await createEvent(fd);
 			resetForm();
@@ -213,23 +223,38 @@ const EventsTab = ({
 			return;
 		}
 		try {
-			// Map frontend names to backend expected fields
 			const updatePayload = {
 				title: eventFields.title?.trim(),
 				description: eventFields.description?.trim(),
 				eventDate: eventFields.date ? datetimeLocalToISO(eventFields.date) : undefined,
+				eventTime: eventFields.eventTime || undefined,
 				venue: eventFields.location?.trim(),
+				room: eventFields.room?.trim(),
 				organizer: eventFields.organizer?.trim(),
 				category: eventFields.category?.trim(),
+				subcategory: eventFields.subcategory?.trim(),
 				status: eventFields.status,
+				totalSpots:
+					eventFields.totalSpots !== '' ? Number(eventFields.totalSpots) : undefined,
+				ticketPrice:
+					eventFields.ticketPrice !== '' ? Number(eventFields.ticketPrice) : undefined,
+				tags: eventFields.tags,
+				registrationOpenDate: eventFields.registrationOpenDate
+					? datetimeLocalToISO(eventFields.registrationOpenDate)
+					: undefined,
+				registrationCloseDate: eventFields.registrationCloseDate
+					? datetimeLocalToISO(eventFields.registrationCloseDate)
+					: undefined,
+				registration: {
+					mode: eventFields.registrationMode || 'none',
+					externalUrl: eventFields.externalUrl || undefined,
+					allowGuests: eventFields.allowGuests,
+					capacityOverride:
+						eventFields.capacityOverride !== ''
+							? Number(eventFields.capacityOverride)
+							: undefined,
+				},
 			};
-			// optional numeric fields
-			if (typeof eventFields.totalSpots !== 'undefined')
-				updatePayload.totalSpots = Number(eventFields.totalSpots);
-			if (typeof eventFields.ticketPrice !== 'undefined')
-				updatePayload.ticketPrice = Number(eventFields.ticketPrice);
-			if (eventFields.tags) updatePayload.tags = eventFields.tags;
-
 			await updateEvent(editEventId, updatePayload);
 			resetForm();
 			setShowEditEvent(false);
@@ -244,7 +269,6 @@ const EventsTab = ({
 
 	const handleDeleteEvent = async (id) => {
 		setActionError('');
-		// simple confirm dialog - replace with modal if needed
 		if (!window.confirm('Delete this event? This action cannot be undone.')) return;
 		try {
 			await deleteEvent(id);
@@ -260,13 +284,32 @@ const EventsTab = ({
 		setEditEventId(event._id);
 		setEventFields({
 			title: event.title || '',
-			// convert to datetime-local local value
 			date: toDatetimeLocalInput(event.eventDate || event.date),
+			eventTime: event.eventTime || '',
 			location: event.venue || event.location || '',
+			room: event.room || '',
 			description: event.description || '',
 			status: event.status || 'upcoming',
 			organizer: event.organizer || '',
 			category: event.category || '',
+			subcategory: event.subcategory || '',
+			totalSpots: event.totalSpots ?? '',
+			ticketPrice: event.ticketPrice ?? '',
+			tags: event.tags || [],
+			posters: [],
+			registrationMode: event.registration?.mode || 'none',
+			externalUrl: event.registration?.externalUrl || '',
+			allowGuests:
+				typeof event.registration?.allowGuests === 'boolean'
+					? event.registration.allowGuests
+					: true,
+			capacityOverride: event.registration?.capacityOverride ?? '',
+			registrationOpenDate: event.registrationOpenDate
+				? toDatetimeLocalInput(event.registrationOpenDate)
+				: '',
+			registrationCloseDate: event.registrationCloseDate
+				? toDatetimeLocalInput(event.registrationCloseDate)
+				: '',
 		});
 		setFormError('');
 		setActionError('');
@@ -291,7 +334,6 @@ const EventsTab = ({
 						</span>
 					</div>
 				</div>
-
 				<div className="flex gap-2 w-full md:w-auto">
 					<div className="relative w-full md:w-64">
 						<Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
@@ -304,7 +346,6 @@ const EventsTab = ({
 							aria-label="Search events"
 						/>
 					</div>
-
 					<div className="relative">
 						<select
 							className="appearance-none bg-gray-700/50 border border-gray-600 rounded-lg pl-4 pr-10 py-2 text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
@@ -320,7 +361,6 @@ const EventsTab = ({
 						</select>
 						<ChevronDown className="absolute right-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400 pointer-events-none" />
 					</div>
-
 					<button
 						className="flex items-center gap-2 px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-500 transition disabled:opacity-60"
 						onClick={() => {
@@ -337,8 +377,6 @@ const EventsTab = ({
 					</button>
 				</div>
 			</div>
-
-			{/* action-level errors */}
 			{(formError || actionError) && (
 				<div
 					className={`${
@@ -351,11 +389,7 @@ const EventsTab = ({
 					<div className="text-sm">{formError || actionError}</div>
 				</div>
 			)}
-
-			{/* server error component */}
 			<ErrorMessage error={eventsError ? formatApiError(eventsError) : null} />
-
-			{/* content */}
 			{eventsLoading ? (
 				<LoadingSpinner />
 			) : filteredEvents.length === 0 ? (
@@ -399,8 +433,6 @@ const EventsTab = ({
 					))}
 				</div>
 			)}
-
-			{/* Create Event Modal */}
 			{showCreateEvent && (
 				<EventModal
 					isEdit={false}
@@ -412,8 +444,6 @@ const EventsTab = ({
 					loading={createLoading}
 				/>
 			)}
-
-			{/* Edit Event Modal */}
 			{showEditEvent && (
 				<EventModal
 					isEdit={true}
