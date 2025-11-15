@@ -44,9 +44,22 @@ const ManageModal = ({ open = true, event, onClose, onDone, setParentError }) =>
 		toast.error(msg);
 	};
 
+	// Defensive: ensure event exists
+	const ensureEventId = () => {
+		if (!event || !event._id) {
+			const msg = 'Event not available';
+			setError(msg);
+			toast.error(msg);
+			return null;
+		}
+		return event._id;
+	};
+
 	// Partners
 	const handleAddPartner = async () => {
 		if (!partnerForm.name || !partnerForm.name.trim()) return setError('Name required');
+		const id = ensureEventId();
+		if (!id) return;
 		setError('');
 		setLoading(true);
 		try {
@@ -62,7 +75,7 @@ const ManageModal = ({ open = true, event, onClose, onDone, setParentError }) =>
 					website: partnerForm.website?.trim(),
 				};
 			}
-			await addEventPartner(event._id, payload);
+			await addEventPartner(id, payload);
 			setPartnerForm({ name: '', website: '', logo: null });
 			toast.success('Partner added');
 			onDone && onDone();
@@ -76,9 +89,11 @@ const ManageModal = ({ open = true, event, onClose, onDone, setParentError }) =>
 	const handleRemovePartner = async (ident) => {
 		if (!ident) return;
 		if (!window.confirm('Remove partner?')) return;
+		const id = ensureEventId();
+		if (!id) return;
 		setLoading(true);
 		try {
-			await removeEventPartner(event._id, ident);
+			await removeEventPartner(id, ident);
 			toast.success('Partner removed');
 			onDone && onDone();
 		} catch (err) {
@@ -91,6 +106,8 @@ const ManageModal = ({ open = true, event, onClose, onDone, setParentError }) =>
 	// Speakers
 	const handleAddSpeaker = async () => {
 		if (!speakerForm.name || !speakerForm.name.trim()) return setError('Name required');
+		const id = ensureEventId();
+		if (!id) return;
 		setError('');
 		setLoading(true);
 		try {
@@ -108,7 +125,7 @@ const ManageModal = ({ open = true, event, onClose, onDone, setParentError }) =>
 					bio: speakerForm.bio?.trim(),
 				};
 			}
-			await addEventSpeaker(event._id, payload);
+			await addEventSpeaker(id, payload);
 			setSpeakerForm({ name: '', title: '', bio: '', photo: null });
 			toast.success('Speaker added');
 			onDone && onDone();
@@ -121,9 +138,11 @@ const ManageModal = ({ open = true, event, onClose, onDone, setParentError }) =>
 
 	const handleRemoveSpeaker = async (index) => {
 		if (!window.confirm('Remove speaker?')) return;
+		const id = ensureEventId();
+		if (!id) return;
 		setLoading(true);
 		try {
-			await removeEventSpeaker(event._id, index);
+			await removeEventSpeaker(id, index);
 			toast.success('Speaker removed');
 			onDone && onDone();
 		} catch (err) {
@@ -136,10 +155,12 @@ const ManageModal = ({ open = true, event, onClose, onDone, setParentError }) =>
 	// Resources
 	const handleAddResource = async () => {
 		if (!resourceForm.title || !resourceForm.url) return setError('Title and URL required');
+		const id = ensureEventId();
+		if (!id) return;
 		setError('');
 		setLoading(true);
 		try {
-			await addEventResource(event._id, {
+			await addEventResource(id, {
 				title: resourceForm.title.trim(),
 				url: resourceForm.url.trim(),
 			});
@@ -155,9 +176,11 @@ const ManageModal = ({ open = true, event, onClose, onDone, setParentError }) =>
 
 	const handleRemoveResource = async (index) => {
 		if (!window.confirm('Remove resource?')) return;
+		const id = ensureEventId();
+		if (!id) return;
 		setLoading(true);
 		try {
-			await removeEventResource(event._id, index);
+			await removeEventResource(id, index);
 			toast.success('Resource removed');
 			onDone && onDone();
 		} catch (err) {
@@ -170,10 +193,12 @@ const ManageModal = ({ open = true, event, onClose, onDone, setParentError }) =>
 	// Co-organizers
 	const handleAddCo = async () => {
 		if (!coName || !coName.trim()) return setError('Name required');
+		const id = ensureEventId();
+		if (!id) return;
 		setError('');
 		setLoading(true);
 		try {
-			await addEventCoOrganizer(event._id, { name: coName.trim() });
+			await addEventCoOrganizer(id, { name: coName.trim() });
 			setCoName('');
 			toast.success('Co-organizer added');
 			onDone && onDone();
@@ -186,9 +211,11 @@ const ManageModal = ({ open = true, event, onClose, onDone, setParentError }) =>
 
 	const handleRemoveCoIndex = async (idx) => {
 		if (!window.confirm('Remove co-organizer?')) return;
+		const id = ensureEventId();
+		if (!id) return;
 		setLoading(true);
 		try {
-			await removeEventCoOrganizerByIndex(event._id, idx);
+			await removeEventCoOrganizerByIndex(id, idx);
 			toast.success('Co-organizer removed');
 			onDone && onDone();
 		} catch (err) {
@@ -201,9 +228,11 @@ const ManageModal = ({ open = true, event, onClose, onDone, setParentError }) =>
 	const handleRemoveCoName = async (name) => {
 		if (!name) return;
 		if (!window.confirm(`Remove co-organizer "${name}"?`)) return;
+		const id = ensureEventId();
+		if (!id) return;
 		setLoading(true);
 		try {
-			await removeEventCoOrganizerByName(event._id, name);
+			await removeEventCoOrganizerByName(id, name);
 			toast.success('Co-organizer removed');
 			onDone && onDone();
 		} catch (err) {
@@ -216,12 +245,14 @@ const ManageModal = ({ open = true, event, onClose, onDone, setParentError }) =>
 	// Posters
 	const handleAddPoster = async () => {
 		if (!posterFile) return setError('Choose a file first');
+		const id = ensureEventId();
+		if (!id) return;
 		setError('');
 		setLoading(true);
 		try {
 			const fd = new FormData();
 			fd.append('poster', posterFile);
-			await addEventPoster(event._id, fd);
+			await addEventPoster(id, fd);
 			setPosterFile(null);
 			toast.success('Poster added');
 			onDone && onDone();
@@ -235,9 +266,11 @@ const ManageModal = ({ open = true, event, onClose, onDone, setParentError }) =>
 	const handleRemovePoster = async (publicId) => {
 		if (!publicId) return;
 		if (!window.confirm('Remove poster?')) return;
+		const id = ensureEventId();
+		if (!id) return;
 		setLoading(true);
 		try {
-			await removeEventPoster(event._id, publicId);
+			await removeEventPoster(id, publicId);
 			toast.success('Poster removed');
 			onDone && onDone();
 		} catch (err) {
@@ -247,7 +280,7 @@ const ManageModal = ({ open = true, event, onClose, onDone, setParentError }) =>
 		}
 	};
 
-	if (!open) return null;
+	if (!open || !event) return null;
 
 	// derive lists from event
 	const partners = event.partners || [];
@@ -258,31 +291,36 @@ const ManageModal = ({ open = true, event, onClose, onDone, setParentError }) =>
 
 	return (
 		<div className="fixed inset-0 z-[100000] flex items-center justify-center p-4 bg-black/60">
-			<div className="w-full max-w-3xl bg-gray-900 rounded-lg overflow-hidden border border-gray-800">
+			<div className="w-full max-w-3xl sm:rounded-lg bg-gray-900 rounded-lg overflow-hidden border border-gray-800 shadow-xl">
 				<div className="flex items-center justify-between px-4 py-3 border-b border-gray-800">
-					<h3 className="text-lg font-semibold">Manage: {event.title}</h3>
+					<h3 className="text-lg font-semibold truncate">Manage: {event.title || '—'}</h3>
 					<div className="flex items-center gap-2">
 						<button
+							type="button"
 							onClick={() => onClose?.()}
 							className="px-3 py-1 rounded bg-gray-800 text-white"
+							aria-label="Close"
 						>
 							Close
 						</button>
 						<button
+							type="button"
 							onClick={() => onDone?.()}
 							className="px-3 py-1 rounded bg-blue-600 text-white"
+							aria-label="Done"
 						>
 							Done
 						</button>
 					</div>
 				</div>
 
-				<div className="flex">
-					{/* tabs */}
-					<nav className="w-40 border-r border-gray-800">
+				<div className="flex flex-col md:flex-row">
+					{/* Left nav for md+; horizontal tabs for small screens */}
+					<nav className="hidden md:block w-40 border-r border-gray-800">
 						{TABS.map((t) => (
 							<button
 								key={t}
+								type="button"
 								onClick={() => {
 									setTab(t);
 									setError('');
@@ -292,6 +330,7 @@ const ManageModal = ({ open = true, event, onClose, onDone, setParentError }) =>
 										? 'bg-gray-800 text-white'
 										: 'text-gray-300 hover:bg-gray-800/40'
 								}`}
+								aria-pressed={tab === t}
 							>
 								{t === 'partners' && 'Partners'}
 								{t === 'speakers' && 'Speakers'}
@@ -302,8 +341,36 @@ const ManageModal = ({ open = true, event, onClose, onDone, setParentError }) =>
 						))}
 					</nav>
 
+					{/* Horizontal tabs on small */}
+					<div className="md:hidden border-b border-gray-800 overflow-x-auto">
+						<div className="flex gap-1 px-2">
+							{TABS.map((t) => (
+								<button
+									key={t}
+									type="button"
+									onClick={() => {
+										setTab(t);
+										setError('');
+									}}
+									className={`px-3 py-2 rounded whitespace-nowrap ${
+										tab === t
+											? 'bg-gray-800 text-white'
+											: 'text-gray-300 hover:bg-gray-800/40'
+									}`}
+									aria-pressed={tab === t}
+								>
+									{t === 'partners' && 'Partners'}
+									{t === 'speakers' && 'Speakers'}
+									{t === 'resources' && 'Resources'}
+									{t === 'coOrganizers' && 'Co-organizers'}
+									{t === 'posters' && 'Posters'}
+								</button>
+							))}
+						</div>
+					</div>
+
 					{/* content */}
-					<div className="flex-1 p-4 min-h-[300px]">
+					<div className="flex-1 p-4 min-h-[300px] max-h-[70vh] overflow-y-auto">
 						{error && <div className="mb-3 text-sm text-red-400">{error}</div>}
 
 						{tab === 'partners' && (
@@ -315,7 +382,7 @@ const ManageModal = ({ open = true, event, onClose, onDone, setParentError }) =>
 									)}
 									{partners.map((p, i) => (
 										<div
-											key={i}
+											key={p._id || p.name || i}
 											className="flex items-center justify-between bg-gray-800 rounded p-2"
 										>
 											<div className="flex items-center gap-3">
@@ -323,7 +390,7 @@ const ManageModal = ({ open = true, event, onClose, onDone, setParentError }) =>
 													{p.logo?.url ? (
 														<img
 															src={p.logo.url}
-															alt={p.name}
+															alt={p.name || 'partner logo'}
 															className="object-cover w-full h-full"
 														/>
 													) : (
@@ -334,17 +401,18 @@ const ManageModal = ({ open = true, event, onClose, onDone, setParentError }) =>
 														</span>
 													)}
 												</div>
-												<div>
-													<div className="font-medium text-white">
+												<div className="min-w-0">
+													<div className="font-medium text-white truncate">
 														{p.name}
 													</div>
-													<div className="text-xs text-gray-400">
+													<div className="text-xs text-gray-400 truncate">
 														{p.website || p.tier || ''}
 													</div>
 												</div>
 											</div>
 											<div className="flex items-center gap-2">
 												<button
+													type="button"
 													onClick={() =>
 														handleRemovePartner(
 															p.logo?.publicId ||
@@ -353,6 +421,7 @@ const ManageModal = ({ open = true, event, onClose, onDone, setParentError }) =>
 														)
 													}
 													className="text-red-400 p-1"
+													aria-label={`Remove partner ${p.name}`}
 												>
 													<Trash2 className="h-4 w-4" />
 												</button>
@@ -369,7 +438,8 @@ const ManageModal = ({ open = true, event, onClose, onDone, setParentError }) =>
 										onChange={(e) =>
 											setPartnerForm((v) => ({ ...v, name: e.target.value }))
 										}
-										className="px-3 py-2 bg-gray-800 rounded"
+										className="px-3 py-2 bg-gray-800 rounded w-full"
+										aria-label="Partner name"
 									/>
 									<input
 										placeholder="Website"
@@ -380,7 +450,8 @@ const ManageModal = ({ open = true, event, onClose, onDone, setParentError }) =>
 												website: e.target.value,
 											}))
 										}
-										className="px-3 py-2 bg-gray-800 rounded"
+										className="px-3 py-2 bg-gray-800 rounded w-full"
+										aria-label="Partner website"
 									/>
 									<div className="flex items-center gap-2">
 										<input
@@ -389,14 +460,18 @@ const ManageModal = ({ open = true, event, onClose, onDone, setParentError }) =>
 											onChange={(e) =>
 												setPartnerForm((v) => ({
 													...v,
-													logo: e.target.files?.[0] || null,
+													logo: e?.target?.files?.[0] || null,
 												}))
 											}
+											className="text-sm"
+											aria-label="Partner logo"
 										/>
 										<button
+											type="button"
 											onClick={handleAddPartner}
 											disabled={loading}
 											className="px-3 py-2 bg-blue-600 rounded text-white"
+											aria-label="Add partner"
 										>
 											<Plus className="inline-block mr-2 h-4 w-4" /> Add
 										</button>
@@ -412,7 +487,7 @@ const ManageModal = ({ open = true, event, onClose, onDone, setParentError }) =>
 								)}
 								{speakers.map((s, idx) => (
 									<div
-										key={idx}
+										key={s._id || s.name || idx}
 										className="flex items-center justify-between bg-gray-800 rounded p-2"
 									>
 										<div className="flex items-center gap-3">
@@ -421,25 +496,27 @@ const ManageModal = ({ open = true, event, onClose, onDone, setParentError }) =>
 													<img
 														src={s.photo.url}
 														className="object-cover w-full h-full"
-														alt={s.name}
+														alt={s.name || 'speaker photo'}
 													/>
 												) : (
 													<User className="h-4 w-4 text-gray-300" />
 												)}
 											</div>
-											<div>
-												<div className="font-medium text-white">
+											<div className="min-w-0">
+												<div className="font-medium text-white truncate">
 													{s.name}
 												</div>
-												<div className="text-xs text-gray-400">
+												<div className="text-xs text-gray-400 truncate">
 													{s.title}
 												</div>
 											</div>
 										</div>
 										<div>
 											<button
+												type="button"
 												onClick={() => handleRemoveSpeaker(idx)}
 												className="text-red-400 p-1"
+												aria-label={`Remove speaker ${s.name}`}
 											>
 												<Trash2 className="h-4 w-4" />
 											</button>
@@ -453,7 +530,8 @@ const ManageModal = ({ open = true, event, onClose, onDone, setParentError }) =>
 										onChange={(e) =>
 											setSpeakerForm((v) => ({ ...v, name: e.target.value }))
 										}
-										className="px-3 py-2 bg-gray-800 rounded"
+										className="px-3 py-2 bg-gray-800 rounded w-full"
+										aria-label="Speaker name"
 									/>
 									<input
 										placeholder="Title"
@@ -461,7 +539,8 @@ const ManageModal = ({ open = true, event, onClose, onDone, setParentError }) =>
 										onChange={(e) =>
 											setSpeakerForm((v) => ({ ...v, title: e.target.value }))
 										}
-										className="px-3 py-2 bg-gray-800 rounded"
+										className="px-3 py-2 bg-gray-800 rounded w-full"
+										aria-label="Speaker title"
 									/>
 									<input
 										placeholder="Bio"
@@ -469,7 +548,8 @@ const ManageModal = ({ open = true, event, onClose, onDone, setParentError }) =>
 										onChange={(e) =>
 											setSpeakerForm((v) => ({ ...v, bio: e.target.value }))
 										}
-										className="px-3 py-2 bg-gray-800 rounded"
+										className="px-3 py-2 bg-gray-800 rounded w-full"
+										aria-label="Speaker bio"
 									/>
 									<div className="flex items-center gap-2">
 										<input
@@ -478,14 +558,18 @@ const ManageModal = ({ open = true, event, onClose, onDone, setParentError }) =>
 											onChange={(e) =>
 												setSpeakerForm((v) => ({
 													...v,
-													photo: e.target.files?.[0] || null,
+													photo: e?.target?.files?.[0] || null,
 												}))
 											}
+											className="text-sm"
+											aria-label="Speaker photo"
 										/>
 										<button
+											type="button"
 											onClick={handleAddSpeaker}
 											disabled={loading}
 											className="px-3 py-2 bg-blue-600 rounded text-white"
+											aria-label="Add speaker"
 										>
 											<Plus className="inline-block mr-2 h-4 w-4" /> Add
 										</button>
@@ -501,19 +585,23 @@ const ManageModal = ({ open = true, event, onClose, onDone, setParentError }) =>
 								)}
 								{resources.map((r, idx) => (
 									<div
-										key={idx}
+										key={r.title || r.url || idx}
 										className="flex items-center justify-between bg-gray-800 rounded p-2"
 									>
-										<div>
-											<div className="font-medium text-white">{r.title}</div>
+										<div className="min-w-0">
+											<div className="font-medium text-white truncate">
+												{r.title}
+											</div>
 											<div className="text-xs text-gray-400 truncate">
 												{r.url}
 											</div>
 										</div>
 										<div>
 											<button
+												type="button"
 												onClick={() => handleRemoveResource(idx)}
 												className="text-red-400 p-1"
+												aria-label={`Remove resource ${r.title}`}
 											>
 												<Trash2 className="h-4 w-4" />
 											</button>
@@ -530,7 +618,8 @@ const ManageModal = ({ open = true, event, onClose, onDone, setParentError }) =>
 												title: e.target.value,
 											}))
 										}
-										className="px-3 py-2 bg-gray-800 rounded"
+										className="px-3 py-2 bg-gray-800 rounded w-full"
+										aria-label="Resource title"
 									/>
 									<input
 										placeholder="URL"
@@ -538,12 +627,15 @@ const ManageModal = ({ open = true, event, onClose, onDone, setParentError }) =>
 										onChange={(e) =>
 											setResourceForm((v) => ({ ...v, url: e.target.value }))
 										}
-										className="px-3 py-2 bg-gray-800 rounded"
+										className="px-3 py-2 bg-gray-800 rounded w-full"
+										aria-label="Resource url"
 									/>
 									<button
+										type="button"
 										onClick={handleAddResource}
 										disabled={loading}
 										className="px-3 py-2 bg-blue-600 rounded text-white"
+										aria-label="Add resource"
 									>
 										<Plus className="inline-block mr-2 h-4 w-4" /> Add
 									</button>
@@ -558,20 +650,24 @@ const ManageModal = ({ open = true, event, onClose, onDone, setParentError }) =>
 								)}
 								{coOrganizers.map((c, idx) => (
 									<div
-										key={idx}
+										key={`${c}-${idx}`}
 										className="flex items-center justify-between bg-gray-800 rounded p-2"
 									>
-										<div className="text-white">{c}</div>
+										<div className="text-white truncate">{c}</div>
 										<div className="flex gap-2">
 											<button
+												type="button"
 												onClick={() => handleRemoveCoIndex(idx)}
 												className="text-red-400 p-1"
+												aria-label={`Remove co-organizer ${c}`}
 											>
 												<Trash2 className="h-4 w-4" />
 											</button>
 											<button
+												type="button"
 												onClick={() => handleRemoveCoName(c)}
 												className="text-yellow-400 p-1"
+												aria-label={`Remove co-organizer by name ${c}`}
 											>
 												Remove by name
 											</button>
@@ -584,11 +680,14 @@ const ManageModal = ({ open = true, event, onClose, onDone, setParentError }) =>
 										value={coName}
 										onChange={(e) => setCoName(e.target.value)}
 										className="px-3 py-2 bg-gray-800 rounded flex-1"
+										aria-label="Co-organizer name"
 									/>
 									<button
+										type="button"
 										onClick={handleAddCo}
 										disabled={loading}
 										className="px-3 py-2 bg-blue-600 rounded text-white"
+										aria-label="Add co-organizer"
 									>
 										<Plus className="inline-block mr-2 h-4 w-4" /> Add
 									</button>
@@ -604,7 +703,7 @@ const ManageModal = ({ open = true, event, onClose, onDone, setParentError }) =>
 								<div className="flex gap-2 flex-wrap">
 									{posters.map((p, idx) => (
 										<div
-											key={idx}
+											key={p.publicId || p.public_id || idx}
 											className="w-32 bg-gray-800 rounded overflow-hidden p-1"
 										>
 											{p.url ? (
@@ -621,12 +720,14 @@ const ManageModal = ({ open = true, event, onClose, onDone, setParentError }) =>
 													{p.caption || ''}
 												</div>
 												<button
+													type="button"
 													onClick={() =>
 														handleRemovePoster(
 															p.publicId || p.public_id
 														)
 													}
 													className="text-red-400 p-1"
+													aria-label="Remove poster"
 												>
 													<Trash2 className="h-4 w-4" />
 												</button>
@@ -638,12 +739,18 @@ const ManageModal = ({ open = true, event, onClose, onDone, setParentError }) =>
 									<input
 										type="file"
 										accept="image/*"
-										onChange={(e) => setPosterFile(e.target.files?.[0] || null)}
+										onChange={(e) =>
+											setPosterFile(e?.target?.files?.[0] || null)
+										}
+										className="text-sm"
+										aria-label="Poster file"
 									/>
 									<button
+										type="button"
 										onClick={handleAddPoster}
 										disabled={loading}
 										className="px-3 py-2 bg-blue-600 rounded text-white"
+										aria-label="Add poster"
 									>
 										<Plus className="inline-block mr-2 h-4 w-4" /> Add
 									</button>
