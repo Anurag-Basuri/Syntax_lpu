@@ -19,6 +19,7 @@ const findEventById = async (id) => {
 
 // Create a new event
 const createEvent = asyncHandler(async (req, res) => {
+	// Normalize-safe extraction
 	const {
 		title,
 		description,
@@ -31,90 +32,92 @@ const createEvent = asyncHandler(async (req, res) => {
 		ticketPrice = 0,
 		registrationOpenDate,
 		registrationCloseDate,
+		registration,
 	} = req.body;
 
-	// Defensive check (multer should populate req.files)
-	if (!req.files?.length) {
-		throw ApiError.BadRequest('At least one event poster is required.');
+	// parse eventDate safely
+	const eventDate = eventDateRaw ? new Date(eventDateRaw) : null;
+	if (!eventDate || Number.isNaN(eventDate.getTime())) {
+		return ApiResponse.error(res, 'Invalid or missing eventDate', 400);
 	}
 
-	// Upload posters
-	const uploaded = await Promise.all(
-		req.files.map((file) => uploadFile(file, { folder: 'events/posters' }))
-	);
-	// Normalize uploaded poster shape (some utils return different keys)
-	const uploadedPosters = uploaded.map((u) => ({
-		url: u.url || u.secure_url || '',
-		publicId: u.publicId || u.public_id || u.public_id,
-		resource_type: u.resource_type || 'image',
-	}));
+	// handle upload results (req.files optional)
+	const uploadedPosters =
+		Array.isArray(req.files) && req.files.length
+			? await Promise.all(
+					req.files.map(async (file) => {
+						// existing upload utility (may return different keys)
+						const u = await uploadFile(file, { folder: 'events/posters' });
+						return {
+							url: u.secure_url || u.url || u.publicUrl || '',
+							publicId: u.public_id || u.publicId || u.publicId,
+						};
+					})
+				)
+			: [];
 
-	// allow tags as CSV string or array (normalize)
-	const normalizedTags =
-		typeof tags === 'string'
+	// normalize tags to array
+	const normalizedTags = Array.isArray(tags)
+		? tags.map((t) => String(t).trim()).filter(Boolean)
+		: typeof tags === 'string'
 			? tags
 					.split(',')
 					.map((t) => t.trim())
 					.filter(Boolean)
-			: Array.isArray(tags)
-				? tags.map((t) => String(t).trim()).filter(Boolean)
-				: [];
+			: [];
 
-	// Build registration object from incoming payload (support both nested and flat inputs)
-	const regMode =
-		(req.body.registration && req.body.registration.mode) ||
-		req.body.registrationMode ||
-		req.body.mode ||
-		'internal';
+	// Normalize registration object
+	const registrationObj = registration && typeof registration === 'object' ? registration : {};
+	const regMode = registrationObj.mode || req.body.registrationMode || 'internal';
+	const regExternalUrl =
+		registrationObj.externalUrl ||
+		req.body.registrationExternalUrl ||
+		req.body.externalUrl ||
+		null;
 
-	const registration = {
-		mode: regMode,
-		externalUrl:
-			(req.body.registration && req.body.registration.externalUrl) ||
-			req.body.registrationExternalUrl ||
-			req.body.externalUrl ||
-			null,
-		allowGuests:
-			typeof (req.body.registration && req.body.registration.allowGuests) !== 'undefined'
-				? req.body.registration.allowGuests
-				: typeof req.body.allowGuests !== 'undefined'
-					? req.body.allowGuests
-					: true,
-		capacityOverride:
-			(req.body.registration && req.body.registration.capacityOverride) ||
-			req.body.capacityOverride ||
-			undefined,
-	};
-
-	// server-side validation for external mode
-	if (registration.mode === 'external' && !registration.externalUrl) {
-		throw ApiError.BadRequest('externalUrl is required when registration.mode is "external".');
+	// Validate external registration requirement
+	if (regMode === 'external' && !regExternalUrl) {
+		return ApiResponse.error(
+			res,
+			'externalUrl is required when registration.mode is "external".',
+			400
+		);
 	}
 
-	// Prefer normalized eventDate field; allow date alias (controller-safe)
-	const finalEventDate = eventDateRaw || req.body.date;
-	if (!finalEventDate) {
-		throw ApiError.BadRequest('Event date is required.');
-	}
-
-	const newEvent = await Event.create({
+	// Build event document
+	const eventDoc = {
 		title: title?.trim(),
 		description: description?.trim(),
-		eventDate: new Date(finalEventDate),
+		eventDate,
 		venue: venue?.trim(),
-		organizer: organizer?.trim(),
+		organizer: organizer?.trim() || undefined,
 		category: category?.trim(),
 		posters: uploadedPosters,
 		tags: normalizedTags,
-		totalSpots: Number(totalSpots),
-		ticketPrice: Number(ticketPrice),
-		registrationOpenDate: registrationOpenDate ? new Date(registrationOpenDate) : null,
-		registrationCloseDate: registrationCloseDate ? new Date(registrationCloseDate) : null,
-		registeredUsers: [], // Explicit default
-		registration,
-	});
+		totalSpots: Number(totalSpots) || 0,
+		ticketPrice: Number(ticketPrice) || 0,
+		registrationOpenDate: registrationOpenDate ? new Date(registrationOpenDate) : undefined,
+		registrationCloseDate: registrationCloseDate ? new Date(registrationCloseDate) : undefined,
+		registration: {
+			mode: regMode,
+			externalUrl: regExternalUrl,
+			allowGuests:
+				typeof registrationObj.allowGuests !== 'undefined'
+					? registrationObj.allowGuests
+					: typeof req.body.allowGuests !== 'undefined'
+						? req.body.allowGuests
+						: true,
+			capacityOverride:
+				typeof registrationObj.capacityOverride !== 'undefined'
+					? registrationObj.capacityOverride
+					: req.body.capacityOverride,
+		},
+	};
 
-	return ApiResponse.success(res, newEvent, 'Event created successfully', 201);
+	// Create and save (let mongoose run validators / pre-save)
+	const created = await Event.create(eventDoc);
+
+	return ApiResponse.success(res, created, 'Event created successfully', 201);
 });
 
 // Get all events with filtering, sorting, and pagination
@@ -377,6 +380,16 @@ const getEventRegistrations = asyncHandler(async (req, res) => {
 	);
 });
 
+// --- Public API Endpoints ---
+
+// Get event details for public view (no auth required)
+const getPublicEventDetails = asyncHandler(async (req, res) => {
+	const event = await findEventById(req.params.id);
+	// Exclude sensitive fields for public view
+	const { registration, ...publicData } = event.toObject();
+	return ApiResponse.success(res, publicData, 'Event details retrieved successfully');
+});
+
 export {
 	createEvent,
 	getAllEvents,
@@ -387,4 +400,5 @@ export {
 	removeEventPoster,
 	getEventStats,
 	getEventRegistrations,
+	getPublicEventDetails,
 };
