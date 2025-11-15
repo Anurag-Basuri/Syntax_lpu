@@ -27,6 +27,16 @@ const EventModal = ({ isEdit, open, onClose, eventFields, setEventFields, onSubm
 		setTagsInput((eventFields.tags || []).join(', '));
 	}, [eventFields.tags, open]);
 
+	// Prevent background scrolling when modal is open and restore afterwards
+	useEffect(() => {
+		if (!open) return;
+		const previousOverflow = document.body.style.overflow;
+		document.body.style.overflow = 'hidden';
+		return () => {
+			document.body.style.overflow = previousOverflow || '';
+		};
+	}, [open]);
+
 	if (!open) return null;
 
 	// --- Handlers ---
@@ -125,14 +135,19 @@ const EventModal = ({ isEdit, open, onClose, eventFields, setEventFields, onSubm
 	// --- Dynamic Array Fields ---
 	const handleArrayChange = (field, idx, key, value) => {
 		const arr = [...(eventFields[field] || [])];
-		arr[idx][key] = value;
+		// support plain array of strings and array of objects
+		if (key === null) {
+			arr[idx] = value;
+		} else {
+			arr[idx] = { ...(arr[idx] || {}), [key]: value };
+		}
 		setEventFields((prev) => ({ ...prev, [field]: arr }));
 	};
 
 	const handleAddArrayItem = (field, template) => {
 		setEventFields((prev) => ({
 			...prev,
-			[field]: [...(prev[field] || []), { ...template }],
+			[field]: [...(prev[field] || []), template],
 		}));
 	};
 
@@ -151,8 +166,13 @@ const EventModal = ({ isEdit, open, onClose, eventFields, setEventFields, onSubm
 	];
 
 	return (
-		<div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm">
-			<div className="w-full max-w-3xl bg-gray-800 rounded-xl border border-gray-700 shadow-2xl overflow-hidden">
+		<div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm">
+			{/* Ensure modal container is above everything (z higher than overlay) */}
+			<div
+				className="w-full max-w-3xl bg-gray-800 rounded-xl border border-gray-700 shadow-2xl overflow-hidden relative z-[10000]"
+				role="dialog"
+				aria-modal="true"
+			>
 				<div className="flex justify-between items-center p-4 border-b border-gray-700">
 					<h3 className="text-lg font-semibold text-white">
 						{isEdit ? 'Edit Event' : 'Create New Event'}
@@ -183,7 +203,14 @@ const EventModal = ({ isEdit, open, onClose, eventFields, setEventFields, onSubm
 					))}
 				</div>
 
-				<div className="p-6 overflow-y-auto max-h-[70vh]">
+				{/* Scrollable content: capture wheel/touch to avoid outer scroll handlers (e.g., Lenis) */}
+				<div
+					className="p-6 overflow-y-auto max-h-[85vh] -webkit-overflow-scrolling-touch overscroll-contain"
+					onWheel={(e) => e.stopPropagation()}
+					onTouchMove={(e) => e.stopPropagation()}
+					onTouchStart={(e) => e.stopPropagation()}
+					tabIndex={-1}
+				>
 					{localError && (
 						<div className="bg-red-900/20 border border-red-700 rounded-lg p-2 mb-4 text-red-300 text-sm">
 							{localError}
