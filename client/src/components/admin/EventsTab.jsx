@@ -103,6 +103,14 @@ const EventsTab = ({
 		if (!fields.location || fields.location.trim().length < 2) {
 			return 'Location is required.';
 		}
+		// new: organizer required (server validates this)
+		if (!fields.organizer || fields.organizer.trim().length < 2) {
+			return 'Organizer is required (min 2 characters).';
+		}
+		// new: description required (server validates this)
+		if (!fields.description || fields.description.trim().length < 10) {
+			return 'Description is required (min 10 characters).';
+		}
 		return '';
 	};
 
@@ -170,7 +178,24 @@ const EventsTab = ({
 			return;
 		}
 		try {
-			await updateEvent(editEventId, eventFields);
+			// Map frontend names to backend expected fields
+			const updatePayload = {
+				title: eventFields.title?.trim(),
+				description: eventFields.description?.trim(),
+				eventDate: eventFields.date ? new Date(eventFields.date).toISOString() : undefined,
+				venue: eventFields.location?.trim(),
+				organizer: eventFields.organizer?.trim(),
+				category: eventFields.category?.trim(),
+				status: eventFields.status,
+			};
+			// optional numeric fields
+			if (typeof eventFields.totalSpots !== 'undefined')
+				updatePayload.totalSpots = Number(eventFields.totalSpots);
+			if (typeof eventFields.ticketPrice !== 'undefined')
+				updatePayload.ticketPrice = Number(eventFields.ticketPrice);
+			if (eventFields.tags) updatePayload.tags = eventFields.tags;
+
+			await updateEvent(editEventId, updatePayload);
 			resetForm();
 			setShowEditEvent(false);
 			setEditEventId(null);
@@ -200,11 +225,16 @@ const EventsTab = ({
 		setEditEventId(event._id);
 		setEventFields({
 			title: event.title || '',
-			// convert to local datetime-local input format (yyyy-mm-ddThh:mm)
-			date: event.date ? new Date(event.date).toISOString().slice(0, 16) : '',
-			location: event.location || '',
+			// prefer event.eventDate, fallback to event.date
+			date:
+				event.eventDate || event.date
+					? new Date(event.eventDate || event.date).toISOString().slice(0, 16)
+					: '',
+			location: event.venue || event.location || '',
 			description: event.description || '',
 			status: event.status || 'upcoming',
+			organizer: event.organizer || '',
+			category: event.category || '',
 		});
 		setFormError('');
 		setActionError('');

@@ -57,7 +57,6 @@ const EventSchema = new mongoose.Schema(
 			required: [true, 'Organizer is required'],
 			trim: true,
 			default: 'Syntax Organization',
-			minlength: [2, 'Organizer must be at least 2 characters'],
 			maxlength: [100, 'Organizer cannot exceed 100 characters'],
 		},
 		category: {
