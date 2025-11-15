@@ -16,6 +16,7 @@ import ErrorMessage from './ErrorMessage.jsx';
 import EventModal from './EventModal.jsx';
 import EventCard from './EventCard.jsx';
 import { useTheme } from '../../hooks/useTheme.js';
+import formatApiError from '../../utils/formatApiError.js';
 
 // Converts a Date/string to <input type="datetime-local"> value
 const toDatetimeLocalInput = (value) => {
@@ -50,13 +51,6 @@ const statusOptions = [
 	{ value: 'cancelled', label: 'Cancelled' },
 	{ value: 'postponed', label: 'Postponed' },
 ];
-
-const formatApiError = (err) => {
-	if (!err) return 'Unknown error';
-	return (
-		err?.response?.data?.message || err?.response?.data?.error || err?.message || String(err)
-	);
-};
 
 const initialEventFields = {
 	title: '',

@@ -1,8 +1,37 @@
 const ErrorMessage = ({ error }) => {
 	if (!error) return null;
 
-	// Accept either string or Error-like object
-	const message = typeof error === 'string' ? error : error?.message || JSON.stringify(error);
+	// If it's an axios error, extract structured info
+	const res = error?.response;
+	let title = null;
+	let details = null;
+
+	if (res) {
+		const status = res.status;
+		const data = res.data || {};
+		const serverMessage =
+			data.message || data.error || (typeof data === 'string' ? data : null);
+		title = serverMessage ? `(${status}) ${serverMessage}` : `Server error (${status})`;
+
+		if (Array.isArray(data.errors) && data.errors.length) {
+			details = data.errors.map((e, i) => e.msg || e.message || JSON.stringify(e)).join('; ');
+		} else if (data.validation) {
+			details =
+				typeof data.validation === 'string'
+					? data.validation
+					: JSON.stringify(data.validation);
+		} else if (data.details) {
+			details = JSON.stringify(data.details);
+		} else if (data.error && typeof data.error === 'object') {
+			details = JSON.stringify(data.error);
+		} else if (!serverMessage && data) {
+			// fallback to any body content
+			details = typeof data === 'string' ? data : JSON.stringify(data);
+		}
+	} else {
+		// non-axios error
+		title = typeof error === 'string' ? error : error?.message || JSON.stringify(error);
+	}
 
 	return (
 		<div
@@ -21,7 +50,10 @@ const ErrorMessage = ({ error }) => {
 					clipRule="evenodd"
 				/>
 			</svg>
-			<div className="text-sm">{message}</div>
+			<div className="text-sm">
+				<div className="font-semibold">{title}</div>
+				{details && <div className="mt-1 text-xs text-red-600">{details}</div>}
+			</div>
 		</div>
 	);
 };
