@@ -25,8 +25,11 @@ const ImageLightbox = ({ image, onClose, onPrev, onNext }) => {
 			aria-modal="true"
 			role="dialog"
 			aria-label={image?.caption || 'Image preview'}
-			style={{ background: 'rgba(0,0,0,0.8)' }}
+			style={{ background: 'transparent' }}
 		>
+			{/* glass backdrop to keep page background visible while focusing the image */}
+			<div className="absolute inset-0" style={{ background: 'rgba(0,0,0,0.6)' }} />
+
 			<div className="relative max-w-6xl w-full max-h-[90vh]">
 				<button onClick={onClose} className="absolute top-3 right-3 p-2 rounded-md" style={{ background: 'rgba(255,255,255,0.06)', color: 'var(--text-primary)' }}>
 					<X size={18} />

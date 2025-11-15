@@ -29,7 +29,7 @@ const GalleryGrid = ({ gallery = [], onImageClick }) => {
 							loading="lazy"
 							className="w-full h-auto object-cover transition-transform duration-400 transform group-hover:scale-105"
 						/>
-						<div className="absolute inset-0 flex items-center justify-center" style={{ background: 'rgba(0,0,0,0.18)', opacity: 0, transition: 'opacity 200ms' }}>
+						<div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity" style={{ background: 'rgba(0,0,0,0.18)' }}>
 							<Eye className="text-white" size={34} aria-hidden />
 						</div>
 					</motion.button>
