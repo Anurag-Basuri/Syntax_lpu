@@ -1,5 +1,15 @@
-import { useState, useMemo, useEffect } from 'react';
-import { CalendarDays, Plus, Search, ChevronDown, AlertCircle } from 'lucide-react';
+import { useState, useMemo, useEffect, useRef } from 'react';
+import {
+	CalendarDays,
+	Plus,
+	Search,
+	ChevronDown,
+	AlertCircle,
+	Filter,
+	RefreshCw,
+	Grid,
+	List,
+} from 'lucide-react';
 import { useCreateEvent, useUpdateEvent, useDeleteEvent } from '../../hooks/useEvents.js';
 import LoadingSpinner from './LoadingSpinner.jsx';
 import ErrorMessage from './ErrorMessage.jsx';
@@ -82,23 +92,35 @@ const EventsTab = ({
 	const { theme } = useTheme();
 	const isDark = theme === 'dark';
 
-	const panelClass = isDark
-		? 'bg-gray-800/50 rounded-xl p-4 border border-gray-700'
-		: 'bg-white rounded-xl p-4 border border-gray-200';
+	// Visual state
+	const [viewMode, setViewMode] = useState('grid'); // 'grid' | 'list'
+	const [compactCards, setCompactCards] = useState(false);
 
+	// Modal & form
 	const [showCreateEvent, setShowCreateEvent] = useState(false);
 	const [showEditEvent, setShowEditEvent] = useState(false);
 	const [eventFields, setEventFields] = useState(initialEventFields);
 	const [editEventId, setEditEventId] = useState(null);
+
+	// Filters & search
 	const [searchTerm, setSearchTerm] = useState('');
+	const [debouncedSearch, setDebouncedSearch] = useState('');
 	const [statusFilter, setStatusFilter] = useState('all');
+	const [sortBy, setSortBy] = useState('eventDate');
+	const [sortOrder, setSortOrder] = useState('asc');
+
+	// UI/errors
 	const [formError, setFormError] = useState('');
 	const [actionError, setActionError] = useState('');
+	const [isFilteringOpen, setIsFilteringOpen] = useState(false);
+
+	const searchTimer = useRef(null);
 
 	const { createEvent, loading: createLoading } = useCreateEvent();
 	const { updateEvent, loading: updateLoading } = useUpdateEvent();
 	const { deleteEvent, loading: deleteLoading } = useDeleteEvent();
 
+	// sync API errors
 	useEffect(() => {
 		if (eventsError) {
 			const msg = formatApiError(eventsError);
@@ -107,25 +129,74 @@ const EventsTab = ({
 		}
 	}, [eventsError, setDashboardError]);
 
+	// debounce search for better UX
+	useEffect(() => {
+		if (searchTimer.current) clearTimeout(searchTimer.current);
+		searchTimer.current = setTimeout(() => {
+			setDebouncedSearch(searchTerm.trim().toLowerCase());
+		}, 300);
+		return () => {
+			if (searchTimer.current) clearTimeout(searchTimer.current);
+		};
+	}, [searchTerm]);
+
+	// counts
 	const totalCount = (events || []).length;
 	const upcomingCount = (events || []).filter((e) => e.status === 'upcoming').length;
 
+	// improved filtering + sorting
 	const filteredEvents = useMemo(() => {
-		const q = (searchTerm || '').trim().toLowerCase();
-		return (events || [])
-			.filter((event) => {
-				if (!q) return true;
+		const q = debouncedSearch || '';
+		let list = Array.isArray(events) ? events.slice() : [];
+
+		// search across multiple fields
+		if (q) {
+			list = list.filter((event) => {
 				const title = (event.title || '').toLowerCase();
 				const location = (event.venue || event.location || '').toLowerCase();
 				const description = (event.description || '').toLowerCase();
-				return title.includes(q) || location.includes(q) || description.includes(q);
-			})
-			.filter((event) => (statusFilter === 'all' ? true : event.status === statusFilter));
-	}, [events, searchTerm, statusFilter]);
+				const organizer = (event.organizer || '').toLowerCase();
+				const tags = (event.tags || []).join(',').toLowerCase();
+				return (
+					title.includes(q) ||
+					location.includes(q) ||
+					description.includes(q) ||
+					organizer.includes(q) ||
+					tags.includes(q)
+				);
+			});
+		}
 
+		// status
+		if (statusFilter !== 'all') {
+			list = list.filter((e) => e.status === statusFilter);
+		}
+
+		// sort
+		list.sort((a, b) => {
+			const aVal = a[sortBy];
+			const bVal = b[sortBy];
+			if (sortBy === 'eventDate') {
+				const da = new Date(aVal || a.eventDate || a.date || 0).getTime();
+				const db = new Date(bVal || b.eventDate || b.date || 0).getTime();
+				return sortOrder === 'asc' ? da - db : db - da;
+			}
+			// fallback string compare
+			const sa = String(aVal ?? '').toLowerCase();
+			const sb = String(bVal ?? '').toLowerCase();
+			if (sa < sb) return sortOrder === 'asc' ? -1 : 1;
+			if (sa > sb) return sortOrder === 'asc' ? 1 : -1;
+			return 0;
+		});
+
+		return list;
+	}, [events, debouncedSearch, statusFilter, sortBy, sortOrder]);
+
+	// reset form
 	const resetForm = () => setEventFields(initialEventFields);
 
-	const validateFields = (fields) => {
+	// validation (kept same but robust)
+	const validateFields = (fields, forEdit = false) => {
 		if (!fields.title || fields.title.trim().length < 3)
 			return 'Title is required (min 3 characters).';
 		if (!fields.date) return 'Date & time are required.';
@@ -139,17 +210,18 @@ const EventsTab = ({
 		if (!fields.category || fields.category.trim().length < 2) return 'Category is required.';
 		if (!fields.description || fields.description.trim().length < 10)
 			return 'Description is required (min 10 characters).';
-		if (!showEditEvent && (!fields.posters || !fields.posters.length))
+		if (!forEdit && (!fields.posters || !fields.posters.length))
 			return 'At least one poster image is required.';
 		if (fields.registrationMode === 'external' && !fields.externalUrl)
 			return 'External registration URL is required for external mode.';
 		return '';
 	};
 
+	// create
 	const handleCreateEvent = async () => {
 		setFormError('');
 		setActionError('');
-		const validation = validateFields(eventFields);
+		const validation = validateFields(eventFields, false);
 		if (validation) {
 			setFormError(validation);
 			return;
@@ -178,7 +250,7 @@ const EventsTab = ({
 				else fd.append('tags', String(eventFields.tags));
 			}
 
-			for (const file of eventFields.posters) {
+			for (const file of eventFields.posters || []) {
 				fd.append('posters', file);
 			}
 
@@ -210,10 +282,11 @@ const EventsTab = ({
 		}
 	};
 
+	// edit
 	const handleEditEvent = async () => {
 		setFormError('');
 		setActionError('');
-		const validation = validateFields(eventFields);
+		const validation = validateFields(eventFields, true);
 		if (validation) {
 			setFormError(validation);
 			return;
@@ -316,16 +389,16 @@ const EventsTab = ({
 		setShowEditEvent(true);
 	};
 
+	// small responsive helpers
+	const isEmpty = !eventsLoading && filteredEvents.length === 0;
+
 	return (
 		<div className="space-y-6">
-			{/* Header */}
+			{/* Top bar */}
 			<div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
 				<div className="flex items-start gap-4">
-					<h2 className="text-2xl font-bold text-white flex items-center gap-3">
-						Event Management
-						<span className="text-sm text-gray-400 font-medium">({totalCount})</span>
-					</h2>
-					<div className="hidden md:flex items-center gap-3 text-sm text-gray-300">
+					<h2 className="text-2xl font-semibold text-white">Events</h2>
+					<div className="hidden sm:flex items-center gap-2 text-sm text-gray-300">
 						<span className="px-2 py-1 bg-blue-700/20 text-blue-300 rounded-full">
 							{upcomingCount} upcoming
 						</span>
@@ -334,49 +407,110 @@ const EventsTab = ({
 						</span>
 					</div>
 				</div>
-				<div className="flex gap-2 w-full md:w-auto">
-					<div className="relative w-full md:w-64">
-						<Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
-						<input
-							type="text"
-							placeholder="Search events by title, location or description..."
-							className="w-full pl-10 pr-4 py-2 bg-gray-700/50 border border-gray-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-							value={searchTerm}
-							onChange={(e) => setSearchTerm(e.target.value)}
-							aria-label="Search events"
-						/>
+
+				{/* controls */}
+				<div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 w-full md:w-auto">
+					{/* search */}
+					<div className="flex items-center gap-2 w-full sm:w-72">
+						<div className="relative flex-1">
+							<Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+							<input
+								type="search"
+								placeholder="Search events, organizers, tags..."
+								value={searchTerm}
+								onChange={(e) => setSearchTerm(e.target.value)}
+								className="w-full pl-10 pr-3 py-2 rounded-lg bg-gray-700/10 border border-gray-200 dark:bg-gray-800/40 dark:border-gray-700 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+								aria-label="Search events"
+							/>
+						</div>
+						<button
+							onClick={() => {
+								// quick refresh
+								getAllEvents?.();
+							}}
+							title="Refresh"
+							className="p-2 rounded-lg bg-gray-700/30 hover:bg-gray-700/40 text-gray-200"
+						>
+							<RefreshCw className="h-4 w-4" />
+						</button>
 					</div>
-					<div className="relative">
+
+					{/* filter / sort / view */}
+					<div className="flex items-center gap-2">
+						{/* status */}
 						<select
-							className="appearance-none bg-gray-700/50 border border-gray-600 rounded-lg pl-4 pr-10 py-2 text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
 							value={statusFilter}
 							onChange={(e) => setStatusFilter(e.target.value)}
-							aria-label="Filter by status"
+							className="appearance-none bg-gray-700/10 border border-gray-200 dark:bg-gray-800/40 dark:border-gray-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
 						>
-							{statusOptions.map((opt) => (
-								<option key={opt.value} value={opt.value}>
-									{opt.label}
+							{statusOptions.map((o) => (
+								<option key={o.value} value={o.value}>
+									{o.label}
 								</option>
 							))}
 						</select>
-						<ChevronDown className="absolute right-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400 pointer-events-none" />
+
+						{/* sort */}
+						<div className="relative">
+							<select
+								value={`${sortBy}:${sortOrder}`}
+								onChange={(e) => {
+									const [sBy, sOrder] = e.target.value.split(':');
+									setSortBy(sBy);
+									setSortOrder(sOrder);
+								}}
+								className="appearance-none bg-gray-700/10 border border-gray-200 dark:bg-gray-800/40 dark:border-gray-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+								aria-label="Sort by"
+							>
+								<option value="eventDate:asc">Date ↑</option>
+								<option value="eventDate:desc">Date ↓</option>
+								<option value="title:asc">Title A→Z</option>
+								<option value="title:desc">Title Z→A</option>
+							</select>
+							<ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 h-4 w-4 pointer-events-none" />
+						</div>
+
+						{/* view toggle */}
+						<div className="flex items-center gap-1 bg-gray-700/10 rounded-lg p-1">
+							<button
+								className={`p-2 rounded ${
+									viewMode === 'grid' ? 'bg-blue-600 text-white' : 'text-gray-300'
+								}`}
+								onClick={() => setViewMode('grid')}
+								aria-label="Grid view"
+							>
+								<Grid className="h-4 w-4" />
+							</button>
+							<button
+								className={`p-2 rounded ${
+									viewMode === 'list' ? 'bg-blue-600 text-white' : 'text-gray-300'
+								}`}
+								onClick={() => setViewMode('list')}
+								aria-label="List view"
+							>
+								<List className="h-4 w-4" />
+							</button>
+						</div>
+
+						{/* create */}
+						<button
+							className="flex items-center gap-2 px-3 py-2 rounded-lg bg-blue-600 hover:bg-blue-500 text-white"
+							onClick={() => {
+								resetForm();
+								setFormError('');
+								setActionError('');
+								setShowCreateEvent(true);
+							}}
+							disabled={createLoading || updateLoading}
+						>
+							<Plus className="h-4 w-4" />
+							<span className="hidden sm:inline">Create</span>
+						</button>
 					</div>
-					<button
-						className="flex items-center gap-2 px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-500 transition disabled:opacity-60"
-						onClick={() => {
-							resetForm();
-							setFormError('');
-							setActionError('');
-							setShowCreateEvent(true);
-						}}
-						disabled={createLoading || updateLoading}
-						title="Create event"
-					>
-						<Plus className="h-5 w-5" />
-						Create Event
-					</button>
 				</div>
 			</div>
+
+			{/* errors */}
 			{(formError || actionError) && (
 				<div
 					className={`${
@@ -389,28 +523,23 @@ const EventsTab = ({
 					<div className="text-sm">{formError || actionError}</div>
 				</div>
 			)}
+
 			<ErrorMessage error={eventsError ? formatApiError(eventsError) : null} />
+
+			{/* content */}
 			{eventsLoading ? (
-				<LoadingSpinner />
-			) : filteredEvents.length === 0 ? (
-				<div className={`${panelClass} text-center py-12 rounded-xl`}>
-					<CalendarDays className="h-12 w-12 mx-auto text-gray-500" />
-					<h3
-						className={`${
-							isDark ? 'text-gray-300' : 'text-gray-700'
-						} text-xl font-bold mt-4`}
-					>
-						No events found
-					</h3>
-					<p className={`${isDark ? 'text-gray-400' : 'text-gray-500'} mt-2`}>
-						Create your first event to get started.
+				<div className="rounded-xl p-6 bg-gray-800/40">
+					<LoadingSpinner size="lg" />
+				</div>
+			) : isEmpty ? (
+				<div className="rounded-xl p-8 text-center bg-transparent border border-dashed border-gray-700">
+					<CalendarDays className="h-12 w-12 mx-auto text-gray-400" />
+					<h3 className="text-lg font-semibold text-white mt-4">No events found</h3>
+					<p className="text-sm text-gray-400 mt-2">
+						Use the Create button to add your first event.
 					</p>
 					<button
-						className={`${
-							isDark
-								? 'mt-6 inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-500 text-white'
-								: 'mt-6 inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-500 text-white'
-						}`}
+						className="mt-4 inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-500 text-white"
 						onClick={() => {
 							resetForm();
 							setShowCreateEvent(true);
@@ -420,19 +549,65 @@ const EventsTab = ({
 					</button>
 				</div>
 			) : (
-				<div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-					{filteredEvents.map((event) => (
-						<EventCard
-							key={event._id}
-							event={event}
-							onEdit={() => openEditEventModal(event)}
-							onDelete={() => handleDeleteEvent(event._id)}
-							deleteLoading={deleteLoading}
-							theme={theme}
-						/>
-					))}
-				</div>
+				<>
+					{viewMode === 'grid' ? (
+						<div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+							{filteredEvents.map((event) => (
+								<EventCard
+									key={event._id}
+									event={event}
+									compact={compactCards}
+									onEdit={() => openEditEventModal(event)}
+									onDelete={() => handleDeleteEvent(event._id)}
+									deleteLoading={deleteLoading}
+								/>
+							))}
+						</div>
+					) : (
+						<div className="space-y-4">
+							{filteredEvents.map((event) => (
+								<div
+									key={event._id}
+									className="bg-gray-800/40 rounded-lg p-4 border border-gray-700"
+								>
+									<div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+										<div className="flex items-start gap-3">
+											<div className="w-12 h-12 rounded-md bg-gradient-to-br from-purple-800 to-blue-800 flex items-center justify-center text-white text-sm font-semibold">
+												{(event.title || '').slice(0, 2).toUpperCase()}
+											</div>
+											<div>
+												<h4 className="font-semibold text-white">
+													{event.title}
+												</h4>
+												<p className="text-xs text-gray-400">
+													{event.venue || event.location || 'TBA'}
+												</p>
+											</div>
+										</div>
+										<div className="flex items-center gap-2">
+											<button
+												onClick={() => openEditEventModal(event)}
+												className="px-3 py-1 rounded bg-gray-700/30 text-white text-sm"
+											>
+												Edit
+											</button>
+											<button
+												onClick={() => handleDeleteEvent(event._id)}
+												disabled={deleteLoading}
+												className="px-3 py-1 rounded bg-red-700/60 text-white text-sm disabled:opacity-50"
+											>
+												Delete
+											</button>
+										</div>
+									</div>
+								</div>
+							))}
+						</div>
+					)}
+				</>
 			)}
+
+			{/* modals */}
 			{showCreateEvent && (
 				<EventModal
 					isEdit={false}
