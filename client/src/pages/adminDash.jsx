@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import {
 	ShieldCheck,
 	Ticket,
@@ -8,6 +8,8 @@ import {
 	LayoutDashboard,
 	Menu,
 	X,
+	Search as SearchIcon,
+	Plus,
 } from 'lucide-react';
 import { useAuth } from '../hooks/useAuth.js';
 import { useGetAllEvents } from '../hooks/useEvents.js';
@@ -29,7 +31,6 @@ const TABS = [
 ];
 
 const AdminDash = () => {
-	// include isAuthenticated so we can guard the route properly
 	const { user, loading: authLoading, logoutAdmin, token, isAuthenticated } = useAuth();
 	const { theme } = useTheme();
 	const isDark = theme === 'dark';
@@ -38,11 +39,17 @@ const AdminDash = () => {
 	const [dashboardError, setDashboardError] = useState('');
 	const [showCreateTicketModal, setShowCreateTicketModal] = useState(false);
 	const [sidebarOpen, setSidebarOpen] = useState(false);
+	const [query, setQuery] = useState('');
 
 	// Events
-	const { getAllEvents, events, loading: eventsLoading, error: eventsError } = useGetAllEvents();
+	const {
+		getAllEvents,
+		events = [],
+		loading: eventsLoading,
+		error: eventsError,
+	} = useGetAllEvents();
 
-	// fetch events on mount (include getAllEvents in deps to satisfy hooks rules)
+	// fetch events on mount
 	useEffect(() => {
 		const fetchData = async () => {
 			try {
@@ -80,6 +87,16 @@ const AdminDash = () => {
 		}
 	};
 
+	const stats = useMemo(() => {
+		const total = events.length;
+		const upcoming = events.filter((e) => e.status === 'upcoming').length;
+		const ongoing = events.filter((e) => e.status === 'ongoing').length;
+		const withOpenRegistration = events.filter(
+			(e) => e.registration && e.registration.mode && e.registration.mode !== 'none'
+		).length;
+		return { total, upcoming, ongoing, withOpenRegistration };
+	}, [events]);
+
 	if (authLoading) {
 		return (
 			<div
@@ -87,14 +104,12 @@ const AdminDash = () => {
 					isDark ? 'bg-gray-900' : 'bg-white'
 				}`}
 			>
-				<div className="w-12 h-12 border-4 border-blue-500 border-t-transparent rounded-full animate-spin mb-4" />
-				<span
-					className={`text-lg font-semibold ${
-						isDark ? 'text-blue-400' : 'text-blue-600'
-					} animate-pulse`}
-				>
-					Loading Dashboard...
-				</span>
+				<div className="flex flex-col items-center gap-4">
+					<div className="w-14 h-14 border-4 border-blue-500 border-t-transparent rounded-full animate-spin" />
+					<span className={`${isDark ? 'text-blue-400' : 'text-blue-600'} font-semibold`}>
+						Loading Dashboard...
+					</span>
+				</div>
 			</div>
 		);
 	}
@@ -126,7 +141,7 @@ const AdminDash = () => {
 				{sidebarOpen && (
 					<div className="fixed inset-0 z-50 bg-black/60">
 						<aside
-							className={`fixed top-0 left-0 h-full w-64 ${sidebarBg} shadow-xl flex flex-col`}
+							className={`fixed top-0 left-0 h-full w-72 ${sidebarBg} shadow-xl flex flex-col`}
 						>
 							<div className="flex items-center gap-3 px-6 py-6 border-b border-gray-800">
 								<ShieldCheck className="h-8 w-8 text-blue-400" />
@@ -243,33 +258,47 @@ const AdminDash = () => {
 			<header
 				className={`sticky top-0 md:ml-64 ${headerBg} h-16 flex items-center justify-between px-4 md:px-6 shadow-md z-30`}
 			>
-				<div className="flex items-center gap-3">
-					<span
-						className={`text-xl font-bold ${isDark ? 'text-white' : 'text-gray-900'}`}
-					>
+				<div className="flex items-center gap-4 w-full max-w-3xl">
+					<div className="text-xl font-bold truncate">
 						{TABS.find((t) => t.key === activeTab)?.label || 'Dashboard'}
-					</span>
+					</div>
+					{/* search (desktop & mobile compact) */}
+					<div className="ml-4 flex-1">
+						<div className="relative max-w-xl">
+							<SearchIcon className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+							<input
+								type="search"
+								placeholder="Search events, organizers, tags..."
+								value={query}
+								onChange={(e) => setQuery(e.target.value)}
+								className="w-full pl-10 pr-4 py-2 rounded-lg bg-gray-700/10 border border-gray-200 dark:bg-gray-800/40 dark:border-gray-700 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+								aria-label="Search dashboard"
+							/>
+						</div>
+					</div>
 				</div>
+
 				<div className="flex items-center gap-4">
 					<div
-						className={`flex items-center gap-2 rounded-lg px-4 py-2 ${
+						className={`hidden sm:flex items-center gap-2 rounded-lg px-3 py-2 ${
 							isDark ? 'bg-gray-700/50' : 'bg-gray-100'
-						} shadow`}
+						}`}
 					>
 						<span className={`${isDark ? 'text-white' : 'text-gray-900'} font-medium`}>
 							{user?.fullname || user?.name || 'Admin'}
 						</span>
 					</div>
+
 					{activeTab === 'tickets' && (
 						<button
 							onClick={() => setShowCreateTicketModal(true)}
-							className={`flex items-center gap-2 px-4 py-2 rounded-lg ${
+							className={`hidden sm:flex items-center gap-2 px-4 py-2 rounded-lg ${
 								isDark
 									? 'bg-blue-700/80 text-white hover:bg-blue-600'
 									: 'bg-blue-600 text-white hover:bg-blue-500'
 							} transition shadow`}
 						>
-							<Ticket className="h-5 w-5" />
+							<Plus className="h-4 w-4" />
 							Create Ticket
 						</button>
 					)}
@@ -277,42 +306,80 @@ const AdminDash = () => {
 			</header>
 
 			{/* Content area */}
-			<main className="md:ml-64 pt-6 px-2 md:px-8 transition-all">
-				<div className={`min-h-screen ${mainPanelBg} rounded-xl shadow-lg p-2 md:p-8`}>
+			<main className="md:ml-64 pt-6 px-3 md:px-8 transition-all">
+				<div className={`min-h-screen ${mainPanelBg} rounded-xl shadow-lg p-4 md:p-8`}>
 					{dashboardError && (
 						<div className="mb-4">
 							<ErrorMessage error={dashboardError} />
 						</div>
 					)}
 
+					{/* Top stats */}
+					<div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+						<div className="p-4 rounded-lg bg-white/5 flex flex-col">
+							<span className="text-sm text-gray-400">Total Events</span>
+							<span className="text-2xl font-bold">{stats.total}</span>
+						</div>
+						<div className="p-4 rounded-lg bg-white/5 flex flex-col">
+							<span className="text-sm text-gray-400">Upcoming</span>
+							<span className="text-2xl font-bold text-blue-400">
+								{stats.upcoming}
+							</span>
+						</div>
+						<div className="p-4 rounded-lg bg-white/5 flex flex-col">
+							<span className="text-sm text-gray-400">Ongoing</span>
+							<span className="text-2xl font-bold text-green-400">
+								{stats.ongoing}
+							</span>
+						</div>
+						<div className="p-4 rounded-lg bg-white/5 flex flex-col">
+							<span className="text-sm text-gray-400">With Registration</span>
+							<span className="text-2xl font-bold text-indigo-400">
+								{stats.withOpenRegistration}
+							</span>
+						</div>
+					</div>
+
 					{/* Main Tab Content */}
-					{activeTab === 'dashboard' && (
-						<DashboardTab
-							events={events}
-							eventsLoading={eventsLoading}
-							setActiveTab={setActiveTab}
-						/>
-					)}
-					{activeTab === 'members' && (
-						<MembersTab token={token} setDashboardError={setDashboardError} />
-					)}
-					{activeTab === 'events' && (
-						<EventsTab
-							events={events}
-							eventsLoading={eventsLoading}
-							eventsError={eventsError}
-							token={token}
-							setDashboardError={setDashboardError}
-							getAllEvents={getAllEvents}
-						/>
-					)}
-					{activeTab === 'tickets' && (
-						<TicketsTab
-							token={token}
-							events={events}
-							setDashboardError={setDashboardError}
-						/>
-					)}
+					<div className="space-y-6">
+						{activeTab === 'dashboard' && (
+							<DashboardTab
+								events={events}
+								eventsLoading={eventsLoading}
+								setActiveTab={setActiveTab}
+							/>
+						)}
+						{activeTab === 'members' && (
+							<MembersTab token={token} setDashboardError={setDashboardError} />
+						)}
+						{activeTab === 'events' && (
+							<EventsTab
+								events={events.filter((e) => {
+									if (!query) return true;
+									const q = query.toLowerCase();
+									return (
+										(e.title || '').toLowerCase().includes(q) ||
+										(e.venue || e.location || '').toLowerCase().includes(q) ||
+										(e.description || '').toLowerCase().includes(q) ||
+										(e.organizer || '').toLowerCase().includes(q) ||
+										(e.tags || []).join(',').toLowerCase().includes(q)
+									);
+								})}
+								eventsLoading={eventsLoading}
+								eventsError={eventsError}
+								token={token}
+								setDashboardError={setDashboardError}
+								getAllEvents={getAllEvents}
+							/>
+						)}
+						{activeTab === 'tickets' && (
+							<TicketsTab
+								token={token}
+								events={events}
+								setDashboardError={setDashboardError}
+							/>
+						)}
+					</div>
 				</div>
 			</main>
 
