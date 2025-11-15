@@ -2,7 +2,6 @@ import React from 'react';
 import PropTypes from 'prop-types';
 import { motion } from 'framer-motion';
 import { Eye } from 'lucide-react';
-import './tech.css';
 
 const GalleryGrid = ({ gallery = [], onImageClick }) => {
 	if (!gallery?.length) return null;

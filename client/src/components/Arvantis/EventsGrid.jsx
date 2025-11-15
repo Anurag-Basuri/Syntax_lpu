@@ -2,7 +2,6 @@ import React, { useCallback } from 'react';
 import PropTypes from 'prop-types';
 import { Calendar, ArrowRight } from 'lucide-react';
 import { motion } from 'framer-motion';
-import './tech.css';
 
 const formatDate = (date) => {
 	if (!date) return 'TBA';

@@ -1,7 +1,6 @@
 import { Sparkles, Calendar, Ticket } from 'lucide-react';
 import { StatusPill } from './StatusPill';
 import { motion } from 'framer-motion';
-import './tech.css';
 
 const formatDate = (date) => {
 	if (!date) return 'TBA';

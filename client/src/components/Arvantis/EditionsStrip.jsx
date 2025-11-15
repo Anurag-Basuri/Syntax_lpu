@@ -1,6 +1,5 @@
 import { ChevronRight } from 'lucide-react';
 import { motion } from 'framer-motion';
-import './tech.css';
 
 const EditionsStrip = ({ editions, currentIdentifier, onSelect }) => {
 	if (!editions?.length) return null;

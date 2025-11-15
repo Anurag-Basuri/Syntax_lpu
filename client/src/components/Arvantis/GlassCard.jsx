@@ -1,5 +1,4 @@
 import React from 'react';
-import './tech.css';
 
 const GlassCard = ({ children, className = '', hover = false, gradient = false }) => (
 	<div

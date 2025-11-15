@@ -1,6 +1,5 @@
 import React, { useEffect } from 'react';
 import { X, ChevronLeft, ChevronRight } from 'lucide-react';
-import './tech.css';
 
 const ImageLightbox = ({ image, onClose, onPrev, onNext }) => {
 	useEffect(() => {

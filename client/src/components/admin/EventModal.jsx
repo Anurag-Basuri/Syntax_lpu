@@ -13,14 +13,14 @@ import {
 } from 'lucide-react';
 
 const EventModal = ({ isEdit, open, onClose, eventFields, setEventFields, onSubmit, loading }) => {
-	if (!open) return null;
-
 	// Local helper state for tags string input
 	const [tagsInput, setTagsInput] = useState((eventFields.tags || []).join(', '));
 
 	useEffect(() => {
 		setTagsInput((eventFields.tags || []).join(', '));
 	}, [eventFields.tags, open]);
+
+	if (!open) return null;
 
 	const handleChange = (e) => {
 		const { name, value, type, checked } = e.target;

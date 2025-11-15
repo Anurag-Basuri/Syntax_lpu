@@ -1,7 +1,6 @@
 import React from 'react';
 import PropTypes from 'prop-types';
 import { motion } from 'framer-motion';
-import './tech.css';
 
 const PartnersGrid = ({ partners = [] }) => {
 	if (!partners?.length) return null;
