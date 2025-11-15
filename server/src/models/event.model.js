@@ -166,7 +166,10 @@ const EventSchema = new mongoose.Schema(
 			required: [true, 'Event category is required (e.g., Workshop, Competition)'],
 			trim: true,
 		},
-		subcategory: { type: String, trim: true },
+		subcategory: {
+			type: String,
+			trim: true 
+		},
 		posters: {
 			type: [mediaSchema],
 			default: [],
@@ -181,10 +184,16 @@ const EventSchema = new mongoose.Schema(
 			type: [mediaSchema],
 			default: [],
 		},
+		partners: {
+			type: [partnerSchema],
+			default: [],
+		},
+
 		speakers: {
 			type: [speakerSchema],
 			default: [],
 		},
+
 		totalSpots: {
 			type: Number,
 			min: [0, 'Total spots cannot be negative'],
