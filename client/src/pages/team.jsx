@@ -151,7 +151,7 @@ const TeamsPage = () => {
 					setShowMobileFilters(!showMobileFilters);
 					setShowMobileSort(false);
 				}}
-				className="lg:hidden fixed bottom-4 right-4 sm:bottom-6 sm:right-6 z-[9999] w-12 h-12 sm:w-14 sm:h-14 rounded-full bg-gradient-to-r from-indigo-600 to-purple-600 text-white shadow-xl flex items-center justify-center hover:scale-110 active:scale-95 transition-transform touch-manipulation"
+				className="lg:hidden fixed bottom-4 right-4 sm:bottom-6 sm:right-6 z-[9999] w-12 h-12 sm:w-14 sm:h-14 rounded-full bg-gradient-to-r from-indigo-600 to-purple-600 text-white shadow-2xl flex items-center justify-center hover:scale-105 active:scale-95 transition-transform"
 				aria-label="Toggle filters"
 				aria-expanded={showMobileFilters}
 			>
@@ -177,10 +177,10 @@ const TeamsPage = () => {
 				}`}
 				onClick={(e) => e.stopPropagation()}
 			>
-				<div className="team-sidebar-content">
-					<div className="flex items-center justify-between mb-4 lg:mb-0">
-						<h2 className="filter-header flex-1">
-							<Users size={20} />
+				<div className="team-sidebar-content p-4 lg:p-6">
+					<div className="flex items-center justify-between mb-4 lg:mb-2">
+						<h2 className="filter-header flex-1 flex items-center gap-2 text-sm font-semibold">
+							<Users size={18} />
 							<span>Departments</span>
 						</h2>
 						<button
@@ -188,17 +188,21 @@ const TeamsPage = () => {
 								e.stopPropagation();
 								setShowMobileFilters(false);
 							}}
-							className="lg:hidden p-2 rounded-lg hover:bg-glass-hover transition-colors touch-manipulation"
+							className="lg:hidden p-2 rounded-lg hover:bg-glass-hover transition-colors"
 							aria-label="Close filters"
 						>
 							<X size={18} />
 						</button>
 					</div>
-					<nav className="filter-nav" aria-label="Departments">
+					<nav className="filter-nav flex flex-col gap-2" aria-label="Departments">
 						{departments.map((dept) => (
 							<button
 								key={dept}
-								className={`filter-button ${activeFilter === dept ? 'active' : ''}`}
+								className={`filter-button flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-all ${
+									activeFilter === dept
+										? 'bg-gradient-to-r from-indigo-50 to-purple-50 dark:from-indigo-900/40 dark:to-purple-900/30 ring-1 ring-indigo-300 dark:ring-0 shadow-sm'
+										: 'hover:bg-gray-50 dark:hover:bg-gray-800'
+								}`}
 								onClick={(e) => {
 									e.stopPropagation();
 									setActiveFilter(dept);
@@ -206,9 +210,9 @@ const TeamsPage = () => {
 								}}
 								aria-pressed={activeFilter === dept}
 							>
-								{dept === 'Leadership' && <Star size={16} />}
+								{dept === 'Leadership' && <Star size={16} className="text-amber-500" />}
 								{dept !== 'Leadership' && dept !== 'All' && <Briefcase size={16} />}
-								<span>{dept}</span>
+								<span className="truncate">{dept}</span>
 							</button>
 						))}
 					</nav>
@@ -216,27 +220,34 @@ const TeamsPage = () => {
 			</aside>
 
 			{/* Main Content */}
-			<main className="team-main-content">
+			<main className="team-main-content w-full">
 				<header className="mb-6">
-					<h1 className="text-xl xs:text-2xl sm:text-3xl md:text-4xl lg:text-5xl font-bold tracking-tight mb-2 sm:mb-3 brand-text">
-						Our Team
-					</h1>
-					<p
-						className="text-xs xs:text-sm sm:text-base md:text-lg"
-						style={{ color: 'var(--text-secondary)' }}
-					>
-						{isLoading
-							? 'Loading amazing people…'
-							: `${enrichedMembers.length} talented member${
-									enrichedMembers.length !== 1 ? 's' : ''
-							  } across ${departments.length - 2} department${
-									departments.length - 2 !== 1 ? 's' : ''
-							  }`}
-					</p>
+					<div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-3">
+						<div>
+							<h1 className="text-3xl sm:text-4xl md:text-5xl font-extrabold tracking-tight brand-text leading-tight">
+								Our Team
+							</h1>
+							<p className="text-sm mt-1 text-[var(--text-secondary)]">
+								{isLoading
+									? 'Loading amazing people…'
+									: `${enrichedMembers.length} talented member${
+											enrichedMembers.length !== 1 ? 's' : ''
+									  } across ${departments.length - 2} department${
+											departments.length - 2 !== 1 ? 's' : ''
+									  }`}
+							</p>
+						</div>
+
+						<div className="hidden sm:flex items-center gap-3">
+							<div className="text-sm text-[var(--text-secondary)]">
+								{isLoading ? '—' : `${filteredMembers.length} result${filteredMembers.length !== 1 ? 's' : ''}`}
+							</div>
+						</div>
+					</div>
 				</header>
 
-				{/* Controls - sticky for quick access */}
-				<div className="team-controls sticky top-[var(--navbar-height,4.5rem)] z-40 backdrop-blur-sm py-3 -mx-4 sm:-mx-6 px-4 sm:px-6 rounded-b-2xl">
+				{/* Controls */}
+				<div className="team-controls sticky top-[var(--navbar-height,4.5rem)] z-40 backdrop-blur-md py-4 px-4 sm:px-6 rounded-b-2xl bg-white/70 dark:bg-gray-900/60 border-b border-gray-200 dark:border-gray-800">
 					<div className="max-w-8xl mx-auto flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
 						<div className="search-bar-wrapper relative flex-1 max-w-xl">
 							<Search
@@ -247,7 +258,7 @@ const TeamsPage = () => {
 								value={query}
 								onChange={(e) => setQuery(e.target.value)}
 								placeholder="Search by name, role, or skill…"
-								className="search-input pl-10 pr-10 w-full"
+								className="search-input pl-10 pr-10 w-full rounded-lg border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 py-2.5 focus:ring-2 focus:ring-indigo-300 focus:outline-none"
 								aria-label="Search team members"
 								type="search"
 							/>
@@ -256,7 +267,7 @@ const TeamsPage = () => {
 									type="button"
 									aria-label="Clear search"
 									onClick={() => setQuery('')}
-									className="clear-search-button absolute right-2 top-1/2 -translate-y-1/2 touch-manipulation"
+									className="clear-search-button absolute right-2 top-1/2 -translate-y-1/2 touch-manipulation p-1.5 rounded-md hover:bg-gray-100 dark:hover:bg-gray-800"
 								>
 									<X size={16} />
 								</button>
@@ -271,7 +282,7 @@ const TeamsPage = () => {
 								</label>
 								<select
 									id="sort-select"
-									className="control-select text-sm"
+									className="control-select text-sm rounded-md border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 py-2 px-3"
 									value={sortBy}
 									onChange={(e) => setSortBy(e.target.value)}
 									aria-label="Sort team members"
@@ -290,7 +301,7 @@ const TeamsPage = () => {
 										setShowMobileSort(!showMobileSort);
 										setShowMobileFilters(false);
 									}}
-									className="flex items-center justify-between gap-2 px-3 py-2.5 rounded-lg border-2 border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-sm font-medium text-gray-700 dark:text-gray-300 min-w-[110px] max-w-[140px] touch-manipulation"
+									className="flex items-center justify-between gap-2 px-3 py-2.5 rounded-lg border-2 border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-sm font-medium text-gray-700 dark:text-gray-300 min-w-[110px] max-w-[140px]"
 									aria-label="Sort team members"
 									aria-expanded={showMobileSort}
 								>
@@ -303,9 +314,7 @@ const TeamsPage = () => {
 									</span>
 									<ChevronDown
 										size={14}
-										className={`flex-shrink-0 transition-transform ${
-											showMobileSort ? 'rotate-180' : ''
-										}`}
+										className={`flex-shrink-0 transition-transform ${showMobileSort ? 'rotate-180' : ''}`}
 									/>
 								</button>
 								{showMobileSort && (
@@ -318,35 +327,34 @@ const TeamsPage = () => {
 													setSortBy(option);
 													setShowMobileSort(false);
 												}}
-												className={`w-full text-left px-3 py-2.5 text-sm hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors touch-manipulation ${
+												className={`w-full text-left px-3 py-2.5 text-sm hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors ${
 													sortBy === option
 														? 'bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 font-medium'
 														: 'text-gray-700 dark:text-gray-300'
 												}`}
 											>
-												{option === 'name'
-													? 'Name'
-													: option === 'role'
-													? 'Role'
-													: 'Department'}
+												{option === 'name' ? 'Name' : option === 'role' ? 'Role' : 'Department'}
 											</button>
 										))}
 									</div>
 								)}
 							</div>
 
-							<div className="result-count text-sm text-[var(--text-secondary)]" aria-live="polite">
+							<div className="result-count text-sm text-[var(--text-secondary)] lg:hidden" aria-live="polite">
 								{isLoading ? '—' : `${filteredMembers.length} result${filteredMembers.length !== 1 ? 's' : ''}`}
 							</div>
 						</div>
 					</div>
 				</div>
 
-				{isLoading ? (
-					<TeamSkeleton />
-				) : (
-					<TeamGrid members={filteredMembers} onCardClick={openModal} />
-				)}
+				{/* Content */}
+				<div className="py-6">
+					{isLoading ? (
+						<TeamSkeleton />
+					) : (
+						<TeamGrid members={filteredMembers} onCardClick={openModal} />
+					)}
+				</div>
 			</main>
 
 			<TeamMemberModal
