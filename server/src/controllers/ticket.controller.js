@@ -2,7 +2,7 @@ import Event from '../models/event.model.js';
 import Ticket from '../models/ticket.model.js';
 import { ApiError } from '../utils/ApiError.js';
 import { ApiResponse } from '../utils/ApiResponse.js';
-import asyncHandler from '../utils/asyncHandler.js';
+import { asyncHandler } from '../utils/asyncHandler.js';
 import mongoose from 'mongoose';
 import { generateTicketQR } from '../services/qrcode.service.js';
 import { sendRegistrationEmail } from '../services/email.service.js';

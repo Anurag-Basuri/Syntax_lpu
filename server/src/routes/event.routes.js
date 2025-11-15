@@ -15,6 +15,7 @@ import { validate } from '../middlewares/validator.middleware.js';
 import { uploadFile } from '../middlewares/multer.middleware.js';
 import { body, param } from 'express-validator';
 import normalizeEventPayload from '../middlewares/normalizeEvent.middleware.js';
+import { registerForEvent } from '../controllers/ticket.controller.js';
 
 const router = Router();
 const { protect, authorize } = authMiddleware;
@@ -31,6 +32,29 @@ router.get(
 	'/:id',
 	validate([param('id').isMongoId().withMessage('Invalid event ID')]),
 	getEventById
+);
+
+// Register (internal) - public
+router.post(
+	'/:id/register',
+	validate([
+		param('id').isMongoId().withMessage('Invalid event ID'),
+		body('fullName').trim().isLength({ min: 2 }).withMessage('Full name is required'),
+		body('email').isEmail().withMessage('Valid email is required'),
+		body('phone').notEmpty().withMessage('Phone is required'),
+		body('lpuId').notEmpty().withMessage('LPU ID is required'),
+		body('gender')
+			.isIn(['Male', 'Female', 'Other', 'Prefer not to say'])
+			.withMessage('Invalid gender'),
+		body('course').notEmpty().withMessage('Course is required'),
+		body('hosteler').optional().isBoolean(),
+		body('hostel')
+			.optional()
+			.if(body('hosteler').equals('true'))
+			.notEmpty()
+			.withMessage('Hostel is required for hosteler attendees'),
+	]),
+	registerForEvent
 );
 
 //================================================================================
