@@ -22,7 +22,7 @@ const createEvent = asyncHandler(async (req, res) => {
 	const {
 		title,
 		description,
-		eventDate,
+		eventDate: eventDateRaw,
 		venue,
 		organizer,
 		category,
@@ -34,6 +34,7 @@ const createEvent = asyncHandler(async (req, res) => {
 		// registration fields may come either as registration.* or top level for convenience
 	} = req.body;
 
+	// Defensive check (multer should populate req.files)
 	if (!req.files?.length) {
 		throw ApiError.BadRequest('At least one event poster is required.');
 	}
@@ -48,6 +49,17 @@ const createEvent = asyncHandler(async (req, res) => {
 		publicId: u.publicId || u.public_id || u.public_id,
 		resource_type: u.resource_type || 'image',
 	}));
+
+	// allow tags as CSV string or array (normalize)
+	const normalizedTags =
+		typeof tags === 'string'
+			? tags
+					.split(',')
+					.map((t) => t.trim())
+					.filter(Boolean)
+			: Array.isArray(tags)
+				? tags.map((t) => String(t).trim()).filter(Boolean)
+				: [];
 
 	// Build registration object from incoming payload (support both nested and flat inputs)
 	const regMode =
@@ -80,20 +92,21 @@ const createEvent = asyncHandler(async (req, res) => {
 		throw ApiError.BadRequest('externalUrl is required when registration.mode is "external".');
 	}
 
+	// Prefer normalized eventDate field; allow date alias (controller-safe)
+	const finalEventDate = eventDateRaw || req.body.date;
+	if (!finalEventDate) {
+		throw ApiError.BadRequest('Event date is required.');
+	}
+
 	const newEvent = await Event.create({
 		title: title?.trim(),
 		description: description?.trim(),
-		eventDate: new Date(eventDate),
+		eventDate: new Date(finalEventDate),
 		venue: venue?.trim(),
 		organizer: organizer?.trim(),
 		category: category?.trim(),
 		posters: uploadedPosters,
-		tags: tags
-			? tags
-					.split(',')
-					.map((t) => t.trim())
-					.filter(Boolean)
-			: [],
+		tags: normalizedTags,
 		totalSpots: Number(totalSpots),
 		ticketPrice: Number(ticketPrice),
 		registrationOpenDate: registrationOpenDate ? new Date(registrationOpenDate) : null,
