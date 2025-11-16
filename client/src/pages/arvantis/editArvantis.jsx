@@ -43,6 +43,10 @@ const EditArvantis = ({ setDashboardError = () => {} }) => {
 	});
 	const [editForm, setEditForm] = useState(null);
 
+	// new local UI helpers for hero upload & richer presentation editing
+	const [heroFile, setHeroFile] = useState(null);
+	const [heroCaption, setHeroCaption] = useState('');
+
 	const mountedRef = useRef(false);
 	const setDashboardErrorRef = useRef(setDashboardError);
 	useEffect(() => {
@@ -107,7 +111,6 @@ const EditArvantis = ({ setDashboardError = () => {} }) => {
 			const normalized = {
 				...data,
 				_id: data._id || data.id,
-				// prefer explicit arrays provided by backend
 				posters: Array.isArray(data.posters)
 					? data.posters
 					: data.poster
@@ -124,11 +127,12 @@ const EditArvantis = ({ setDashboardError = () => {} }) => {
 			if (mountedRef.current) {
 				setEditForm(normalized);
 				setSelectedFestId(normalized._id);
-				// prepare presentation drafts
 				setPresentationDraft({
 					themeColors: normalized.themeColors || {},
 					socialLinks: normalized.socialLinks || {},
 				});
+				// keep any pending hero UI in sync
+				setHeroCaption(normalized.hero?.caption || '');
 			}
 		} catch (err) {
 			console.error('loadFestDetails', err);
@@ -1001,8 +1005,16 @@ const EditArvantis = ({ setDashboardError = () => {} }) => {
 										alt="hero"
 										className="w-40 h-24 object-cover rounded"
 									/>
-									<div className="text-sm text-gray-400">
-										{editForm.hero.caption || ''}
+									<div className="flex-1">
+										<div className="text-sm text-gray-400 mb-1">
+											{editForm.hero.caption || ''}
+										</div>
+										<input
+											value={heroCaption}
+											onChange={(e) => setHeroCaption(e.target.value)}
+											placeholder="Edit hero caption (local)"
+											className="p-2 bg-white/5 rounded w-full mb-2"
+										/>
 									</div>
 									<div className="ml-auto flex gap-2">
 										<button
@@ -1017,12 +1029,30 @@ const EditArvantis = ({ setDashboardError = () => {} }) => {
 							) : (
 								<div className="text-sm text-gray-400 mb-2">No hero image</div>
 							)}
-							<input
-								type="file"
-								accept="image/*"
-								onChange={(e) => void uploadHero(e.target.files?.[0])}
-								disabled={actionBusy}
-							/>
+
+							<div className="flex gap-2 items-center">
+								<input
+									type="file"
+									accept="image/*"
+									onChange={(e) => setHeroFile(e.target.files?.[0] || null)}
+									disabled={actionBusy}
+								/>
+								<input
+									type="text"
+									placeholder="Caption (optional)"
+									value={heroCaption}
+									onChange={(e) => setHeroCaption(e.target.value)}
+									className="p-2 bg-white/5 rounded flex-1"
+									disabled={actionBusy}
+								/>
+								<button
+									onClick={() => uploadHero(heroFile, heroCaption)}
+									disabled={actionBusy || !heroFile}
+									className="px-3 py-2 bg-emerald-600 text-white rounded"
+								>
+									Upload Hero
+								</button>
+							</div>
 						</div>
 
 						{/* Gallery */}
@@ -1106,7 +1136,14 @@ const EditArvantis = ({ setDashboardError = () => {} }) => {
 													if (newName && newName !== p.name) {
 														updateExistingPartner(p.name, {
 															name: newName,
-														});
+														}).catch((err) =>
+															toast.error(
+																getErrMsg(
+																	err,
+																	'Failed to update partner'
+																)
+															)
+														);
 													}
 												}}
 												className="text-blue-400"
@@ -1228,58 +1265,222 @@ const EditArvantis = ({ setDashboardError = () => {} }) => {
 									</select>
 								</div>
 
-								<div className="col-span-2">
-									<label className="block text-sm text-gray-400 mb-1">
-										Social Links (JSON)
-									</label>
-									<textarea
-										value={JSON.stringify(
-											presentationDraft.socialLinks || {},
-											null,
-											2
-										)}
-										onChange={(e) => {
-											try {
-												const parsed = JSON.parse(e.target.value);
+								{/* Social links structured inputs */}
+								<div className="col-span-2 grid grid-cols-2 gap-3">
+									<div>
+										<label className="block text-sm text-gray-400 mb-1">
+											Website
+										</label>
+										<input
+											value={presentationDraft.socialLinks?.website || ''}
+											onChange={(e) =>
 												setPresentationDraft((s) => ({
 													...s,
-													socialLinks: parsed,
-												}));
-											} catch (err) {
-												// ignore until valid JSON
+													socialLinks: {
+														...(s.socialLinks || {}),
+														website: e.target.value,
+													},
+												}))
 											}
-										}}
-										className="p-3 bg-white/5 rounded w-full"
-										rows={3}
-										placeholder='{"twitter":"...", "website":"..."}'
-									/>
+											className="p-2 bg-white/5 rounded w-full"
+											placeholder="https://example.com"
+										/>
+									</div>
+									<div>
+										<label className="block text-sm text-gray-400 mb-1">
+											Twitter
+										</label>
+										<input
+											value={presentationDraft.socialLinks?.twitter || ''}
+											onChange={(e) =>
+												setPresentationDraft((s) => ({
+													...s,
+													socialLinks: {
+														...(s.socialLinks || {}),
+														twitter: e.target.value,
+													},
+												}))
+											}
+											className="p-2 bg-white/5 rounded w-full"
+											placeholder="@handle or https://twitter.com/handle"
+										/>
+									</div>
+									<div>
+										<label className="block text-sm text-gray-400 mb-1">
+											Instagram
+										</label>
+										<input
+											value={presentationDraft.socialLinks?.instagram || ''}
+											onChange={(e) =>
+												setPresentationDraft((s) => ({
+													...s,
+													socialLinks: {
+														...(s.socialLinks || {}),
+														instagram: e.target.value,
+													},
+												}))
+											}
+											className="p-2 bg-white/5 rounded w-full"
+											placeholder="@handle or url"
+										/>
+									</div>
+									<div>
+										<label className="block text-sm text-gray-400 mb-1">
+											Facebook
+										</label>
+										<input
+											value={presentationDraft.socialLinks?.facebook || ''}
+											onChange={(e) =>
+												setPresentationDraft((s) => ({
+													...s,
+													socialLinks: {
+														...(s.socialLinks || {}),
+														facebook: e.target.value,
+													},
+												}))
+											}
+											className="p-2 bg-white/5 rounded w-full"
+											placeholder="facebook page url"
+										/>
+									</div>
+									<div className="col-span-2">
+										<label className="block text-sm text-gray-400 mb-1">
+											LinkedIn
+										</label>
+										<input
+											value={presentationDraft.socialLinks?.linkedin || ''}
+											onChange={(e) =>
+												setPresentationDraft((s) => ({
+													...s,
+													socialLinks: {
+														...(s.socialLinks || {}),
+														linkedin: e.target.value,
+													},
+												}))
+											}
+											className="p-2 bg-white/5 rounded w-full"
+											placeholder="linkedin url"
+										/>
+									</div>
 								</div>
 
-								<div className="col-span-2">
-									<label className="block text-sm text-gray-400 mb-1">
-										Theme Colors (JSON)
-									</label>
-									<textarea
-										value={JSON.stringify(
-											presentationDraft.themeColors || {},
-											null,
-											2
-										)}
-										onChange={(e) => {
-											try {
-												const parsed = JSON.parse(e.target.value);
-												setPresentationDraft((s) => ({
-													...s,
-													themeColors: parsed,
-												}));
-											} catch (err) {
-												// ignore until valid
-											}
-										}}
-										className="p-3 bg-white/5 rounded w-full"
-										rows={3}
-										placeholder='{"primary":"#06b6d4"}'
-									/>
+								{/* Theme color pickers */}
+								<div className="col-span-2 grid grid-cols-3 gap-3">
+									<div>
+										<label className="block text-sm text-gray-400 mb-1">
+											Primary
+										</label>
+										<div className="flex gap-2 items-center">
+											<input
+												type="color"
+												value={
+													presentationDraft.themeColors?.primary ||
+													'#06b6d4'
+												}
+												onChange={(e) =>
+													setPresentationDraft((s) => ({
+														...s,
+														themeColors: {
+															...(s.themeColors || {}),
+															primary: e.target.value,
+														},
+													}))
+												}
+												className="w-12 h-8 p-0 border-0 rounded"
+											/>
+											<input
+												value={presentationDraft.themeColors?.primary || ''}
+												onChange={(e) =>
+													setPresentationDraft((s) => ({
+														...s,
+														themeColors: {
+															...(s.themeColors || {}),
+															primary: e.target.value,
+														},
+													}))
+												}
+												className="p-2 bg-white/5 rounded w-full"
+												placeholder="#06b6d4"
+											/>
+										</div>
+									</div>
+
+									<div>
+										<label className="block text-sm text-gray-400 mb-1">
+											Accent
+										</label>
+										<div className="flex gap-2 items-center">
+											<input
+												type="color"
+												value={
+													presentationDraft.themeColors?.accent ||
+													'#0284c7'
+												}
+												onChange={(e) =>
+													setPresentationDraft((s) => ({
+														...s,
+														themeColors: {
+															...(s.themeColors || {}),
+															accent: e.target.value,
+														},
+													}))
+												}
+												className="w-12 h-8 p-0 border-0 rounded"
+											/>
+											<input
+												value={presentationDraft.themeColors?.accent || ''}
+												onChange={(e) =>
+													setPresentationDraft((s) => ({
+														...s,
+														themeColors: {
+															...(s.themeColors || {}),
+															accent: e.target.value,
+														},
+													}))
+												}
+												className="p-2 bg-white/5 rounded w-full"
+												placeholder="#0284c7"
+											/>
+										</div>
+									</div>
+
+									<div>
+										<label className="block text-sm text-gray-400 mb-1">
+											Background
+										</label>
+										<div className="flex gap-2 items-center">
+											<input
+												type="color"
+												value={
+													presentationDraft.themeColors?.bg || '#0f172a'
+												}
+												onChange={(e) =>
+													setPresentationDraft((s) => ({
+														...s,
+														themeColors: {
+															...(s.themeColors || {}),
+															bg: e.target.value,
+														},
+													}))
+												}
+												className="w-12 h-8 p-0 border-0 rounded"
+											/>
+											<input
+												value={presentationDraft.themeColors?.bg || ''}
+												onChange={(e) =>
+													setPresentationDraft((s) => ({
+														...s,
+														themeColors: {
+															...(s.themeColors || {}),
+															bg: e.target.value,
+														},
+													}))
+												}
+												className="p-2 bg-white/5 rounded w-full"
+												placeholder="#0f172a"
+											/>
+										</div>
+									</div>
 								</div>
 							</div>
 
@@ -1305,288 +1506,6 @@ const EditArvantis = ({ setDashboardError = () => {} }) => {
 								>
 									Save Theme Colors
 								</button>
-							</div>
-						</div>
-
-						{/* Tracks */}
-						<div className="mb-4">
-							<div className="flex items-center justify-between mb-2">
-								<h4 className="font-semibold text-white">
-									Tracks ({(editForm.tracks || []).length})
-								</h4>
-								<button
-									onClick={() => {
-										const title = prompt('Enter track title');
-										if (title) void addTrack({ title });
-									}}
-									className="px-3 py-1 rounded bg-emerald-600 text-white text-sm"
-								>
-									Add Track
-								</button>
-							</div>
-							<div className="space-y-2">
-								{(editForm.tracks || []).map((track, idx) => (
-									<div
-										key={track.key}
-										className="flex items-center justify-between p-3 bg-white/3 rounded"
-									>
-										<div className="flex-1">
-											<div className="font-medium text-white">
-												{track.title}
-											</div>
-											<div className="text-sm text-gray-400">
-												{track.description || ''}
-											</div>
-										</div>
-										<div className="flex gap-2">
-											<button
-												onClick={() => {
-													const newTitle = prompt(
-														'Enter new title',
-														track.title
-													);
-													if (newTitle && newTitle !== track.title) {
-														void svc
-															.updateTrack(editForm._id, track.key, {
-																title: newTitle,
-															})
-															.then(() =>
-																loadFestDetails(editForm._id)
-															);
-													}
-												}}
-												className="text-blue-400"
-												title="Edit track"
-											>
-												Edit
-											</button>
-											<button
-												onClick={() => void removeExistingTrack(track.key)}
-												className="text-red-400"
-												title="Remove track"
-											>
-												<Trash2 className="w-5 h-5" />
-											</button>
-											<button
-												onClick={() => void reorderTracks(idx, idx - 1)}
-												disabled={idx === 0}
-												className="text-gray-400"
-												title="Move up"
-											>
-												<ArrowUp className="w-5 h-5" />
-											</button>
-											<button
-												onClick={() => void reorderTracks(idx, idx + 1)}
-												disabled={
-													idx === (editForm.tracks || []).length - 1
-												}
-												className="text-gray-400"
-												title="Move down"
-											>
-												<ArrowDown className="w-5 h-5" />
-											</button>
-										</div>
-									</div>
-								))}
-							</div>
-						</div>
-
-						{/* FAQs */}
-						<div className="mb-4">
-							<div className="flex items-center justify-between mb-2">
-								<h4 className="font-semibold text-white">
-									FAQs ({(editForm.faqs || []).length})
-								</h4>
-								<button
-									onClick={() => {
-										const question = prompt('Enter FAQ question');
-										const answer = question ? prompt('Enter FAQ answer') : null;
-										if (question && answer) void addFaq({ question, answer });
-									}}
-									className="px-3 py-1 rounded bg-emerald-600 text-white text-sm"
-								>
-									Add FAQ
-								</button>
-							</div>
-							<div className="space-y-2">
-								{(editForm.faqs || []).map((faq, idx) => (
-									<div
-										key={String(faq._id || faq.id)}
-										className="flex items-center justify-between p-3 bg-white/3 rounded"
-									>
-										<div className="flex-1">
-											<div className="font-medium text-white">
-												{faq.question}
-											</div>
-											<div className="text-sm text-gray-400">
-												{faq.answer}
-											</div>
-										</div>
-										<div className="flex gap-2 items-center">
-											<button
-												onClick={() => {
-													const newAnswer = prompt(
-														'Enter new answer',
-														faq.answer
-													);
-													if (newAnswer && newAnswer !== faq.answer)
-														void svc
-															.updateFAQ(
-																editForm._id,
-																faq._id || faq.id,
-																{ answer: newAnswer }
-															)
-															.then(() =>
-																loadFestDetails(editForm._id)
-															);
-												}}
-												className="text-blue-400"
-												title="Edit FAQ"
-											>
-												Edit
-											</button>
-											<button
-												onClick={() =>
-													void removeExistingFaq(faq._id || faq.id)
-												}
-												className="text-red-400"
-												title="Remove FAQ"
-											>
-												<Trash2 className="w-5 h-5" />
-											</button>
-
-											<button
-												onClick={() => reorderFaqs(idx, idx - 1)}
-												disabled={idx === 0 || actionBusy}
-												className="text-gray-400"
-												title="Move up"
-											>
-												<ArrowUp className="w-5 h-5" />
-											</button>
-											<button
-												onClick={() => reorderFaqs(idx, idx + 1)}
-												disabled={
-													idx === (editForm.faqs || []).length - 1 ||
-													actionBusy
-												}
-												className="text-gray-400"
-												title="Move down"
-											>
-												<ArrowDown className="w-5 h-5" />
-											</button>
-										</div>
-									</div>
-								))}
-							</div>
-						</div>
-
-						{/* Media bulk actions (includes posters & hero) */}
-						<div className="mb-4">
-							<div className="flex items-center justify-between mb-2">
-								<h4 className="font-semibold text-white">Media Actions</h4>
-								<div className="flex gap-2">
-									<button
-										onClick={() => bulkDeleteSelectedMedia()}
-										className="px-3 py-1 rounded bg-red-600 text-white text-sm"
-										disabled={bulkDeleting}
-									>
-										{bulkDeleting ? 'Deleting...' : 'Delete Selected Media'}
-									</button>
-									<button
-										onClick={() => setMediaSelection(new Set())}
-										className="px-3 py-1 rounded bg-white/5 text-white text-sm"
-									>
-										Clear Selection
-									</button>
-								</div>
-							</div>
-
-							<div className="flex gap-2 flex-wrap">
-								{/* Posters selectable */}
-								{(editForm.posters || []).map((p) => (
-									<div
-										key={p.publicId}
-										className="relative w-24 h-24 bg-gray-800 rounded overflow-hidden"
-									>
-										{p.url && (
-											<img
-												src={p.url}
-												alt={p.caption || ''}
-												className="object-cover w-full h-full"
-											/>
-										)}
-										<div className="absolute top-0 right-0 p-1">
-											<button
-												onClick={() => toggleMediaSelect(p.publicId)}
-												className={`p-1 rounded-full ${
-													mediaSelection.has(p.publicId)
-														? 'bg-purple-600 text-white'
-														: 'bg-black/50 text-purple-600'
-												}`}
-												aria-label="Select poster"
-											>
-												{mediaSelection.has(p.publicId) ? '✓' : 'P'}
-											</button>
-										</div>
-									</div>
-								))}
-								{/* Hero selectable */}
-								{editForm.hero?.publicId && (
-									<div className="relative w-24 h-24 bg-gray-800 rounded overflow-hidden">
-										{editForm.hero.url && (
-											<img
-												src={editForm.hero.url}
-												alt="hero"
-												className="object-cover w-full h-full"
-											/>
-										)}
-										<div className="absolute top-0 right-0 p-1">
-											<button
-												onClick={() =>
-													toggleMediaSelect(editForm.hero.publicId)
-												}
-												className={`p-1 rounded-full ${
-													mediaSelection.has(editForm.hero.publicId)
-														? 'bg-purple-600 text-white'
-														: 'bg-black/50 text-purple-600'
-												}`}
-												aria-label="Select hero"
-											>
-												{mediaSelection.has(editForm.hero.publicId)
-													? '✓'
-													: 'H'}
-											</button>
-										</div>
-									</div>
-								)}
-								{/* Gallery selectable */}
-								{(editForm.gallery || []).map((g) => (
-									<div
-										key={g.publicId}
-										className="relative w-24 h-24 bg-gray-800 rounded overflow-hidden"
-									>
-										{g.url && (
-											<img
-												src={g.url}
-												alt={g.caption || ''}
-												className="object-cover w-full h-full"
-											/>
-										)}
-										<div className="absolute top-0 right-0 p-1">
-											<button
-												onClick={() => toggleMediaSelect(g.publicId)}
-												className={`p-1 rounded-full ${
-													mediaSelection.has(g.publicId)
-														? 'bg-purple-600 text-white'
-														: 'bg-black/50 text-purple-600'
-												}`}
-												aria-label="Select media"
-											>
-												{mediaSelection.has(g.publicId) ? '✓' : '+'}
-											</button>
-										</div>
-									</div>
-								))}
 							</div>
 						</div>
 					</GlassCard>
