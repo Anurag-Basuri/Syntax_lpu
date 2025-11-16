@@ -210,12 +210,14 @@ const deleteFest = asyncHandler(async (req, res) => {
 	// collect media to delete
 	const mediaToDelete = [];
 
-	if (fest.poster?.publicId) {
-		mediaToDelete.push({
-			public_id: fest.poster.publicId,
-			resource_type: fest.poster.resource_type || 'image',
-		});
-	}
+	// posters (array)
+	(fest.posters || []).forEach((p) => {
+		if (p?.publicId)
+			mediaToDelete.push({
+				public_id: p.publicId,
+				resource_type: p.resource_type || 'image',
+			});
+	});
 	if (fest.heroMedia?.publicId) {
 		mediaToDelete.push({
 			public_id: fest.heroMedia.publicId,
@@ -380,7 +382,7 @@ const removeGalleryMedia = asyncHandler(async (req, res) => {
 	return ApiResponse.success(res, null, 'Gallery media removed successfully');
 });
 
-// Fest poster management
+// Fest poster management (now supports multiple posters)
 const addFestPoster = asyncHandler(async (req, res) => {
 	const { identifier } = req.params;
 	const fest = await findFestBySlugOrYear(identifier);
@@ -388,8 +390,9 @@ const addFestPoster = asyncHandler(async (req, res) => {
 	if (!req.files || req.files.length === 0)
 		throw new ApiError.BadRequest('At least one media file is required.');
 
+	// upload to posters folder (separate from gallery)
 	const uploadPromises = req.files.map((f) =>
-		uploadFile(f, { folder: `arvantis/${fest.year}/gallery` })
+		uploadFile(f, { folder: `arvantis/${fest.year}/posters` })
 	);
 	const uploaded = await Promise.all(uploadPromises);
 
@@ -399,30 +402,36 @@ const addFestPoster = asyncHandler(async (req, res) => {
 		resource_type: u.resource_type,
 	}));
 
-	fest.gallery.push(...items);
+	// ensure posters array exists
+	fest.posters = fest.posters || [];
+	fest.posters.push(...items);
 	await fest.save();
-	return ApiResponse.success(res, items, 'Gallery media added successfully', 201);
+	return ApiResponse.success(res, items, 'Poster(s) added successfully', 201);
 });
 
-// Remove fest poster
+// Remove fest poster (by publicId)
+// Accepts :publicId param or publicId in body for flexibility
 const removeFestPoster = asyncHandler(async (req, res) => {
 	const { identifier } = req.params;
+	// support both routes: /:identifier/posters/:publicId and /:identifier/poster (body)
+	const publicId = req.params.publicId || req.body.publicId;
+	if (!publicId) throw new ApiError.BadRequest('publicId of poster is required.');
+
 	const fest = await findFestBySlugOrYear(identifier);
 
-	if (!fest.poster || !fest.poster.publicId) {
-		throw new ApiError.BadRequest('No poster to remove for this fest.');
-	}
+	const idx = (fest.posters || []).findIndex((p) => p.publicId === publicId);
+	if (idx === -1) throw new ApiError.NotFound('Poster not found.');
 
+	const [removed] = fest.posters.splice(idx, 1);
 	try {
 		await deleteFile({
-			public_id: fest.poster.publicId,
-			resource_type: fest.poster.resource_type || 'image',
+			public_id: removed.publicId,
+			resource_type: removed.resource_type || 'image',
 		});
 	} catch (err) {
 		console.warn('Failed to delete poster from Cloudinary:', err.message || err);
 	}
 
-	fest.poster = undefined;
 	await fest.save();
 	return ApiResponse.success(res, null, 'Fest poster removed successfully');
 });
@@ -647,7 +656,8 @@ const duplicateFest = asyncHandler(async (req, res) => {
 		name: data.name ? `${data.name} ${y}` : `Arvantis ${y}`,
 		startDate: null,
 		endDate: null,
-		poster: undefined,
+		// new model uses posters array
+		posters: [],
 		heroMedia: undefined,
 		gallery: [],
 		events: [],
