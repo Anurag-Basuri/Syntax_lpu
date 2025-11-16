@@ -1,18 +1,16 @@
 import { useState, useEffect, useRef, useMemo } from 'react';
 import { AnimatePresence, motion as Motion } from 'framer-motion';
-import { useEvent } from '../../hooks/useEvents.js'; // use the existing hook
+import { useEvent } from '../../hooks/useEvents.js'; // keep existing hook
 
-// Handles invalid or missing dates gracefully
+// Friendly date formatter
 const safeFormatDate = (dateInput) => {
 	if (!dateInput) return 'Date TBD';
 	const date = new Date(dateInput);
-	if (isNaN(date.getTime())) {
-		return 'Invalid Date';
-	}
+	if (isNaN(date.getTime())) return 'Invalid Date';
 	return new Intl.DateTimeFormat('en-US', {
-		weekday: 'long',
+		weekday: 'short',
 		year: 'numeric',
-		month: 'long',
+		month: 'short',
 		day: 'numeric',
 		hour: '2-digit',
 		minute: '2-digit',
@@ -23,8 +21,7 @@ const timeUntil = (date) => {
 	if (!date) return null;
 	const now = new Date();
 	const diff = new Date(date) - now;
-	if (isNaN(diff)) return null;
-	if (diff <= 0) return null;
+	if (isNaN(diff) || diff <= 0) return null;
 	const minutes = Math.floor(diff / 60000);
 	const days = Math.floor(minutes / 1440);
 	const hours = Math.floor((minutes % 1440) / 60);
@@ -36,9 +33,9 @@ const generateICS = (ev = {}) => {
 	const start = ev.eventDate || ev.date;
 	if (!start) return null;
 	const dtstart = new Date(start).toISOString().replace(/[-:]/g, '').split('.')[0] + 'Z';
-	const dtend = dtstart; // unknown - keep same
+	const dtend = dtstart;
 	const uid = `${ev._id || Math.random().toString(36).slice(2)}@syntaxclub`;
-	const title = ev.title || 'Event';
+	const title = (ev.title || 'Event').replace(/\r?\n/g, ' ');
 	const desc = (ev.description || '').replace(/\r\n/g, '\\n').replace(/\n/g, '\\n');
 	const location = ev.venue || '';
 	return [
@@ -58,19 +55,30 @@ const generateICS = (ev = {}) => {
 	].join('\r\n');
 };
 
+/**
+ * EventDetailModal
+ * - Uses existing useEvent hook (no changes to hooks or services)
+ * - Modal is non-scrollable; layout adapts to viewport to show all details on one page.
+ * - Fully responsive: two-column on md+, stacked but compact on small screens.
+ */
 const EventDetailModal = ({ event: initialEvent, isOpen, onClose }) => {
-	const [currentImageIndex, setCurrentImageIndex] = useState(0);
-	const closeBtnRef = useRef(null);
+	const [imgIndex, setImgIndex] = useState(0);
+	const closeRef = useRef(null);
 	const id = initialEvent?._id ?? null;
 
-	// Use the existing useEvent hook. Pass id only when modal is open to avoid unnecessary fetches.
-	// We intentionally call the hook unconditionally (with null when closed) so hook order is stable.
+	// call hook with id only when modal is open; hook still respects enabled: !!id
+	// call unconditionally so hook order is stable
 	const { data: fetched, isLoading, isError, refetch } = useEvent(isOpen ? id : null);
+
+	// Prefer fetched, fallback to initial event to open fast
+	const event = fetched || initialEvent;
+
+	// Precompute countdown even if event is undefined (safe)
+	const countdown = useMemo(() => timeUntil(event?.eventDate || event?.date), [event]);
 
 	useEffect(() => {
 		if (!isOpen) return;
-		// focus close button for keyboard users
-		closeBtnRef.current?.focus();
+		closeRef.current?.focus();
 		const onKey = (e) => {
 			if (e.key === 'Escape') onClose();
 		};
@@ -78,19 +86,8 @@ const EventDetailModal = ({ event: initialEvent, isOpen, onClose }) => {
 		return () => window.removeEventListener('keydown', onKey);
 	}, [isOpen, onClose]);
 
-	// Prefer fetched data, fallback to initialEvent
-	const event = fetched || initialEvent;
-
-	// compute countdown unconditionally so hooks are stable; safe if event is undefined
-	const countdown = useMemo(() => timeUntil(event?.eventDate || event?.date), [event]);
-
+	// If not open or no event data available, render nothing
 	if (!isOpen || !event) return null;
-
-	const eventDate = new Date(event.eventDate || event.date);
-	const isValidDate = !isNaN(eventDate.getTime());
-	const isOngoing =
-		isValidDate &&
-		(event.status === 'ongoing' || eventDate.toDateString() === new Date().toDateString());
 
 	const registrationLink =
 		event.registrationLink ||
@@ -99,17 +96,27 @@ const EventDetailModal = ({ event: initialEvent, isOpen, onClose }) => {
 		event.registerUrl ||
 		null;
 
-	const onRemindClick = (e) => {
-		e.stopPropagation();
-		// lightweight client-side "remind me" — you can replace with real subscription workflow
-		alert('Reminder saved (client-side). Integrate a notification service to make this real.');
+	const onRegister = (ev) => {
+		ev.stopPropagation();
+		if (registrationLink) window.open(registrationLink, '_blank');
 	};
 
-	const downloadICS = (e) => {
-		e.stopPropagation();
+	const onRemind = (ev) => {
+		ev.stopPropagation();
+		// placeholder behavior — integrate real subscription if desired
+		try {
+			localStorage.setItem(`remind_${event._id}`, Date.now());
+		} catch (e) {
+			/* ignore storage errors */
+		}
+		alert('Reminder saved locally.');
+	};
+
+	const downloadICS = (ev) => {
+		ev.stopPropagation();
 		const ics = generateICS(event);
 		if (!ics) {
-			alert('Unable to generate calendar file — missing date.');
+			alert('Cannot generate calendar file — missing date.');
 			return;
 		}
 		const blob = new Blob([ics], { type: 'text/calendar;charset=utf-8' });
@@ -123,19 +130,25 @@ const EventDetailModal = ({ event: initialEvent, isOpen, onClose }) => {
 		URL.revokeObjectURL(url);
 	};
 
-	const nextImage = () => {
-		if (event.posters?.length > 1) {
-			setCurrentImageIndex((prev) => (prev + 1) % event.posters.length);
-		}
+	const nextImg = (e) => {
+		e.stopPropagation();
+		if (!event.posters?.length) return;
+		setImgIndex((p) => (p + 1) % event.posters.length);
+	};
+	const prevImg = (e) => {
+		e.stopPropagation();
+		if (!event.posters?.length) return;
+		setImgIndex((p) => (p - 1 + event.posters.length) % event.posters.length);
 	};
 
-	const prevImage = () => {
-		if (event.posters?.length > 1) {
-			setCurrentImageIndex(
-				(prev) => (prev - 1 + event.posters.length) % event.posters.length
-			);
-		}
-	};
+	// Compact helpers to ensure layout fits screen
+	const compactText = (text, max = 500) =>
+		typeof text === 'string' && text.length > max ? text.slice(0, max).trim() + '…' : text || '';
+
+	// Build lists (speakers, partners, resources) defensively
+	const speakers = Array.isArray(event.speakers) ? event.speakers : event.speakers ? [event.speakers] : [];
+	const partners = Array.isArray(event.partners) ? event.partners : event.partners ? [event.partners] : [];
+	const resources = Array.isArray(event.resources) ? event.resources : event.resources ? [event.resources] : [];
 
 	return (
 		<AnimatePresence>
@@ -143,284 +156,222 @@ const EventDetailModal = ({ event: initialEvent, isOpen, onClose }) => {
 				initial={{ opacity: 0 }}
 				animate={{ opacity: 1 }}
 				exit={{ opacity: 0 }}
-				className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4"
+				className="fixed inset-0 z-50 flex items-center justify-center bg-black/75"
 				onClick={onClose}
-				role="presentation"
 			>
+				{/* Non-scrollable modal container, uses viewport-fitting layout */}
 				<Motion.div
-					initial={{ opacity: 0, scale: 0.95 }}
-					animate={{ opacity: 1, scale: 1 }}
-					exit={{ opacity: 0, scale: 0.95 }}
-					className="glass-card rounded-2xl max-w-5xl w-full max-h-[90vh] overflow-y-auto relative"
+					initial={{ scale: 0.98, opacity: 0 }}
+					animate={{ scale: 1, opacity: 1 }}
+					exit={{ scale: 0.98, opacity: 0 }}
+					className="bg-gradient-to-br from-gray-900/90 to-black/90 text-white rounded-2xl w-[92vw] max-w-[1100px] h-[88vh] overflow-hidden shadow-2xl grid grid-rows-1 md:grid-cols-2 md:grid-rows-1"
 					onClick={(e) => e.stopPropagation()}
 					role="dialog"
 					aria-modal="true"
 					aria-labelledby="event-modal-title"
-					tabIndex={-1}
 				>
-					{/* Close Button */}
-					<button
-						ref={closeBtnRef}
-						onClick={onClose}
-						className="absolute top-3 right-3 z-20 bg-red-500/80 text-white p-2 rounded-full"
-						aria-label="Close event details"
-						type="button"
-					>
-						<svg
-							className="w-5 h-5"
-							fill="none"
-							stroke="currentColor"
-							viewBox="0 0 24 24"
-						>
-							<path
-								strokeLinecap="round"
-								strokeLinejoin="round"
-								strokeWidth={2}
-								d="M6 18L18 6M6 6l12 12"
-							/>
-						</svg>
-					</button>
-
-					<div className="md:grid md:grid-cols-2 md:gap-0">
-						{/* Image / gallery area */}
-						<div className="relative h-52 md:h-auto md:min-h-[40vh] bg-black rounded-t-2xl md:rounded-tr-none md:rounded-l-2xl flex items-center justify-center overflow-hidden">
-							{event.posters?.length > 0 ? (
+					{/* Left: image area (flexible) */}
+					<div className="relative md:col-span-1 flex-shrink-0 flex items-center justify-center bg-black">
+						{/* Constrain image so it doesn't force scrolling */}
+						{event.posters?.length ? (
+							<>
 								<img
-									key={currentImageIndex}
-									src={event.posters[currentImageIndex].url}
-									alt={
-										event.posters[currentImageIndex].caption ||
-										`${event.title} poster`
-									}
+									src={event.posters[imgIndex]?.url}
+									alt={event.posters[imgIndex]?.caption || event.title || 'poster'}
 									className="w-full h-full object-cover"
 									loading="lazy"
 								/>
-							) : (
-								<div className="w-full h-full flex items-center justify-center text-6xl opacity-20">
-									🎭
+								{event.posters.length > 1 && (
+									<>
+										<button
+											onClick={prevImg}
+											aria-label="Previous image"
+											className="absolute left-3 top-1/2 -translate-y-1/2 bg-black/40 p-2 rounded-full"
+										>
+											<svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+												<path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+											</svg>
+										</button>
+										<button
+											onClick={nextImg}
+											aria-label="Next image"
+											className="absolute right-3 top-1/2 -translate-y-1/2 bg-black/40 p-2 rounded-full"
+										>
+											<svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+												<path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+											</svg>
+										</button>
+									</>
+								)}
+								{/* image overlay summary */}
+								<div className="absolute left-4 bottom-4 px-3 py-2 bg-black/50 rounded-md text-sm">
+									{event.posters[imgIndex]?.caption ?? ''}
 								</div>
-							)}
-							{event.posters?.length > 1 && (
-								<>
-									<button
-										onClick={(e) => {
-											e.stopPropagation();
-											prevImage();
-										}}
-										type="button"
-										className="absolute left-2 top-1/2 -translate-y-1/2 bg-black/50 text-white p-2 rounded-full"
-										aria-label="Previous image"
-									>
-										<svg
-											className="w-6 h-6"
-											fill="none"
-											stroke="currentColor"
-											viewBox="0 0 24 24"
+							</>
+						) : (
+							<div className="flex items-center justify-center w-full h-full text-6xl opacity-20">🎭</div>
+						)}
+						{/* Close button over image for mobile */}
+						<button
+							ref={closeRef}
+							onClick={onClose}
+							aria-label="Close"
+							className="absolute top-4 right-4 bg-red-600/90 text-white p-2 rounded-full"
+						>
+							<svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+								<path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+							</svg>
+						</button>
+					</div>
+
+					{/* Right: details area - designed to fit inside viewport (no scroll) */}
+					<div className="p-5 md:p-6 flex flex-col justify-between md:col-span-1 bg-gradient-to-t from-black/60 to-transparent">
+						{/* Top: title + meta */}
+						<div className="space-y-3">
+							<div className="flex items-start justify-between gap-3">
+								<div className="flex-1 min-w-0">
+									<h2 id="event-modal-title" className="text-lg md:text-2xl font-bold leading-tight truncate">
+										{event.title}
+									</h2>
+									<p className="text-xs text-gray-400 mt-1">
+										{event.organizer ? `${event.organizer}` : event.host || ''}
+									</p>
+								</div>
+
+								{/* CTA column (compact) */}
+								<div className="flex flex-col items-end gap-2">
+									{registrationLink ? (
+										<button
+											onClick={onRegister}
+											className="bg-emerald-500 text-white px-3 py-1 rounded text-sm"
 										>
-											<path
-												strokeLinecap="round"
-												strokeLinejoin="round"
-												strokeWidth={2}
-												d="M15 19l-7-7 7-7"
-											/>
+											Register
+										</button>
+									) : countdown ? (
+										<div className="text-right">
+											<div className="text-xs text-gray-300">Starts in</div>
+											<div className="font-semibold">
+												{countdown.days > 0
+													? `${countdown.days}d ${countdown.hours}h`
+													: countdown.hours > 0
+													? `${countdown.hours}h ${countdown.mins}m`
+													: `${countdown.mins}m`}
+											</div>
+											<button onClick={onRemind} className="mt-1 text-xs px-2 py-0.5 rounded bg-blue-600 text-white">
+												Remind
+											</button>
+										</div>
+									) : (
+										<div className="text-xs text-gray-300">{event.status || 'TBD'}</div>
+									)}
+								</div>
+							</div>
+
+							{/* Meta chips */}
+							<div className="flex flex-wrap gap-2 items-center">
+								<span className="text-xs text-gray-300 flex items-center gap-1">
+									<svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+										<path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+									</svg>
+									{safeFormatDate(event.eventDate)}
+								</span>
+
+								{event.venue && (
+									<span className="text-xs text-gray-300 flex items-center gap-1">
+										<svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+											<path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
 										</svg>
-									</button>
-									<button
-										onClick={(e) => {
-											e.stopPropagation();
-											nextImage();
-										}}
-										type="button"
-										className="absolute right-2 top-1/2 -translate-y-1/2 bg-black/50 text-white p-2 rounded-full"
-										aria-label="Next image"
-									>
-										<svg
-											className="w-6 h-6"
-											fill="none"
-											stroke="currentColor"
-											viewBox="0 0 24 24"
-										>
-											<path
-												strokeLinecap="round"
-												strokeLinejoin="round"
-												strokeWidth={2}
-												d="M9 5l7 7-7 7"
-											/>
-										</svg>
-									</button>
-								</>
-							)}
+										{event.venue}
+									</span>
+								)}
+
+								{Array.isArray(event.tags) &&
+									event.tags.slice(0, 4).map((t) => (
+										<span key={t} className="text-xs bg-white/5 px-2 py-0.5 rounded">
+											{t}
+										</span>
+									))}
+							</div>
 						</div>
 
-						{/* Details */}
-						<div className="p-6 space-y-4">
-							{isLoading ? (
-								<div className="animate-pulse space-y-4">
-									<div className="h-6 bg-gray-700 rounded w-3/4" />
-									<div className="h-4 bg-gray-700 rounded w-1/2" />
-									<div className="h-48 bg-gray-800 rounded" />
-								</div>
-							) : isError ? (
-								<div className="text-center py-8">
-									<p className="text-red-400 mb-3">Failed to load details</p>
-									<button
-										className="px-4 py-2 rounded bg-blue-600 text-white"
-										onClick={(e) => {
-											e.stopPropagation();
-											refetch();
-										}}
-									>
-										Retry
-									</button>
-								</div>
-							) : (
-								<>
-									<header className="flex items-start justify-between gap-4">
-										<div className="flex-1">
-											<h2
-												id="event-modal-title"
-												className="text-2xl md:text-3xl font-bold text-white"
-											>
-												{event.title}
-											</h2>
-											<p className="text-sm text-gray-400 mt-1">
-												{event.organizer ? `${event.organizer}` : null}
-											</p>
-										</div>
-										<div className="flex flex-col items-end space-y-2">
-											{registrationLink ? (
-												<a
-													href={registrationLink}
-													target="_blank"
-													rel="noreferrer"
-													onClick={(e) => e.stopPropagation()}
-													className="inline-flex items-center gap-2 px-3 py-2 bg-emerald-500 text-white rounded shadow hover:bg-emerald-400"
-												>
-													Register
-													<svg
-														className="w-4 h-4"
-														fill="none"
-														stroke="currentColor"
-														viewBox="0 0 24 24"
-													>
-														<path
-															strokeLinecap="round"
-															strokeLinejoin="round"
-															strokeWidth={2}
-															d="M13 7l5 5m0 0l-5 5m5-5H6"
-														/>
-													</svg>
-												</a>
-											) : countdown ? (
-												<div className="text-right">
-													<div className="text-sm text-gray-300">Starts in</div>
-													<div className="font-semibold text-white">
-														{countdown.days > 0
-															? `${countdown.days}d ${countdown.hours}h`
-															: countdown.hours > 0
-															? `${countdown.hours}h ${countdown.mins}m`
-															: `${countdown.mins}m`}
-													</div>
-													<button
-														onClick={(e) => {
-															e.stopPropagation();
-															onRemindClick(e);
-														}}
-														className="mt-2 text-xs px-2 py-1 rounded bg-blue-600 text-white"
-													>
-														Remind me
-													</button>
+						{/* Middle: compact description and details (must fit) */}
+						<div className="mt-3 flex-1 min-h-0">
+							{/* We keep text compact to avoid modal overflow */}
+							<p className="text-sm text-gray-300 leading-snug" style={{ fontSize: '0.95rem', lineHeight: 1.2 }}>
+								{compactText(event.description, 1400)}
+							</p>
+
+							{/* Speakers / Partners / Resources in small tiles */}
+							<div className="mt-3 grid grid-cols-2 gap-2 text-xs">
+								{speakers.length > 0 && (
+									<div className="p-2 bg-white/3 rounded">
+										<div className="font-semibold text-xs">Speakers</div>
+										<div className="mt-1">
+											{speakers.slice(0, 4).map((sp, idx) => (
+												<div key={`${sp.name || idx}`} className="truncate">
+													{sp.name || sp.title || sp}
 												</div>
-											) : (
-												<div className="text-right">
-													<div className="text-sm text-gray-400">Status</div>
-													<div className="font-semibold text-white">
-														{event.status || (isOngoing ? 'Live' : 'TBD')}
-													</div>
-												</div>
-											)}
-										</div>
-									</header>
-
-									<div className="flex flex-wrap gap-4 text-sm items-center">
-										<div className="flex items-center gap-2 text-blue-300">
-											<svg
-												className="w-5 h-5"
-												fill="none"
-												stroke="currentColor"
-												viewBox="0 0 24 24"
-											>
-												<path
-													strokeLinecap="round"
-													strokeLinejoin="round"
-													strokeWidth={2}
-													d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"
-												/>
-											</svg>
-											<span className="font-medium">{safeFormatDate(event.eventDate)}</span>
-										</div>
-
-										{event.venue && (
-											<div className="flex items-center gap-2 text-cyan-300">
-												<svg
-													className="w-5 h-5"
-													fill="none"
-													stroke="currentColor"
-													viewBox="0 0 24 24"
-												>
-													<path
-														strokeLinecap="round"
-														strokeLinejoin="round"
-														strokeWidth={2}
-														d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"
-													/>
-												</svg>
-												<span className="font-medium">{event.venue}</span>
-											</div>
-										)}
-									</div>
-
-									<p className="text-gray-300 leading-relaxed mt-3">{event.description}</p>
-
-									{event.tags?.length > 0 && (
-										<div className="flex flex-wrap gap-2 mt-3">
-											{event.tags.map((tag) => (
-												<span
-													key={tag}
-													className="px-3 py-1 bg-blue-500/20 text-blue-300 rounded-full text-xs font-medium"
-												>
-													{tag}
-												</span>
 											))}
 										</div>
-									)}
-
-									{/* Secondary actions */}
-									<div className="flex items-center gap-2 mt-4">
-										<button
-											onClick={(e) => {
-												e.stopPropagation();
-												downloadICS(e);
-											}}
-											className="px-3 py-2 rounded bg-transparent border border-gray-700 text-gray-200 text-sm hover:bg-gray-800"
-										>
-											Add to calendar
-										</button>
-
-										{!registrationLink && (
-											<button
-												onClick={(e) => {
-													e.stopPropagation();
-													onRemindClick(e);
-												}}
-												className="px-3 py-2 rounded bg-blue-600 text-white text-sm hover:bg-blue-500"
-											>
-												Notify me
-											</button>
-										)}
 									</div>
-								</>
-							)}
+								)}
+
+								{partners.length > 0 && (
+									<div className="p-2 bg-white/3 rounded">
+										<div className="font-semibold text-xs">Partners</div>
+										<div className="mt-1">
+											{partners.slice(0, 4).map((p, i) => (
+												<div key={p.name || i} className="truncate">
+													{p.name || p}
+												</div>
+											))}
+										</div>
+									</div>
+								)}
+
+								{resources.length > 0 && (
+									<div className="p-2 bg-white/3 rounded col-span-2">
+										<div className="font-semibold text-xs">Resources</div>
+										<div className="mt-1 grid gap-1 text-xxs">
+											{resources.slice(0, 6).map((r, i) => (
+												<a
+													key={r.title || r.url || i}
+													href={r.url || '#'}
+													onClick={(e) => e.stopPropagation()}
+													target="_blank"
+													rel="noreferrer"
+													className="text-sm text-blue-300 inline-block truncate"
+												>
+													{r.title || r.url}
+												</a>
+											))}
+										</div>
+									</div>
+								)}
+							</div>
+						</div>
+
+						{/* Bottom: actions and small meta bar (always visible) */}
+						<div className="mt-4 flex items-center justify-between gap-3">
+							<div className="flex items-center gap-2">
+								<button
+									onClick={downloadICS}
+									className="text-sm px-3 py-1 rounded bg-transparent border border-white/10"
+								>
+									Add to calendar
+								</button>
+
+								{!registrationLink && (
+									<button onClick={onRemind} className="text-sm px-3 py-1 rounded bg-blue-600 text-white">
+										Notify me
+									</button>
+								)}
+							</div>
+
+							<div className="text-right text-xs text-gray-400">
+								<div>ID: <span className="text-gray-300">{event._id?.slice?.(0, 8) ?? '-'}</span></div>
+								<div className="mt-1">Created: <span className="text-gray-300">{event.createdAt ? new Date(event.createdAt).toLocaleDateString() : '-'}</span></div>
+							</div>
 						</div>
 					</div>
 				</Motion.div>
