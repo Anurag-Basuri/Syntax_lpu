@@ -9,13 +9,9 @@ import { isLeadershipRole } from '../constants/team.js';
 const ErrorBlock = ({ message, onRetry }) => (
 	<div className="flex flex-col items-center justify-center text-center py-24 px-4">
 		<div className="text-5xl mb-4">⚠️</div>
-		<h2 className="text-xl font-semibold mb-2" style={{ color: 'var(--accent-1)' }}>
-			Failed to load team
-		</h2>
-		<p className="text-sm mb-6 max-w-md" style={{ color: 'var(--text-secondary)' }}>
-			{message}
-		</p>
-		<button onClick={onRetry} className="btn btn-secondary">
+		<h2 className="text-xl font-semibold mb-2 text-[var(--accent-1)]">Failed to load team</h2>
+		<p className="text-sm mb-6 max-w-md text-[var(--text-secondary)]">{message}</p>
+		<button onClick={onRetry} className="inline-flex items-center gap-2 px-4 py-2 rounded-md bg-[var(--button-primary-bg)] text-white">
 			Retry
 		</button>
 	</div>
@@ -30,62 +26,7 @@ const TeamsPage = () => {
 	const [showMobileFilters, setShowMobileFilters] = useState(false);
 	const [showMobileSort, setShowMobileSort] = useState(false);
 
-	// Lock body scroll when mobile sidebar is open
-	useEffect(() => {
-		if (showMobileFilters) {
-			document.body.style.overflow = 'hidden';
-		} else {
-			document.body.style.overflow = '';
-		}
-		return () => {
-			document.body.style.overflow = '';
-		};
-	}, [showMobileFilters]);
-
-	// Close mobile menus when clicking outside or pressing Escape
-	useEffect(() => {
-		const handleClickOutside = (e) => {
-			if (showMobileFilters) {
-				const sidebar = document.querySelector('.team-sidebar');
-				const filterButton = document.querySelector('[aria-label="Toggle filters"]');
-				if (
-					sidebar &&
-					!sidebar.contains(e.target) &&
-					filterButton &&
-					!filterButton.contains(e.target)
-				) {
-					setShowMobileFilters(false);
-				}
-			}
-			if (showMobileSort) {
-				const sortButton = document.querySelector('[aria-label="Sort team members"]');
-				const sortDropdown = document.querySelector('.mobile-sort-dropdown');
-				if (
-					sortButton &&
-					!sortButton.contains(e.target) &&
-					sortDropdown &&
-					!sortDropdown.contains(e.target)
-				) {
-					setShowMobileSort(false);
-				}
-			}
-		};
-
-		const handleEscape = (e) => {
-			if (e.key === 'Escape') {
-				setShowMobileFilters(false);
-				setShowMobileSort(false);
-			}
-		};
-
-		document.addEventListener('mousedown', handleClickOutside);
-		document.addEventListener('keydown', handleEscape);
-		return () => {
-			document.removeEventListener('mousedown', handleClickOutside);
-			document.removeEventListener('keydown', handleEscape);
-		};
-	}, [showMobileFilters, showMobileSort]);
-
+	// prepare enrichedMembers
 	const enrichedMembers = useMemo(() => {
 		const members = data?.members || [];
 		return members.map((m) => {
@@ -93,15 +34,9 @@ const TeamsPage = () => {
 			const department = Array.isArray(m.department) ? m.department[0] : m.department;
 			const primaryDept = m.primaryDepartment || department || 'Other';
 			const primaryRole = m.primaryDesignation || designation || 'Member';
-			const isLeader = !!(
-				m.isLeader || isLeadershipRole(designation || m.primaryDesignation)
-			);
+			const isLeader = !!(m.isLeader || isLeadershipRole(designation || m.primaryDesignation));
 			const skills = Array.isArray(m.skills) ? m.skills : [];
-			const haystack = [m.fullname, primaryDept, primaryRole, ...skills]
-				.filter(Boolean)
-				.join(' ')
-				.toLowerCase();
-
+			const haystack = [m.fullname, primaryDept, primaryRole, ...skills].filter(Boolean).join(' ').toLowerCase();
 			return { ...m, isLeader, primaryDept, primaryRole, _searchHaystack: haystack };
 		});
 	}, [data?.members]);
@@ -114,14 +49,10 @@ const TeamsPage = () => {
 	const filteredMembers = useMemo(() => {
 		const q = query.trim().toLowerCase();
 		let filtered = enrichedMembers;
-
 		if (q) filtered = filtered.filter((m) => m._searchHaystack.includes(q));
-
 		if (activeFilter === 'Leadership') filtered = filtered.filter((m) => m.isLeader);
-		else if (activeFilter !== 'All')
-			filtered = filtered.filter((m) => m.primaryDept === activeFilter);
+		else if (activeFilter !== 'All') filtered = filtered.filter((m) => m.primaryDept === activeFilter);
 
-		// Sorting
 		const by = (v) => (v || '').toString().toLowerCase();
 		const comparators = {
 			name: (a, b) => by(a.fullname).localeCompare(by(b.fullname)),
@@ -142,230 +73,146 @@ const TeamsPage = () => {
 		);
 	}
 
+	// counts
+	const totalCount = enrichedMembers.length;
+	const resultCount = filteredMembers.length;
+
 	return (
-		<div className="page-container tight-top team-page-layout">
-			{/* Mobile Filter Toggle Button */}
-			<button
-				onClick={(e) => {
-					e.stopPropagation();
-					setShowMobileFilters(!showMobileFilters);
-					setShowMobileSort(false);
-				}}
-				className="lg:hidden fixed bottom-4 right-4 sm:bottom-6 sm:right-6 z-[9999] w-12 h-12 sm:w-14 sm:h-14 rounded-full bg-gradient-to-r from-indigo-600 to-purple-600 text-white shadow-2xl flex items-center justify-center hover:scale-105 active:scale-95 transition-transform"
-				aria-label="Toggle filters"
-				aria-expanded={showMobileFilters}
-			>
-				<Filter size={18} className="sm:w-5 sm:h-5" />
-			</button>
-
-			{/* Mobile Filter Overlay */}
-			{showMobileFilters && (
-				<div
-					className="lg:hidden fixed inset-0 z-[9998] bg-black/50 backdrop-blur-sm transition-opacity"
-					onClick={(e) => {
-						e.stopPropagation();
-						setShowMobileFilters(false);
-					}}
-					aria-hidden="true"
-				/>
-			)}
-
-			{/* Sidebar */}
-			<aside
-				className={`team-sidebar ${showMobileFilters ? 'mobile-sidebar-open' : ''} ${
-					showMobileFilters ? 'block' : 'hidden lg:block'
-				}`}
-				onClick={(e) => e.stopPropagation()}
-			>
-				<div className="team-sidebar-content p-4 lg:p-6">
-					<div className="flex items-center justify-between mb-4 lg:mb-2">
-						<h2 className="filter-header flex-1 flex items-center gap-2 text-sm font-semibold">
-							<Users size={18} />
-							<span>Departments</span>
-						</h2>
-						<button
-							onClick={(e) => {
-								e.stopPropagation();
-								setShowMobileFilters(false);
-							}}
-							className="lg:hidden p-2 rounded-lg hover:bg-glass-hover transition-colors"
-							aria-label="Close filters"
-						>
-							<X size={18} />
-						</button>
-					</div>
-					<nav className="filter-nav flex flex-col gap-2" aria-label="Departments">
-						{departments.map((dept) => (
-							<button
-								key={dept}
-								className={`filter-button flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-all ${
-									activeFilter === dept
-										? 'bg-gradient-to-r from-indigo-50 to-purple-50 dark:from-indigo-900/40 dark:to-purple-900/30 ring-1 ring-indigo-300 dark:ring-0 shadow-sm'
-										: 'hover:bg-gray-50 dark:hover:bg-gray-800'
-								}`}
-								onClick={(e) => {
-									e.stopPropagation();
-									setActiveFilter(dept);
-									setShowMobileFilters(false);
-								}}
-								aria-pressed={activeFilter === dept}
-							>
-								{dept === 'Leadership' && <Star size={16} className="text-amber-500" />}
-								{dept !== 'Leadership' && dept !== 'All' && <Briefcase size={16} />}
-								<span className="truncate">{dept}</span>
-							</button>
-						))}
-					</nav>
-				</div>
-			</aside>
-
-			{/* Main Content */}
-			<main className="team-main-content w-full">
-				<header className="mb-6">
-					<div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-3">
-						<div>
-							<h1 className="text-3xl sm:text-4xl md:text-5xl font-extrabold tracking-tight brand-text leading-tight">
-								Our Team
-							</h1>
-							<p className="text-sm mt-1 text-[var(--text-secondary)]">
-								{isLoading
-									? 'Loading amazing people…'
-									: `${enrichedMembers.length} talented member${
-											enrichedMembers.length !== 1 ? 's' : ''
-									  } across ${departments.length - 2} department${
-											departments.length - 2 !== 1 ? 's' : ''
-									  }`}
-							</p>
-						</div>
-
-						<div className="hidden sm:flex items-center gap-3">
-							<div className="text-sm text-[var(--text-secondary)]">
-								{isLoading ? '—' : `${filteredMembers.length} result${filteredMembers.length !== 1 ? 's' : ''}`}
-							</div>
+		<div className="page-container tight-top">
+			{/* Premium hero */}
+			<header className="rounded-2xl p-6 md:p-8 mb-6 bg-gradient-to-r from-[rgba(6,182,212,0.06)] to-[rgba(124,58,237,0.04)] border border-[var(--glass-border)]">
+				<div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+					<div>
+						<h1 className="text-3xl md:text-4xl font-extrabold tracking-tight brand-text">Our Team</h1>
+						<p className="mt-2 text-sm text-[var(--text-secondary)]">A collective of builders, mentors and volunteers driving impact.</p>
+						<div className="mt-3 flex items-center gap-3 text-sm text-[var(--text-muted)]">
+							<span className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/90 dark:bg-white/6">
+								<Users size={16} /> <strong>{totalCount}</strong> members
+							</span>
+							<span className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/90 dark:bg-white/6">
+								<Star size={16} /> Leadership highlighted
+							</span>
 						</div>
 					</div>
-				</header>
 
-				{/* Controls */}
-				<div className="team-controls sticky top-[var(--navbar-height,4.5rem)] z-40 backdrop-blur-md py-4 px-4 sm:px-6 rounded-b-2xl bg-white/70 dark:bg-gray-900/60 border-b border-gray-200 dark:border-gray-800">
-					<div className="max-w-8xl mx-auto flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-						<div className="search-bar-wrapper relative flex-1 max-w-xl">
-							<Search
-								className="search-icon absolute left-3 top-1/2 -translate-y-1/2 text-[var(--text-muted)]"
-								aria-hidden="true"
-							/>
+					<div className="flex items-center gap-3">
+						{/* Search */}
+						<div className="relative">
+							<Search className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--text-muted)]" />
 							<input
 								value={query}
 								onChange={(e) => setQuery(e.target.value)}
-								placeholder="Search by name, role, or skill…"
-								className="search-input pl-10 pr-10 w-full rounded-lg border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 py-2.5 focus:ring-2 focus:ring-indigo-300 focus:outline-none"
+								placeholder="Search name, role, skill..."
+								className="pl-10 pr-10 py-2.5 rounded-lg border border-[var(--glass-border)] bg-[var(--input-bg)] focus:ring-2 focus:ring-[var(--accent-1)]"
 								aria-label="Search team members"
-								type="search"
 							/>
 							{query && (
-								<button
-									type="button"
-									aria-label="Clear search"
-									onClick={() => setQuery('')}
-									className="clear-search-button absolute right-2 top-1/2 -translate-y-1/2 touch-manipulation p-1.5 rounded-md hover:bg-gray-100 dark:hover:bg-gray-800"
-								>
+								<button onClick={() => setQuery('')} className="absolute right-2 top-1/2 -translate-y-1/2 p-1.5 rounded-md">
 									<X size={16} />
 								</button>
 							)}
 						</div>
 
-						<div className="controls-right flex items-center gap-3">
-							{/* Desktop Sort */}
-							<div className="hidden lg:flex items-center gap-2">
-								<label htmlFor="sort-select" className="control-label text-sm">
-									Sort
-								</label>
-								<select
-									id="sort-select"
-									className="control-select text-sm rounded-md border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 py-2 px-3"
-									value={sortBy}
-									onChange={(e) => setSortBy(e.target.value)}
-									aria-label="Sort team members"
+						{/* Sort select for larger screens */}
+						<div className="hidden md:flex items-center gap-2">
+							<label className="text-sm text-[var(--text-muted)]">Sort</label>
+							<select value={sortBy} onChange={(e) => setSortBy(e.target.value)} className="rounded-md border border-[var(--glass-border)] py-2 px-3 bg-[var(--input-bg)]">
+								<option value="name">Name</option>
+								<option value="role">Role</option>
+								<option value="dept">Department</option>
+							</select>
+						</div>
+
+						{/* Mobile filter toggle */}
+						<button
+							onClick={() => setShowMobileFilters(true)}
+							className="md:hidden inline-flex items-center gap-2 px-3 py-2 rounded-md bg-[var(--button-secondary-bg)] border border-[var(--button-secondary-border)]"
+							aria-label="Open filters"
+						>
+							<Filter size={16} /> Filters
+						</button>
+					</div>
+				</div>
+			</header>
+
+			{/* Layout: sidebar + main content */}
+			<div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
+				{/* Sidebar for desktop */}
+				<aside className="hidden lg:block lg:col-span-1">
+					<div className="sticky top-[calc(var(--navbar-height,4.5rem)+1rem)] space-y-4">
+						<h4 className="text-sm font-semibold">Departments</h4>
+						<div className="flex flex-col gap-2">
+							{departments.map((dept) => (
+								<button
+									key={dept}
+									onClick={() => setActiveFilter(dept)}
+									className={`text-left px-3 py-2 rounded-md ${activeFilter === dept ? 'bg-[var(--button-secondary-bg)] ring-1 ring-[var(--accent-1)]' : 'hover:bg-[var(--glass-hover)]'}`}
+									aria-pressed={activeFilter === dept}
 								>
+									{dept}
+								</button>
+							))}
+						</div>
+					</div>
+				</aside>
+
+				{/* Main */}
+				<main className="lg:col-span-4">
+					{/* responsive control bar */}
+					<div className="mb-4 flex items-center justify-between gap-3">
+						<div className="text-sm text-[var(--text-secondary)] hidden md:block">
+							{resultCount} result{resultCount !== 1 ? 's' : ''} • {totalCount} total
+						</div>
+
+						<div className="flex items-center gap-2">
+							{/* Desktop sort (already above) -- show current on mobile */}
+							<div className="md:hidden inline-flex items-center gap-2">
+								<select value={sortBy} onChange={(e) => setSortBy(e.target.value)} className="rounded-md border border-[var(--glass-border)] py-2 px-3 bg-[var(--input-bg)]">
 									<option value="name">Name</option>
 									<option value="role">Role</option>
 									<option value="dept">Department</option>
 								</select>
 							</div>
+						</div>
+					</div>
 
-							{/* Mobile Sort Dropdown */}
-							<div className="lg:hidden relative mobile-sort-container">
-								<button
-									onClick={(e) => {
-										e.stopPropagation();
-										setShowMobileSort(!showMobileSort);
-										setShowMobileFilters(false);
-									}}
-									className="flex items-center justify-between gap-2 px-3 py-2.5 rounded-lg border-2 border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-sm font-medium text-gray-700 dark:text-gray-300 min-w-[110px] max-w-[140px]"
-									aria-label="Sort team members"
-									aria-expanded={showMobileSort}
-								>
-									<span className="truncate">
-										{sortBy === 'name'
-											? 'Name'
-											: sortBy === 'role'
-											? 'Role'
-											: 'Dept'}
-									</span>
-									<ChevronDown
-										size={14}
-										className={`flex-shrink-0 transition-transform ${showMobileSort ? 'rotate-180' : ''}`}
-									/>
-								</button>
-								{showMobileSort && (
-									<div className="mobile-sort-dropdown absolute top-full left-0 right-0 mt-1 bg-white dark:bg-gray-800 border-2 border-gray-200 dark:border-gray-700 rounded-lg shadow-xl z-[10000] overflow-hidden min-w-[140px]">
-										{['name', 'role', 'dept'].map((option) => (
-											<button
-												key={option}
-												onClick={(e) => {
-													e.stopPropagation();
-													setSortBy(option);
-													setShowMobileSort(false);
-												}}
-												className={`w-full text-left px-3 py-2.5 text-sm hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors ${
-													sortBy === option
-														? 'bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 font-medium'
-														: 'text-gray-700 dark:text-gray-300'
-												}`}
-											>
-												{option === 'name' ? 'Name' : option === 'role' ? 'Role' : 'Department'}
-											</button>
-										))}
-									</div>
-								)}
-							</div>
+					{/* Content */}
+					<div className="py-3">
+						{isLoading ? <TeamSkeleton /> : <TeamGrid members={filteredMembers} onCardClick={openModal} />}
+					</div>
+				</main>
+			</div>
 
-							<div className="result-count text-sm text-[var(--text-secondary)] lg:hidden" aria-live="polite">
-								{isLoading ? '—' : `${filteredMembers.length} result${filteredMembers.length !== 1 ? 's' : ''}`}
+			{/* Mobile filters drawer */}
+			{showMobileFilters && (
+				<div className="fixed inset-0 z-[60]">
+					<div className="absolute inset-0 bg-black/40" onClick={() => setShowMobileFilters(false)} />
+					<div className="absolute bottom-0 left-0 right-0 bg-[var(--card-bg)] border-t border-[var(--card-border)] p-4 rounded-t-xl max-h-[70vh] overflow-auto">
+						<div className="flex items-center justify-between mb-3">
+							<h3 className="text-lg font-semibold">Filters</h3>
+							<button onClick={() => setShowMobileFilters(false)} className="p-2 rounded-md"><X size={18} /></button>
+						</div>
+						<div className="space-y-3">
+							<h4 className="text-sm font-medium">Departments</h4>
+							<div className="flex flex-col gap-2">
+								{departments.map((dept) => (
+									<button
+										key={dept}
+										onClick={() => { setActiveFilter(dept); setShowMobileFilters(false); }}
+										className={`text-left px-3 py-2 rounded-md ${activeFilter === dept ? 'bg-[var(--button-secondary-bg)] ring-1 ring-[var(--accent-1)]' : 'hover:bg-[var(--glass-hover)]'}`}
+									>
+										{dept}
+									</button>
+								))}
 							</div>
 						</div>
 					</div>
 				</div>
+			)}
 
-				{/* Content */}
-				<div className="py-6">
-					{isLoading ? (
-						<TeamSkeleton />
-					) : (
-						<TeamGrid members={filteredMembers} onCardClick={openModal} />
-					)}
-				</div>
-			</main>
-
-			<TeamMemberModal
-				member={selectedMember}
-				isOpen={!!selectedMember}
-				onClose={closeModal}
-			/>
+			<TeamMemberModal member={selectedMember} isOpen={!!selectedMember} onClose={closeModal} />
 		</div>
 	);
 };
 
-const TeamsPageWrapper = () => <TeamsPage />;
-
-export default TeamsPageWrapper;
+export default TeamsPage;
