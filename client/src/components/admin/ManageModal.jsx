@@ -1,7 +1,9 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { Trash2, Plus, User } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 import {
+	addEventPoster,
+	removeEventPoster,
 	addEventPartner,
 	removeEventPartner,
 	addEventSpeaker,
@@ -11,8 +13,6 @@ import {
 	addEventCoOrganizer,
 	removeEventCoOrganizerByIndex,
 	removeEventCoOrganizerByName,
-	addEventPoster,
-	removeEventPoster,
 } from '../../services/eventServices.js';
 import formatApiError from '../../utils/formatApiError.js';
 
@@ -28,6 +28,21 @@ const ManageModal = ({ open = true, event, onClose, onDone, setParentError }) =>
 	const [coName, setCoName] = useState('');
 	const [posterFile, setPosterFile] = useState(null);
 
+	const abortRef = useRef(null);
+	const mountedRef = useRef(true);
+
+	useEffect(() => {
+		mountedRef.current = true;
+		return () => {
+			mountedRef.current = false;
+			// abort any in-flight request when unmounting modal
+			if (abortRef.current) {
+				abortRef.current.abort();
+				abortRef.current = null;
+			}
+		};
+	}, []);
+
 	useEffect(() => {
 		setError('');
 		setPartnerForm({ name: '', website: '', logo: null });
@@ -37,9 +52,18 @@ const ManageModal = ({ open = true, event, onClose, onDone, setParentError }) =>
 		setPosterFile(null);
 	}, [event, open]);
 
+	const createAbort = () => {
+		// cancel previous if any
+		if (abortRef.current) {
+			abortRef.current.abort();
+		}
+		abortRef.current = new AbortController();
+		return abortRef.current.signal;
+	};
+
 	const handleApiError = (err) => {
 		const msg = formatApiError(err);
-		setError(msg);
+		if (mountedRef.current) setError(msg);
 		setParentError?.(msg);
 		toast.error(msg);
 	};
@@ -48,7 +72,7 @@ const ManageModal = ({ open = true, event, onClose, onDone, setParentError }) =>
 	const ensureEventId = () => {
 		if (!event || !event._id) {
 			const msg = 'Event not available';
-			setError(msg);
+			if (mountedRef.current) setError(msg);
 			toast.error(msg);
 			return null;
 		}
@@ -57,11 +81,16 @@ const ManageModal = ({ open = true, event, onClose, onDone, setParentError }) =>
 
 	// Partners
 	const handleAddPartner = async () => {
-		if (!partnerForm.name || !partnerForm.name.trim()) return setError('Name required');
+		if (!partnerForm.name || !partnerForm.name.trim()) {
+			return setError('Name required');
+		}
 		const id = ensureEventId();
 		if (!id) return;
-		setError('');
-		setLoading(true);
+		if (mountedRef.current) {
+			setError('');
+			setLoading(true);
+		}
+		const signal = createAbort();
 		try {
 			let payload;
 			if (partnerForm.logo instanceof File) {
@@ -75,14 +104,18 @@ const ManageModal = ({ open = true, event, onClose, onDone, setParentError }) =>
 					website: partnerForm.website?.trim(),
 				};
 			}
-			await addEventPartner(id, payload);
-			setPartnerForm({ name: '', website: '', logo: null });
-			toast.success('Partner added');
-			onDone && onDone();
+			await addEventPartner(id, payload, { signal });
+			if (mountedRef.current) {
+				setPartnerForm({ name: '', website: '', logo: null });
+				toast.success('Partner added');
+				onDone && onDone();
+			}
 		} catch (err) {
+			// ignore abort errors
+			if (err?.name === 'CanceledError' || err?.message === 'canceled') return;
 			handleApiError(err);
 		} finally {
-			setLoading(false);
+			if (mountedRef.current) setLoading(false);
 		}
 	};
 
@@ -91,15 +124,19 @@ const ManageModal = ({ open = true, event, onClose, onDone, setParentError }) =>
 		if (!window.confirm('Remove partner?')) return;
 		const id = ensureEventId();
 		if (!id) return;
-		setLoading(true);
+		if (mountedRef.current) setLoading(true);
+		const signal = createAbort();
 		try {
-			await removeEventPartner(id, ident);
-			toast.success('Partner removed');
-			onDone && onDone();
+			await removeEventPartner(id, ident, { signal });
+			if (mountedRef.current) {
+				toast.success('Partner removed');
+				onDone && onDone();
+			}
 		} catch (err) {
+			if (err?.name === 'CanceledError' || err?.message === 'canceled') return;
 			handleApiError(err);
 		} finally {
-			setLoading(false);
+			if (mountedRef.current) setLoading(false);
 		}
 	};
 
@@ -108,8 +145,11 @@ const ManageModal = ({ open = true, event, onClose, onDone, setParentError }) =>
 		if (!speakerForm.name || !speakerForm.name.trim()) return setError('Name required');
 		const id = ensureEventId();
 		if (!id) return;
-		setError('');
-		setLoading(true);
+		if (mountedRef.current) {
+			setError('');
+			setLoading(true);
+		}
+		const signal = createAbort();
 		try {
 			let payload;
 			if (speakerForm.photo instanceof File) {
@@ -125,14 +165,17 @@ const ManageModal = ({ open = true, event, onClose, onDone, setParentError }) =>
 					bio: speakerForm.bio?.trim(),
 				};
 			}
-			await addEventSpeaker(id, payload);
-			setSpeakerForm({ name: '', title: '', bio: '', photo: null });
-			toast.success('Speaker added');
-			onDone && onDone();
+			await addEventSpeaker(id, payload, { signal });
+			if (mountedRef.current) {
+				setSpeakerForm({ name: '', title: '', bio: '', photo: null });
+				toast.success('Speaker added');
+				onDone && onDone();
+			}
 		} catch (err) {
+			if (err?.name === 'CanceledError' || err?.message === 'canceled') return;
 			handleApiError(err);
 		} finally {
-			setLoading(false);
+			if (mountedRef.current) setLoading(false);
 		}
 	};
 
@@ -140,15 +183,19 @@ const ManageModal = ({ open = true, event, onClose, onDone, setParentError }) =>
 		if (!window.confirm('Remove speaker?')) return;
 		const id = ensureEventId();
 		if (!id) return;
-		setLoading(true);
+		if (mountedRef.current) setLoading(true);
+		const signal = createAbort();
 		try {
-			await removeEventSpeaker(id, index);
-			toast.success('Speaker removed');
-			onDone && onDone();
+			await removeEventSpeaker(id, index, { signal });
+			if (mountedRef.current) {
+				toast.success('Speaker removed');
+				onDone && onDone();
+			}
 		} catch (err) {
+			if (err?.name === 'CanceledError' || err?.message === 'canceled') return;
 			handleApiError(err);
 		} finally {
-			setLoading(false);
+			if (mountedRef.current) setLoading(false);
 		}
 	};
 
@@ -157,20 +204,30 @@ const ManageModal = ({ open = true, event, onClose, onDone, setParentError }) =>
 		if (!resourceForm.title || !resourceForm.url) return setError('Title and URL required');
 		const id = ensureEventId();
 		if (!id) return;
-		setError('');
-		setLoading(true);
+		if (mountedRef.current) {
+			setError('');
+			setLoading(true);
+		}
+		const signal = createAbort();
 		try {
-			await addEventResource(id, {
-				title: resourceForm.title.trim(),
-				url: resourceForm.url.trim(),
-			});
-			setResourceForm({ title: '', url: '' });
-			toast.success('Resource added');
-			onDone && onDone();
+			await addEventResource(
+				id,
+				{
+					title: resourceForm.title.trim(),
+					url: resourceForm.url.trim(),
+				},
+				{ signal }
+			);
+			if (mountedRef.current) {
+				setResourceForm({ title: '', url: '' });
+				toast.success('Resource added');
+				onDone && onDone();
+			}
 		} catch (err) {
+			if (err?.name === 'CanceledError' || err?.message === 'canceled') return;
 			handleApiError(err);
 		} finally {
-			setLoading(false);
+			if (mountedRef.current) setLoading(false);
 		}
 	};
 
@@ -178,15 +235,19 @@ const ManageModal = ({ open = true, event, onClose, onDone, setParentError }) =>
 		if (!window.confirm('Remove resource?')) return;
 		const id = ensureEventId();
 		if (!id) return;
-		setLoading(true);
+		if (mountedRef.current) setLoading(true);
+		const signal = createAbort();
 		try {
-			await removeEventResource(id, index);
-			toast.success('Resource removed');
-			onDone && onDone();
+			await removeEventResource(id, index, { signal });
+			if (mountedRef.current) {
+				toast.success('Resource removed');
+				onDone && onDone();
+			}
 		} catch (err) {
+			if (err?.name === 'CanceledError' || err?.message === 'canceled') return;
 			handleApiError(err);
 		} finally {
-			setLoading(false);
+			if (mountedRef.current) setLoading(false);
 		}
 	};
 
@@ -195,17 +256,23 @@ const ManageModal = ({ open = true, event, onClose, onDone, setParentError }) =>
 		if (!coName || !coName.trim()) return setError('Name required');
 		const id = ensureEventId();
 		if (!id) return;
-		setError('');
-		setLoading(true);
+		if (mountedRef.current) {
+			setError('');
+			setLoading(true);
+		}
+		const signal = createAbort();
 		try {
-			await addEventCoOrganizer(id, { name: coName.trim() });
-			setCoName('');
-			toast.success('Co-organizer added');
-			onDone && onDone();
+			await addEventCoOrganizer(id, { name: coName.trim() }, { signal });
+			if (mountedRef.current) {
+				setCoName('');
+				toast.success('Co-organizer added');
+				onDone && onDone();
+			}
 		} catch (err) {
+			if (err?.name === 'CanceledError' || err?.message === 'canceled') return;
 			handleApiError(err);
 		} finally {
-			setLoading(false);
+			if (mountedRef.current) setLoading(false);
 		}
 	};
 
@@ -213,15 +280,19 @@ const ManageModal = ({ open = true, event, onClose, onDone, setParentError }) =>
 		if (!window.confirm('Remove co-organizer?')) return;
 		const id = ensureEventId();
 		if (!id) return;
-		setLoading(true);
+		if (mountedRef.current) setLoading(true);
+		const signal = createAbort();
 		try {
-			await removeEventCoOrganizerByIndex(id, idx);
-			toast.success('Co-organizer removed');
-			onDone && onDone();
+			await removeEventCoOrganizerByIndex(id, idx, { signal });
+			if (mountedRef.current) {
+				toast.success('Co-organizer removed');
+				onDone && onDone();
+			}
 		} catch (err) {
+			if (err?.name === 'CanceledError' || err?.message === 'canceled') return;
 			handleApiError(err);
 		} finally {
-			setLoading(false);
+			if (mountedRef.current) setLoading(false);
 		}
 	};
 
@@ -230,15 +301,19 @@ const ManageModal = ({ open = true, event, onClose, onDone, setParentError }) =>
 		if (!window.confirm(`Remove co-organizer "${name}"?`)) return;
 		const id = ensureEventId();
 		if (!id) return;
-		setLoading(true);
+		if (mountedRef.current) setLoading(true);
+		const signal = createAbort();
 		try {
-			await removeEventCoOrganizerByName(id, name);
-			toast.success('Co-organizer removed');
-			onDone && onDone();
+			await removeEventCoOrganizerByName(id, name, { signal });
+			if (mountedRef.current) {
+				toast.success('Co-organizer removed');
+				onDone && onDone();
+			}
 		} catch (err) {
+			if (err?.name === 'CanceledError' || err?.message === 'canceled') return;
 			handleApiError(err);
 		} finally {
-			setLoading(false);
+			if (mountedRef.current) setLoading(false);
 		}
 	};
 
@@ -247,19 +322,25 @@ const ManageModal = ({ open = true, event, onClose, onDone, setParentError }) =>
 		if (!posterFile) return setError('Choose a file first');
 		const id = ensureEventId();
 		if (!id) return;
-		setError('');
-		setLoading(true);
+		if (mountedRef.current) {
+			setError('');
+			setLoading(true);
+		}
+		const signal = createAbort();
 		try {
 			const fd = new FormData();
 			fd.append('poster', posterFile);
-			await addEventPoster(id, fd);
-			setPosterFile(null);
-			toast.success('Poster added');
-			onDone && onDone();
+			await addEventPoster(id, fd, { signal });
+			if (mountedRef.current) {
+				setPosterFile(null);
+				toast.success('Poster added');
+				onDone && onDone();
+			}
 		} catch (err) {
+			if (err?.name === 'CanceledError' || err?.message === 'canceled') return;
 			handleApiError(err);
 		} finally {
-			setLoading(false);
+			if (mountedRef.current) setLoading(false);
 		}
 	};
 
@@ -268,15 +349,19 @@ const ManageModal = ({ open = true, event, onClose, onDone, setParentError }) =>
 		if (!window.confirm('Remove poster?')) return;
 		const id = ensureEventId();
 		if (!id) return;
-		setLoading(true);
+		if (mountedRef.current) setLoading(true);
+		const signal = createAbort();
 		try {
-			await removeEventPoster(id, publicId);
-			toast.success('Poster removed');
-			onDone && onDone();
+			await removeEventPoster(id, publicId, { signal });
+			if (mountedRef.current) {
+				toast.success('Poster removed');
+				onDone && onDone();
+			}
 		} catch (err) {
+			if (err?.name === 'CanceledError' || err?.message === 'canceled') return;
 			handleApiError(err);
 		} finally {
-			setLoading(false);
+			if (mountedRef.current) setLoading(false);
 		}
 	};
 
@@ -422,6 +507,7 @@ const ManageModal = ({ open = true, event, onClose, onDone, setParentError }) =>
 													}
 													className="text-red-400 p-1"
 													aria-label={`Remove partner ${p.name}`}
+													disabled={loading}
 												>
 													<Trash2 className="h-4 w-4" />
 												</button>
@@ -440,6 +526,7 @@ const ManageModal = ({ open = true, event, onClose, onDone, setParentError }) =>
 										}
 										className="px-3 py-2 bg-gray-800 rounded w-full"
 										aria-label="Partner name"
+										disabled={loading}
 									/>
 									<input
 										placeholder="Website"
@@ -452,6 +539,7 @@ const ManageModal = ({ open = true, event, onClose, onDone, setParentError }) =>
 										}
 										className="px-3 py-2 bg-gray-800 rounded w-full"
 										aria-label="Partner website"
+										disabled={loading}
 									/>
 									<div className="flex items-center gap-2">
 										<input
@@ -465,6 +553,7 @@ const ManageModal = ({ open = true, event, onClose, onDone, setParentError }) =>
 											}
 											className="text-sm"
 											aria-label="Partner logo"
+											disabled={loading}
 										/>
 										<button
 											type="button"
@@ -517,6 +606,7 @@ const ManageModal = ({ open = true, event, onClose, onDone, setParentError }) =>
 												onClick={() => handleRemoveSpeaker(idx)}
 												className="text-red-400 p-1"
 												aria-label={`Remove speaker ${s.name}`}
+												disabled={loading}
 											>
 												<Trash2 className="h-4 w-4" />
 											</button>
@@ -532,6 +622,7 @@ const ManageModal = ({ open = true, event, onClose, onDone, setParentError }) =>
 										}
 										className="px-3 py-2 bg-gray-800 rounded w-full"
 										aria-label="Speaker name"
+										disabled={loading}
 									/>
 									<input
 										placeholder="Title"
@@ -541,6 +632,7 @@ const ManageModal = ({ open = true, event, onClose, onDone, setParentError }) =>
 										}
 										className="px-3 py-2 bg-gray-800 rounded w-full"
 										aria-label="Speaker title"
+										disabled={loading}
 									/>
 									<input
 										placeholder="Bio"
@@ -550,6 +642,7 @@ const ManageModal = ({ open = true, event, onClose, onDone, setParentError }) =>
 										}
 										className="px-3 py-2 bg-gray-800 rounded w-full"
 										aria-label="Speaker bio"
+										disabled={loading}
 									/>
 									<div className="flex items-center gap-2">
 										<input
@@ -563,6 +656,7 @@ const ManageModal = ({ open = true, event, onClose, onDone, setParentError }) =>
 											}
 											className="text-sm"
 											aria-label="Speaker photo"
+											disabled={loading}
 										/>
 										<button
 											type="button"
@@ -602,6 +696,7 @@ const ManageModal = ({ open = true, event, onClose, onDone, setParentError }) =>
 												onClick={() => handleRemoveResource(idx)}
 												className="text-red-400 p-1"
 												aria-label={`Remove resource ${r.title}`}
+												disabled={loading}
 											>
 												<Trash2 className="h-4 w-4" />
 											</button>
@@ -620,6 +715,7 @@ const ManageModal = ({ open = true, event, onClose, onDone, setParentError }) =>
 										}
 										className="px-3 py-2 bg-gray-800 rounded w-full"
 										aria-label="Resource title"
+										disabled={loading}
 									/>
 									<input
 										placeholder="URL"
@@ -629,6 +725,7 @@ const ManageModal = ({ open = true, event, onClose, onDone, setParentError }) =>
 										}
 										className="px-3 py-2 bg-gray-800 rounded w-full"
 										aria-label="Resource url"
+										disabled={loading}
 									/>
 									<button
 										type="button"
@@ -660,6 +757,7 @@ const ManageModal = ({ open = true, event, onClose, onDone, setParentError }) =>
 												onClick={() => handleRemoveCoIndex(idx)}
 												className="text-red-400 p-1"
 												aria-label={`Remove co-organizer ${c}`}
+												disabled={loading}
 											>
 												<Trash2 className="h-4 w-4" />
 											</button>
@@ -668,6 +766,7 @@ const ManageModal = ({ open = true, event, onClose, onDone, setParentError }) =>
 												onClick={() => handleRemoveCoName(c)}
 												className="text-yellow-400 p-1"
 												aria-label={`Remove co-organizer by name ${c}`}
+												disabled={loading}
 											>
 												Remove by name
 											</button>
@@ -681,6 +780,7 @@ const ManageModal = ({ open = true, event, onClose, onDone, setParentError }) =>
 										onChange={(e) => setCoName(e.target.value)}
 										className="px-3 py-2 bg-gray-800 rounded flex-1"
 										aria-label="Co-organizer name"
+										disabled={loading}
 									/>
 									<button
 										type="button"
@@ -728,6 +828,7 @@ const ManageModal = ({ open = true, event, onClose, onDone, setParentError }) =>
 													}
 													className="text-red-400 p-1"
 													aria-label="Remove poster"
+													disabled={loading}
 												>
 													<Trash2 className="h-4 w-4" />
 												</button>
@@ -744,6 +845,7 @@ const ManageModal = ({ open = true, event, onClose, onDone, setParentError }) =>
 										}
 										className="text-sm"
 										aria-label="Poster file"
+										disabled={loading}
 									/>
 									<button
 										type="button"
