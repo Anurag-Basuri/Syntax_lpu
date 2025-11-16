@@ -5,6 +5,7 @@ import { apiClient, publicClient } from './api.js';
  * { docs, totalDocs, page, totalPages, limit, hasPrevPage, hasNextPage, prevPage, nextPage }
  */
 const normalizePagination = (raw) => {
+	// raw may be axios resp or body
 	const payload = raw?.data ?? raw ?? {};
 	const data = payload.data ?? payload.docs ?? payload;
 	if (Array.isArray(data)) {
@@ -44,6 +45,7 @@ const normalizePagination = (raw) => {
 const extractError = (err, fallback = 'Request failed') =>
 	err?.response?.data?.message || err?.response?.data?.error || err?.message || fallback;
 
+// choose client (publicClient for public calls, apiClient for admin)
 const clientFor = (admin = false) => (admin ? apiClient : publicClient);
 
 // ---------------- Public services ----------------
@@ -80,10 +82,7 @@ export const getFestDetails = async (identifier, options = { admin: false }) => 
 // ---------------- Admin services ----------------
 export const createFest = async (festData) => {
 	try {
-		const isForm = festData instanceof FormData;
-		const resp = isForm
-			? await apiClient.post('/api/v1/arvantis', festData)
-			: await apiClient.post('/api/v1/arvantis', festData);
+		const resp = await apiClient.post('/api/v1/arvantis', festData);
 		return resp.data?.data;
 	} catch (err) {
 		throw new Error(extractError(err, 'Failed to create fest.'));
@@ -277,13 +276,11 @@ export const unlinkEventFromFest = async (identifier, eventId) => {
 };
 
 // Media: poster / hero / gallery / bulk delete
-// Note: server route/controller names use addFestPoster / addGalleryMedia etc.
-// Client exposes clear names and keeps aliases for backward compatibility.
 
 export const addFestPoster = async (identifier, formData) => {
 	if (!identifier) throw new Error('Fest identifier is required.');
 	try {
-		// server expects PATCH /posters (field name "posters", accepts multiple)
+		// backend expects PATCH /posters with FormData field "posters" (multiple)
 		const resp = await apiClient.patch(
 			`/api/v1/arvantis/${encodeURIComponent(identifier)}/posters`,
 			formData
@@ -295,8 +292,6 @@ export const addFestPoster = async (identifier, formData) => {
 };
 export const updateFestPoster = addFestPoster; // alias
 
-// removeFestPoster: prefer publicId param -> DELETE /posters/:publicId
-// fallback: legacy DELETE /poster (no publicId) kept for compatibility
 export const removeFestPoster = async (identifier, publicId) => {
 	if (!identifier) throw new Error('Identifier required.');
 	try {
@@ -308,7 +303,7 @@ export const removeFestPoster = async (identifier, publicId) => {
 				)}`
 			);
 		} else {
-			// legacy route (body-based) - call without body
+			// legacy body-based route
 			resp = await apiClient.delete(
 				`/api/v1/arvantis/${encodeURIComponent(identifier)}/poster`
 			);
@@ -440,9 +435,9 @@ export const generateFestReport = async (identifier) => {
 	}
 };
 
-// --- new: fetch & download helpers for analytics/statistics/report ---
+// --- download helpers ---
 const downloadJSON = (obj, filename) => {
-	const blob = new Blob([JSON.stringify(obj, null, 2)], { type: 'application/json' });
+	const blob = new Blob([JSON.stringify(obj ?? {}, null, 2)], { type: 'application/json' });
 	const url = window.URL.createObjectURL(blob);
 	const a = document.createElement('a');
 	a.href = url;
