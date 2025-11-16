@@ -1,22 +1,40 @@
 import { Router } from 'express';
 import {
-	getLandingPageData,
+	getLatestFest,
 	createFest,
 	getAllFests,
 	getFestDetails,
 	updateFestDetails,
 	deleteFest,
 	addPartner,
+	updatePartner,
 	removePartner,
+	reorderPartners,
 	linkEventToFest,
 	unlinkEventFromFest,
 	updateFestPoster,
 	addGalleryMedia,
 	removeGalleryMedia,
+	reorderGallery,
+	bulkDeleteMedia,
 	exportFestsCSV,
 	getFestStatistics,
 	getFestAnalytics,
 	generateFestReport,
+	updatePresentation,
+	updateSocialLinks,
+	updateThemeColors,
+	addTrack,
+	updateTrack,
+	removeTrack,
+	reorderTracks,
+	addFAQ,
+	updateFAQ,
+	removeFAQ,
+	reorderFAQs,
+	setVisibility,
+	duplicateFest,
+	setFestStatus,
 } from '../controllers/arvantis.controller.js';
 import { authMiddleware } from '../middlewares/auth.middleware.js';
 import { uploadFile } from '../middlewares/multer.middleware.js';
@@ -28,7 +46,7 @@ const { protect, authorize } = authMiddleware;
 
 // ----------------------------- Public Routes -----------------------------
 // Landing / summary list / public detail (public)
-router.get('/landing', getLandingPageData);
+router.get('/landing', getLatestFest);
 
 router.get('/', getAllFests);
 
@@ -57,10 +75,10 @@ router.get(
 router.post(
 	'/',
 	validate([
-		body('year').isInt({ min: 2020 }).withMessage('A valid year (e.g., 2025) is required'),
+		body('year').isInt({ min: 2000 }).withMessage('A valid year is required'),
 		body('description').notEmpty().trim().withMessage('Description is required'),
-		body('startDate').isISO8601().toDate().withMessage('Valid start date is required'),
-		body('endDate').isISO8601().toDate().withMessage('Valid end date is required'),
+		body('startDate').isISO8601().withMessage('Valid start date is required'),
+		body('endDate').isISO8601().withMessage('Valid end date is required'),
 		body('status')
 			.optional()
 			.isIn(['upcoming', 'ongoing', 'completed', 'cancelled', 'postponed']),
@@ -73,8 +91,8 @@ router.patch(
 	validate([
 		param('identifier').notEmpty().withMessage('Fest identifier is required'),
 		body('description').optional().notEmpty().trim(),
-		body('startDate').optional().isISO8601().toDate(),
-		body('endDate').optional().isISO8601().toDate(),
+		body('startDate').optional().isISO8601(),
+		body('endDate').optional().isISO8601(),
 		body('status')
 			.optional()
 			.isIn(['upcoming', 'ongoing', 'completed', 'cancelled', 'postponed']),
@@ -88,11 +106,61 @@ router.delete(
 	deleteFest
 );
 
+// Duplicate, status, presentation, visibility
+router.post(
+	'/:identifier/duplicate',
+	validate([
+		param('identifier').notEmpty().withMessage('Fest identifier is required'),
+		body('year').isInt({ min: 2000 }).withMessage('Target year is required'),
+	]),
+	duplicateFest
+);
+
+router.patch(
+	'/:identifier/status',
+	validate([
+		param('identifier').notEmpty().withMessage('Fest identifier is required'),
+		body('status')
+			.notEmpty()
+			.isIn(['upcoming', 'ongoing', 'completed', 'cancelled', 'postponed'])
+			.withMessage('Invalid status'),
+	]),
+	setFestStatus
+);
+
+router.patch(
+	'/:identifier/presentation',
+	validate([param('identifier').notEmpty().withMessage('Fest identifier is required')]),
+	updatePresentation
+);
+
+router.patch(
+	'/:identifier/social-links',
+	validate([param('identifier').notEmpty().withMessage('Fest identifier is required')]),
+	updateSocialLinks
+);
+
+router.patch(
+	'/:identifier/theme',
+	validate([param('identifier').notEmpty().withMessage('Fest identifier is required')]),
+	updateThemeColors
+);
+
+router.patch(
+	'/:identifier/visibility',
+	validate([
+		param('identifier').notEmpty().withMessage('Fest identifier is required'),
+		body('visibility')
+			.isIn(['public', 'private', 'unlisted'])
+			.withMessage('Invalid visibility'),
+	]),
+	setVisibility
+);
+
 // Partner management
 router.post(
 	'/:identifier/partners',
 	(req, res, next) => {
-		// debug log useful for diagnosing upload/content-type issues
 		/* eslint-disable no-console */
 		console.log('[ROUTE] POST /:identifier/partners', {
 			identifier: req.params.identifier,
@@ -118,6 +186,17 @@ router.post(
 	addPartner
 );
 
+router.patch(
+	'/:identifier/partners/:partnerName',
+	uploadFile('logo', { multiple: false, maxCount: 1 }),
+	validate([
+		param('identifier').notEmpty().withMessage('Fest identifier is required'),
+		param('partnerName').notEmpty().withMessage('Partner name is required'),
+		body('website').optional().isURL().withMessage('Must be a valid URL'),
+	]),
+	updatePartner
+);
+
 router.delete(
 	'/:identifier/partners/:partnerName',
 	validate([
@@ -125,6 +204,12 @@ router.delete(
 		param('partnerName').notEmpty().withMessage('Partner name is required'),
 	]),
 	removePartner
+);
+
+router.patch(
+	'/:identifier/partners/reorder',
+	validate([param('identifier').notEmpty().withMessage('Fest identifier is required')]),
+	reorderPartners
 );
 
 // Event linking
@@ -174,7 +259,7 @@ router.post(
 		/* eslint-enable no-console */
 		next();
 	},
-	uploadFile('media', { multiple: true, maxCount: 10 }),
+	uploadFile('media', { multiple: true, maxCount: 20 }),
 	validate([param('identifier').notEmpty().withMessage('Fest identifier is required')]),
 	addGalleryMedia
 );
@@ -186,6 +271,75 @@ router.delete(
 		param('publicId').notEmpty().withMessage('Media public ID is required'),
 	]),
 	removeGalleryMedia
+);
+
+router.patch(
+	'/:identifier/gallery/reorder',
+	validate([param('identifier').notEmpty().withMessage('Fest identifier is required')]),
+	reorderGallery
+);
+
+router.post(
+	'/:identifier/media/bulk-delete',
+	validate([param('identifier').notEmpty().withMessage('Fest identifier is required')]),
+	bulkDeleteMedia
+);
+
+// Tracks CRUD
+router.post(
+	'/:identifier/tracks',
+	validate([
+		param('identifier').notEmpty().withMessage('Fest identifier is required'),
+		body('title').notEmpty().withMessage('Track title is required'),
+	]),
+	addTrack
+);
+
+router.patch(
+	'/:identifier/tracks/:trackKey',
+	validate([param('identifier').notEmpty().withMessage('Fest identifier is required')]),
+	updateTrack
+);
+
+router.delete(
+	'/:identifier/tracks/:trackKey',
+	validate([param('identifier').notEmpty().withMessage('Fest identifier is required')]),
+	removeTrack
+);
+
+router.patch(
+	'/:identifier/tracks/reorder',
+	validate([param('identifier').notEmpty().withMessage('Fest identifier is required')]),
+	reorderTracks
+);
+
+// FAQs CRUD
+router.post(
+	'/:identifier/faqs',
+	validate([
+		param('identifier').notEmpty().withMessage('Fest identifier is required'),
+		body('question').notEmpty().withMessage('Question is required'),
+		body('answer').notEmpty().withMessage('Answer is required'),
+	]),
+	addFAQ
+);
+
+router.patch(
+	'/:identifier/faqs/:faqId',
+	validate([param('identifier').notEmpty().withMessage('Fest identifier is required')]),
+	updateFAQ
+);
+
+router.delete(
+	'/:identifier/faqs/:faqId',
+	validate([param('identifier').notEmpty().withMessage('Fest identifier is required')]),
+	removeFAQ
+);
+
+router.patch(
+	'/:identifier/faqs/reorder',
+	validate([param('identifier').notEmpty().withMessage('Fest identifier is required')]),
+	reorderFAQs
 );
 
 export default router;
