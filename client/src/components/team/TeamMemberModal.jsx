@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import {
 	X,
 	Mail,
@@ -6,353 +6,275 @@ import {
 	Github,
 	Globe,
 	Phone,
-	Code,
-	GraduationCap,
-	Building,
+	Download,
+	Clock,
+	Shield,
 	FileText,
 	User,
-	Download,
-	Calendar,
-	School,
-	Badge,
-	Clock,
-	IdCard,
-	Shield,
-	AlertTriangle,
-	CheckCircle,
-	XCircle,
-	Info,
+	Clipboard,
 } from 'lucide-react';
 import { useAuth } from '../../hooks/useAuth.js';
 
-const getAvatarUrl = (profilePicture) => {
-	if (!profilePicture) return null;
-	if (typeof profilePicture === 'string') return profilePicture;
-	if (typeof profilePicture === 'object') return profilePicture.url || null;
-	return null;
+/**
+ * TeamMemberModal - improved:
+ * - Responsive two-column layout that stacks on small screens
+ * - Focus trap (basic), Escape to close
+ * - Tab keyboard navigation between sections
+ * - Copy contact and vCard download
+ * - Cleaner visual grouping and accessible controls
+ */
+
+const getAvatar = (p) => {
+	if (!p) return null;
+	if (typeof p === 'string') return p;
+	return p?.url || null;
 };
 
-const formatDate = (dateString) => {
-	if (!dateString) return 'N/A';
-	const d = new Date(dateString);
-	if (isNaN(d.getTime())) return 'Invalid date';
-	return d.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
+const formatDate = (d) => {
+	if (!d) return 'N/A';
+	const dt = new Date(d);
+	if (isNaN(dt.getTime())) return 'Invalid date';
+	return dt.toLocaleDateString();
 };
 
-const formatDateTime = (dateString) => {
-	if (!dateString) return 'N/A';
-	const d = new Date(dateString);
-	if (isNaN(d.getTime())) return 'Invalid date';
-	return d.toLocaleString('en-US', {
-		year: 'numeric',
-		month: 'long',
-		day: 'numeric',
-		hour: '2-digit',
-		minute: '2-digit',
-	});
+const buildVCard = (member) => {
+	const lines = [
+		'BEGIN:VCARD',
+		'VERSION:3.0',
+		`FN:${member.fullname || ''}`,
+		member.primaryRole ? `TITLE:${member.primaryRole}` : '',
+		member.email ? `EMAIL;TYPE=INTERNET:${member.email}` : '',
+		member.phone ? `TEL;TYPE=CELL:${member.phone}` : '',
+		member.primaryDept ? `ORG:${member.primaryDept}` : '',
+		'END:VCARD',
+	].filter(Boolean);
+	return lines.join('\r\n');
 };
 
 const TeamMemberModal = ({ member, isOpen, onClose }) => {
 	const { isAuthenticated } = useAuth();
-	const [activeTab, setActiveTab] = useState('about');
-	const [imageError, setImageError] = useState(false);
-
-	const initials = useMemo(() => {
-		if (!member?.fullname) return '??';
-		return member.fullname
-			.split(' ')
-			.map((n) => n?.[0] || '')
-			.join('')
-			.substring(0, 2)
-			.toUpperCase();
-	}, [member?.fullname]);
-
-	const avatar = getAvatarUrl(member?.profilePicture);
-
-	// Enhanced tabs with authentication-aware visibility
-	const tabs = useMemo(() => {
-		if (!member) return [];
-		const hasContactInfo =
-			(isAuthenticated && (member.email || member.phone)) ||
-			(member.socialLinks?.length ?? 0) > 0;
-		const hasAcademicInfo = !!(member.program || member.year || member.hosteler !== undefined);
-
-		return [
-			{ id: 'about', label: 'About', icon: User, show: true },
-			{
-				id: 'contact',
-				label: 'Contact',
-				icon: Mail,
-				show: hasContactInfo,
-			},
-			{
-				id: 'skills',
-				label: 'Skills',
-				icon: Code,
-				show: Array.isArray(member.skills) && member.skills.length > 0,
-			},
-			{
-				id: 'academic',
-				label: 'Academic',
-				icon: GraduationCap,
-				show: hasAcademicInfo,
-			},
-			{
-				id: 'documents',
-				label: 'Documents',
-				icon: FileText,
-				show: !!member.resume?.url,
-			},
-			{
-				id: 'details',
-				label: 'Details',
-				icon: Info,
-				show: isAuthenticated && (member.memberID || member.status || member._id),
-			},
-		].filter((t) => t.show);
-	}, [member, isAuthenticated]);
-
-	const handleKeyDown = useCallback(
-		(e) => {
-			if (e.key === 'Escape' && isOpen) onClose();
-		},
-		[isOpen, onClose]
-	);
+	const [active, setActive] = useState('about');
+	const [imgError, setImgError] = useState(false);
+	const modalRef = useRef(null);
+	const closeBtnRef = useRef(null);
 
 	useEffect(() => {
 		if (isOpen) {
 			document.body.style.overflow = 'hidden';
-			setActiveTab('about');
-			setImageError(false);
-			window.addEventListener('keydown', handleKeyDown);
+			setActive('about');
+			setImgError(false);
+			// focus close button for quick keyboard access
+			setTimeout(() => closeBtnRef.current?.focus?.(), 50);
 		} else {
 			document.body.style.overflow = '';
 		}
 		return () => {
 			document.body.style.overflow = '';
-			window.removeEventListener('keydown', handleKeyDown);
 		};
-	}, [isOpen, handleKeyDown]);
+	}, [isOpen]);
+
+	// basic focus trap: keep focus inside modal
+	useEffect(() => {
+		const el = modalRef.current;
+		if (!isOpen || !el) return;
+		const focusable = el.querySelectorAll('a[href], button:not([disabled]), textarea, input, select, [tabindex]:not([tabindex="-1"])');
+		const first = focusable[0];
+		const last = focusable[focusable.length - 1];
+		const handleKey = (e) => {
+			if (e.key === 'Escape') onClose();
+			if (e.key === 'Tab') {
+				if (e.shiftKey && document.activeElement === first) {
+					e.preventDefault();
+					last.focus();
+				} else if (!e.shiftKey && document.activeElement === last) {
+					e.preventDefault();
+					first.focus();
+				}
+			}
+			// quick left/right for tabs
+			if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
+				const tabs = ['about', 'contact', 'skills', 'academic', 'documents', 'details'];
+				const visible = tabs.filter(Boolean);
+				const idx = visible.indexOf(active);
+				if (idx >= 0) {
+					const next = e.key === 'ArrowRight' ? visible[(idx + 1) % visible.length] : visible[(idx - 1 + visible.length) % visible.length];
+					setActive(next);
+				}
+			}
+		};
+		el.addEventListener('keydown', handleKey);
+		return () => el.removeEventListener('keydown', handleKey);
+	}, [isOpen, active, onClose]);
 
 	if (!isOpen || !member) return null;
 
-	// Get all departments and designations (not just primary)
-	const allDepartments = Array.isArray(member.department)
-		? member.department.filter(Boolean)
-		: member.department
-		? [member.department]
-		: [];
-	const allDesignations = Array.isArray(member.designation)
-		? member.designation.filter(Boolean)
-		: member.designation
-		? [member.designation]
-		: [];
+	const avatar = getAvatar(member.profilePicture) || `https://api.dicebear.com/8.x/initials/svg?seed=${encodeURIComponent(member.fullname)}`;
+	const initials = (member.fullname || '??').split(' ').map(s => s[0]).join('').slice(0,2).toUpperCase();
 
-	const departmentText = member.primaryDepartment || allDepartments.join(', ') || '';
-	const designationText = member.primaryDesignation || allDesignations.join(', ') || '';
+	const tabs = [
+		{ id: 'about', label: 'About', show: true },
+		{ id: 'contact', label: 'Contact', show: isAuthenticated || (member.socialLinks?.length > 0) },
+		{ id: 'skills', label: 'Skills', show: (member.skills?.length > 0) },
+		{ id: 'academic', label: 'Academic', show: !!(member.program || member.year || typeof member.hosteler === 'boolean') },
+		{ id: 'documents', label: 'Documents', show: !!member.resume?.url },
+		{ id: 'details', label: 'Details', show: isAuthenticated },
+	].filter(t => t.show);
 
-	// Status badge component
-	const StatusBadge = ({ status }) => {
-		const statusConfig = {
-			active: {
-				icon: CheckCircle,
-				color: 'text-green-600 dark:text-green-400',
-				label: 'Active',
-			},
-			banned: { icon: XCircle, color: 'text-red-600 dark:text-red-400', label: 'Banned' },
-			removed: { icon: XCircle, color: 'text-gray-600 dark:text-gray-400', label: 'Removed' },
-		};
-		const config = statusConfig[status] || statusConfig.active;
-		const Icon = config.icon;
-
-		return (
-			<div className={`flex items-center gap-2 ${config.color}`}>
-				<Icon size={16} />
-				<span className="font-medium">{config.label}</span>
-			</div>
-		);
+	const copyContact = async () => {
+		const text = `Name: ${member.fullname}\nEmail: ${member.email || 'N/A'}\nPhone: ${member.phone || 'N/A'}`;
+		try {
+			await navigator.clipboard.writeText(text);
+			// small inline feedback could be added — for simplicity, use alert or console
+			// but try to be unobtrusive
+			if (typeof window !== 'undefined') window.dispatchEvent(new CustomEvent('toast', { detail: { message: 'Contact copied to clipboard' } }));
+		} catch {
+			// ignore
+		}
 	};
 
-	const avatarCoverStyle = avatar
-		? { backgroundImage: `linear-gradient(180deg, rgba(0,0,0,0.22), rgba(0,0,0,0.18)), url(${avatar})` }
-		: { background: 'linear-gradient(135deg, rgba(99,102,241,0.12), rgba(139,92,246,0.08))' };
+	const downloadVCard = () => {
+		const vcard = buildVCard(member);
+		const blob = new Blob([vcard], { type: 'text/vcard' });
+		const url = URL.createObjectURL(blob);
+		const a = document.createElement('a');
+		a.href = url;
+		a.download = `${(member.fullname || 'contact').replace(/\s+/g, '_')}.vcf`;
+		document.body.appendChild(a);
+		a.click();
+		a.remove();
+		URL.revokeObjectURL(url);
+	};
 
 	return (
 		<div
-			className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4"
-			onClick={(e) => {
-				if (e.target === e.currentTarget) onClose();
-			}}
+			className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4"
 			role="dialog"
 			aria-modal="true"
 			aria-label={`Profile of ${member.fullname}`}
+			onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
 		>
 			<div
-				className="relative w-full max-w-5xl max-h-[calc(100vh-var(--navbar-height,4.5rem)-2rem)] bg-white dark:bg-gray-900 rounded-2xl shadow-2xl overflow-hidden flex flex-col md:flex-row"
+				ref={modalRef}
+				className="w-full max-w-5xl max-h-[calc(100vh-4rem)] bg-[var(--card-bg)] rounded-2xl shadow-xl overflow-hidden grid grid-cols-1 md:grid-cols-3"
 				onClick={(e) => e.stopPropagation()}
 			>
-				{/* Left: Hero/Cover */}
-				<div
-					className="w-full md:w-1/3 lg:w-1/3 flex-shrink-0"
-					style={{ minHeight: 220, ...avatarCoverStyle }}
-				>
-					<div className="h-full p-6 flex flex-col justify-between text-white">
-						<div className="flex items-start gap-3">
-							<div className="w-20 h-20 rounded-xl overflow-hidden ring-4 ring-white shadow-xl">
-								{!imageError && avatar ? (
-									<img
-										src={avatar}
-										alt={member.fullname}
-										className="w-full h-full object-cover"
-										onError={() => setImageError(true)}
-										loading="lazy"
-									/>
-								) : (
-									<div className="w-full h-full flex items-center justify-center bg-indigo-600 font-bold text-2xl text-white">
-										{initials}
-									</div>
-								)}
-							</div>
-							<div className="min-w-0">
-								<h2 className="text-xl sm:text-2xl font-bold leading-tight break-words">{member.fullname}</h2>
-								<p className="text-sm mt-1 text-white/80 truncate">{member.primaryRole || member.primaryDesignation || 'Member'}</p>
-								<p className="text-xs mt-1 text-white/70">{member.primaryDept || member.primaryDepartment || 'Team'}</p>
-							</div>
-						</div>
-
-						{/* Actions */}
-						<div className="mt-4">
-							<div className="flex flex-col sm:flex-row sm:items-center gap-3">
-								{member.email && (
-									<a
-										href={`mailto:${member.email}`}
-										className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-white text-indigo-700 font-medium shadow hover:opacity-95"
-									>
-										<Mail size={16} /> Email
-									</a>
-								)}
-								{member.phone && (
-									<a
-										href={`tel:${member.phone}`}
-										className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-white/10 text-white font-medium hover:opacity-95"
-									>
-										<Phone size={16} /> Call
-									</a>
-								)}
-								{member.resume?.url && (
-									<a
-										href={member.resume.url}
-										target="_blank"
-										rel="noopener noreferrer"
-										className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-emerald-600 text-white font-medium shadow hover:bg-emerald-500"
-									>
-										<Download size={16} /> Resume
-									</a>
-								)}
-							</div>
-
-							{/* Social Icons */}
-							{member.socialLinks?.length > 0 && (
-								<div className="mt-4 flex flex-wrap gap-2">
-									{member.socialLinks.map((s, i) => {
-										const raw = s?.url?.startsWith('http') ? s.url : `https://${s?.url || ''}`;
-										const p = (s.platform || '').toLowerCase();
-										const Icon = p.includes('github') ? Github : p.includes('linkedin') ? Linkedin : Globe;
-										return (
-											<a
-												key={i}
-												href={raw}
-												target="_blank"
-												rel="noopener noreferrer"
-												className="inline-flex items-center gap-2 px-3 py-2 rounded-md bg-white/10 text-white hover:bg-white/20"
-											>
-												<Icon size={14} /> <span className="text-sm">{s.platform || 'Profile'}</span>
-											</a>
-										);
-									})}
-								</div>
+				{/* Left: cover & actions */}
+				<div className="col-span-1 p-5 bg-gradient-to-b from-indigo-600/6 to-purple-600/6 flex flex-col gap-4">
+					<div className="flex items-start gap-4">
+						<div className="w-20 h-20 rounded-xl overflow-hidden ring-4 ring-white shadow">
+							{!imgError ? (
+								<img src={avatar} alt={member.fullname} className="w-full h-full object-cover" onError={() => setImgError(true)} />
+							) : (
+								<div className="w-full h-full flex items-center justify-center bg-indigo-600 text-white font-bold text-2xl">{initials}</div>
 							)}
 						</div>
+						<div className="min-w-0">
+							<h2 className="text-lg font-bold">{member.fullname}</h2>
+							<div className="text-sm text-[var(--text-secondary)]">{member.primaryRole || member.primaryDesignation || 'Member'}</div>
+							<div className="text-xs text-[var(--text-muted)] mt-1">{member.primaryDept || 'Team'}</div>
+						</div>
+					</div>
+
+					<div className="flex gap-2 flex-wrap mt-2">
+						{member.email && (
+							<a href={`mailto:${member.email}`} className="inline-flex items-center gap-2 px-3 py-2 rounded-md bg-white text-indigo-700 hover:opacity-95">
+								<Mail size={14} /> Email
+							</a>
+						)}
+						{member.phone && (
+							<a href={`tel:${member.phone}`} className="inline-flex items-center gap-2 px-3 py-2 rounded-md bg-white/8 text-white hover:opacity-95">
+								<Phone size={14} /> Call
+							</a>
+						)}
+						{member.resume?.url && (
+							<a href={member.resume.url} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-2 px-3 py-2 rounded-md bg-emerald-600 text-white">
+								<Download size={14} /> Resume
+							</a>
+						)}
+					</div>
+
+					{member.socialLinks?.length > 0 && (
+						<div className="mt-3 flex flex-wrap gap-2">
+							{member.socialLinks.map((s, i) => {
+								const raw = (s?.url || '').startsWith('http') ? s.url : `https://${s?.url || ''}`;
+								const Icon = (s.platform || '').toLowerCase().includes('github') ? Github : (s.platform || '').toLowerCase().includes('linkedin') ? Linkedin : Globe;
+								return (
+									<a key={i} href={raw} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-2 px-3 py-2 rounded-md bg-[var(--glass-bg)] border border-[var(--glass-border)] text-sm">
+										<Icon size={14} /> <span>{s.platform || 'Profile'}</span>
+									</a>
+								);
+							})}
+						</div>
+					)}
+
+					{/* Copy / vCard actions */}
+					<div className="mt-auto flex gap-2">
+						<button onClick={copyContact} className="inline-flex items-center gap-2 px-3 py-2 rounded-md bg-[var(--glass-bg)] border border-[var(--glass-border)]">
+							<Clipboard size={14} /> Copy contact
+						</button>
+						<button onClick={downloadVCard} className="inline-flex items-center gap-2 px-3 py-2 rounded-md bg-[var(--glass-bg)] border border-[var(--glass-border)]">
+							<FileText size={14} /> Download vCard
+						</button>
 					</div>
 				</div>
 
-				{/* Right: Content */}
-				<div className="flex-1 overflow-y-auto min-h-0 bg-white dark:bg-gray-900 p-5 md:p-6">
-					{/* Header quick meta */}
-					<div className="flex items-center justify-between gap-4 mb-4">
-						<div className="flex items-center gap-4 min-w-0">
-							<div className="hidden md:block text-sm text-gray-500 dark:text-gray-400">
-								<div className="font-medium">{designationText}</div>
-								<div className="text-xs mt-1">{departmentText}</div>
-							</div>
+				{/* Right: tabbed content */}
+				<div className="col-span-2 p-5 overflow-y-auto">
+					<div className="flex items-center justify-between gap-4 mb-3">
+						<div className="flex items-center gap-2">
 							{member.isLeader && (
-								<div className="inline-flex items-center gap-2 px-2 py-1 rounded-full bg-amber-50 dark:bg-amber-900/10 text-amber-700 dark:text-amber-300 text-xs font-semibold">
-									<Shield size={14} /> Leader
+								<div className="inline-flex items-center gap-2 px-2 py-1 rounded-full bg-amber-50 text-amber-700 text-xs">
+									<Shield size={12} /> Leader
 								</div>
 							)}
 						</div>
-
-						<button
-							onClick={onClose}
-							className="p-2 rounded-md text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800"
-							aria-label="Close profile"
-						>
+						<button ref={closeBtnRef} onClick={onClose} className="p-2 rounded-md text-[var(--text-muted)] hover:bg-gray-100">
 							<X size={18} />
 						</button>
 					</div>
 
 					{/* Tabs */}
-					<div className="mb-4 border-b border-gray-200 dark:border-gray-700">
-						<div className="flex gap-2 overflow-x-auto scrollbar-hide">
-							{tabs.map((tab) => {
-								const Icon = tab.icon;
-								return (
+					<nav className="mb-4" aria-label="Profile sections">
+						<ul className="flex gap-2 overflow-x-auto">
+							{tabs.map((t) => (
+								<li key={t.id}>
 									<button
-										key={tab.id}
-										onClick={() => setActiveTab(tab.id)}
-										className={`flex items-center gap-2 px-3 py-2 rounded-md text-sm font-medium whitespace-nowrap ${
-											activeTab === tab.id
-												? 'bg-indigo-50 text-indigo-700 dark:bg-indigo-900/20 dark:text-indigo-300'
-												: 'text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800'
-										}`}
+										onClick={() => setActive(t.id)}
+										className={`px-3 py-2 rounded-md text-sm ${active === t.id ? 'bg-indigo-50 text-indigo-700' : 'text-[var(--text-secondary)] hover:bg-gray-50'}`}
+										aria-current={active === t.id ? 'true' : undefined}
 									>
-										<Icon size={14} />
-										<span>{tab.label}</span>
+										{t.label}
 									</button>
-								);
-							})}
-						</div>
-					</div>
+								</li>
+							))}
+						</ul>
+					</nav>
 
-					{/* Tab Content */}
-					<div className="space-y-4 text-sm text-gray-800 dark:text-gray-200">
-						{/* About */}
-						{activeTab === 'about' && (
-							<div className="space-y-4">
-								<div className="rounded-lg bg-gray-50 dark:bg-gray-800 p-4 border border-gray-100 dark:border-gray-700">
-									<p className={member.bio ? 'text-sm' : 'text-sm italic text-gray-500 dark:text-gray-400'}>
-										{member.bio || 'No bio provided.'}
-									</p>
+					{/* content */}
+					<div className="space-y-4 text-sm">
+						{active === 'about' && (
+							<div className="space-y-3">
+								<div className="rounded-md p-3 bg-[var(--glass-bg)] border border-[var(--glass-border)]">
+									{member.bio ? <p className="text-sm">{member.bio}</p> : <p className="text-sm italic text-[var(--text-muted)]">No bio available.</p>}
 								</div>
 
+								{/* meta grid */}
 								<div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
 									{member.joinedAt && (
-										<div className="rounded-lg bg-gray-50 dark:bg-gray-800 p-3 border border-gray-100 dark:border-gray-700 flex items-center gap-3">
-											<Clock size={18} className="text-indigo-600 dark:text-indigo-300" />
+										<div className="rounded-md p-3 bg-[var(--glass-bg)] border border-[var(--glass-border)] flex items-start gap-3">
+											<Clock size={18} className="text-indigo-600" />
 											<div>
-												<div className="text-xs text-gray-500 dark:text-gray-400">Member since</div>
-												<div className="text-sm font-medium">{formatDate(member.joinedAt)}</div>
+												<div className="text-xs text-[var(--text-muted)]">Member since</div>
+												<div className="font-medium">{formatDate(member.joinedAt)}</div>
 											</div>
 										</div>
 									)}
-									{isAuthenticated && member.restriction?.isRestricted && (
-										<div className="rounded-lg bg-amber-50 dark:bg-amber-900/20 p-3 border border-amber-200 dark:border-amber-800 flex items-start gap-3">
-											<AlertTriangle className="text-amber-600 dark:text-amber-300" size={18} />
+									{member.status && (
+										<div className="rounded-md p-3 bg-[var(--glass-bg)] border border-[var(--glass-border)] flex items-start gap-3">
+											<Shield size={18} className="text-gray-600" />
 											<div>
-												<div className="font-semibold text-amber-800 dark:text-amber-200">Account Restriction</div>
-												{member.restriction.reason && (
-													<div className="text-xs text-amber-700 dark:text-amber-200 mt-1">{member.restriction.reason}</div>
-												)}
+												<div className="text-xs text-[var(--text-muted)]">Account status</div>
+												<div className="font-medium">{member.status}</div>
 											</div>
 										</div>
 									)}
@@ -360,151 +282,74 @@ const TeamMemberModal = ({ member, isOpen, onClose }) => {
 							</div>
 						)}
 
-						{/* Contact */}
-						{activeTab === 'contact' && (
+						{active === 'contact' && (
 							<div className="space-y-3">
 								{isAuthenticated && member.email && (
-									<div className="rounded-lg bg-gray-50 dark:bg-gray-800 p-3 border border-gray-100 dark:border-gray-700">
-										<div className="text-xs text-gray-500 dark:text-gray-400 mb-1 flex items-center gap-2"><Mail size={14} /> Email</div>
-										<a href={`mailto:${member.email}`} className="text-indigo-700 dark:text-indigo-300 font-medium break-all">{member.email}</a>
+									<div className="rounded-md p-3 bg-[var(--glass-bg)] border border-[var(--glass-border)]">
+										<div className="text-xs text-[var(--text-muted)] mb-1 flex items-center gap-2"><Mail size={14} /> Email</div>
+										<a href={`mailto:${member.email}`} className="font-medium break-all text-indigo-700">{member.email}</a>
 									</div>
 								)}
 								{isAuthenticated && member.phone && (
-									<div className="rounded-lg bg-gray-50 dark:bg-gray-800 p-3 border border-gray-100 dark:border-gray-700">
-										<div className="text-xs text-gray-500 dark:text-gray-400 mb-1 flex items-center gap-2"><Phone size={14} /> Phone</div>
-										<a href={`tel:${member.phone}`} className="text-indigo-700 dark:text-indigo-300 font-medium">{member.phone}</a>
+									<div className="rounded-md p-3 bg-[var(--glass-bg)] border border-[var(--glass-border)]">
+										<div className="text-xs text-[var(--text-muted)] mb-1 flex items-center gap-2"><Phone size={14} /> Phone</div>
+										<a href={`tel:${member.phone}`} className="font-medium text-indigo-700">{member.phone}</a>
 									</div>
+								)}
+								{(!isAuthenticated && !member.socialLinks?.length) && (
+									<p className="text-[var(--text-muted)] italic">Sign in to view direct contact details. Public profiles are shown below.</p>
 								)}
 								{member.socialLinks?.length > 0 && (
-									<div className="rounded-lg bg-gray-50 dark:bg-gray-800 p-3 border border-gray-100 dark:border-gray-700">
-										<div className="text-xs text-gray-500 dark:text-gray-400 mb-2 flex items-center gap-2"><Globe size={14} /> Social Profiles</div>
-										<div className="flex flex-wrap gap-2">
-											{member.socialLinks.map((s, i) => {
-												const url = s?.url?.startsWith('http') ? s.url : `https://${s?.url || ''}`;
-												const platform = (s.platform || '').toLowerCase();
-												const Icon = platform.includes('github') ? Github : platform.includes('linkedin') ? Linkedin : Globe;
-												return (
-													<a key={i} href={url} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-2 px-3 py-2 rounded-md bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 text-sm">
-														<Icon size={14} /> {s.platform || 'Profile'}
-													</a>
-												);
-											})}
-										</div>
+									<div className="flex flex-wrap gap-2">
+										{member.socialLinks.map((s,i) => {
+											const url = (s?.url || '').startsWith('http') ? s.url : `https://${s?.url || ''}`;
+											const Icon = (s?.platform || '').toLowerCase().includes('github') ? Github : (s?.platform || '').toLowerCase().includes('linkedin') ? Linkedin : Globe;
+											return (
+												<a key={i} href={url} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-2 px-3 py-2 rounded-md bg-[var(--glass-bg)] border border-[var(--glass-border)] text-sm">
+													<Icon size={14} /> {s.platform || 'Profile'}
+												</a>
+											);
+										})}
 									</div>
-								)}
-								{!isAuthenticated && !member.socialLinks?.length && (
-									<p className="text-gray-500 dark:text-gray-400 italic text-center py-4">Contact information is only available to authenticated users.</p>
 								)}
 							</div>
 						)}
 
-						{/* Skills */}
-						{activeTab === 'skills' && (
+						{active === 'skills' && (
 							<div>
 								{member.skills?.length > 0 ? (
 									<div className="flex flex-wrap gap-2">
-										{member.skills.map((skill, idx) => (
-											<span key={idx} className="px-3 py-1 rounded-full bg-indigo-50 dark:bg-indigo-900/20 text-indigo-700 dark:text-indigo-300 text-xs font-medium">
-												{skill}
-											</span>
+										{member.skills.map((s,i) => (
+											<span key={i} className="px-3 py-1 rounded-full bg-indigo-50 text-indigo-700 text-xs">{s}</span>
 										))}
 									</div>
-								) : (
-									<p className="text-gray-500 dark:text-gray-400 italic text-center py-4">No skills listed.</p>
-								)}
+								) : <p className="text-[var(--text-muted)] italic">No skills listed.</p>}
 							</div>
 						)}
 
-						{/* Academic */}
-						{activeTab === 'academic' && (
+						{active === 'academic' && (
 							<div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-								{member.program && (
-									<div className="rounded-lg bg-gray-50 dark:bg-gray-800 p-3 border border-gray-100 dark:border-gray-700">
-										<div className="text-xs text-gray-500 mb-1 flex items-center gap-2"><School size={14} /> Program</div>
-										<div className="font-medium">{member.program}</div>
-									</div>
-								)}
-								{member.year && (
-									<div className="rounded-lg bg-gray-50 dark:bg-gray-800 p-3 border border-gray-100 dark:border-gray-700">
-										<div className="text-xs text-gray-500 mb-1 flex items-center gap-2"><Calendar size={14} /> Academic Year</div>
-										<div className="font-medium">Year {member.year}</div>
-									</div>
-								)}
-								{typeof member.hosteler === 'boolean' && (
-									<div className="rounded-lg bg-gray-50 dark:bg-gray-800 p-3 border border-gray-100 dark:border-gray-700 sm:col-span-2">
-										<div className="text-xs text-gray-500 mb-1 flex items-center gap-2"><Building size={14} /> Residence</div>
-										<div className="font-medium">{member.hosteler ? `Hosteler${member.hostel ? ` - ${member.hostel}` : ''}` : 'Day Scholar'}</div>
-									</div>
-								)}
+								{member.program && <div className="rounded-md p-3 bg-[var(--glass-bg)] border border-[var(--glass-border)]"><div className="text-xs text-[var(--text-muted)]">Program</div><div className="font-medium mt-1">{member.program}</div></div>}
+								{member.year && <div className="rounded-md p-3 bg-[var(--glass-bg)] border border-[var(--glass-border)]"><div className="text-xs text-[var(--text-muted)]">Academic Year</div><div className="font-medium mt-1">Year {member.year}</div></div>}
+								{typeof member.hosteler === 'boolean' && <div className="rounded-md p-3 bg-[var(--glass-bg)] border border-[var(--glass-border)] sm:col-span-2"><div className="text-xs text-[var(--text-muted)]">Residence</div><div className="font-medium mt-1">{member.hosteler ? `Hosteler${member.hostel ? ` - ${member.hostel}` : ''}` : 'Day Scholar'}</div></div>}
 							</div>
 						)}
 
-						{/* Documents */}
-						{activeTab === 'documents' && (
+						{active === 'documents' && (
 							<div>
 								{member.resume?.url ? (
-									<a href={member.resume.url} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-2 px-4 py-2 rounded-md bg-emerald-600 text-white">
-										<Download size={16} /> View Resume
+									<a href={member.resume.url} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-2 px-3 py-2 rounded-md bg-emerald-600 text-white">
+										<Download size={14} /> View Resume
 									</a>
-								) : (
-									<p className="text-gray-500 dark:text-gray-400 italic text-center py-4">No documents available.</p>
-								)}
+								) : <p className="text-[var(--text-muted)] italic">No documents available.</p>}
 							</div>
 						)}
 
-						{/* Details */}
-						{activeTab === 'details' && isAuthenticated && (
-							<div className="space-y-3">
-								{member.memberID && (
-									<div className="rounded-lg bg-gray-50 dark:bg-gray-800 p-3 border border-gray-100 dark:border-gray-700">
-										<div className="text-xs text-gray-500 mb-1 flex items-center gap-2"><IdCard size={14} /> Member ID</div>
-										<div className="font-mono text-xs break-all">{member.memberID}</div>
-									</div>
-								)}
-								{member._id && (
-									<div className="rounded-lg bg-gray-50 dark:bg-gray-800 p-3 border border-gray-100 dark:border-gray-700">
-										<div className="text-xs text-gray-500 mb-1 flex items-center gap-2"><IdCard size={14} /> Database ID</div>
-										<div className="font-mono text-xs break-all">{member._id}</div>
-									</div>
-								)}
-								{member.status && (
-									<div className="rounded-lg bg-gray-50 dark:bg-gray-800 p-3 border border-gray-100 dark:border-gray-700">
-										<div className="text-xs text-gray-500 mb-1 flex items-center gap-2"><Shield size={14} /> Account Status</div>
-										<StatusBadge status={member.status} />
-									</div>
-								)}
-								{allDepartments.length > 0 && (
-									<div className="rounded-lg bg-gray-50 dark:bg-gray-800 p-3 border border-gray-100 dark:border-gray-700">
-										<div className="text-xs text-gray-500 mb-2 flex items-center gap-2"><Badge size={14} /> All Departments</div>
-										<div className="flex flex-wrap gap-2">
-											{allDepartments.map((d, i) => (
-												<span key={i} className="px-2 py-1 rounded-full bg-indigo-50 dark:bg-indigo-900/20 text-indigo-700 dark:text-indigo-300 text-xs">{d}</span>
-											))}
-										</div>
-									</div>
-								)}
-								{allDesignations.length > 0 && (
-									<div className="rounded-lg bg-gray-50 dark:bg-gray-800 p-3 border border-gray-100 dark:border-gray-700">
-										<div className="text-xs text-gray-500 mb-2 flex items-center gap-2"><User size={14} /> All Designations</div>
-										<div className="flex flex-wrap gap-2">
-											{allDesignations.map((d, i) => (
-												<span key={i} className="px-2 py-1 rounded-full bg-purple-50 dark:bg-purple-900/20 text-purple-700 dark:text-purple-300 text-xs">{d}</span>
-											))}
-										</div>
-									</div>
-								)}
-								{member.createdAt && (
-									<div className="rounded-lg bg-gray-50 dark:bg-gray-800 p-3 border border-gray-100 dark:border-gray-700">
-										<div className="text-xs text-gray-500 mb-1 flex items-center gap-2"><Clock size={14} /> Created At</div>
-										<div className="text-xs">{formatDateTime(member.createdAt)}</div>
-									</div>
-								)}
-								{member.updatedAt && (
-									<div className="rounded-lg bg-gray-50 dark:bg-gray-800 p-3 border border-gray-100 dark:border-gray-700">
-										<div className="text-xs text-gray-500 mb-1 flex items-center gap-2"><Clock size={14} /> Last Updated</div>
-										<div className="text-xs">{formatDateTime(member.updatedAt)}</div>
-									</div>
-								)}
+						{active === 'details' && isAuthenticated && (
+							<div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+								{member.memberID && <div className="rounded-md p-3 bg-[var(--glass-bg)] border border-[var(--glass-border)]"><div className="text-xs text-[var(--text-muted)]">Member ID</div><div className="font-mono mt-1">{member.memberID}</div></div>}
+								{member._id && <div className="rounded-md p-3 bg-[var(--glass-bg)] border border-[var(--glass-border)]"><div className="text-xs text-[var(--text-muted)]">Database ID</div><div className="font-mono mt-1">{member._id}</div></div>}
+								{member.createdAt && <div className="rounded-md p-3 bg-[var(--glass-bg)] border border-[var(--glass-border)] sm:col-span-2"><div className="text-xs text-[var(--text-muted)]">Created</div><div className="mt-1">{formatDate(member.createdAt)}</div></div>}
 							</div>
 						)}
 					</div>
