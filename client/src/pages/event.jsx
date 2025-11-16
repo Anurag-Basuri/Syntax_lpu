@@ -43,15 +43,15 @@ const LoadingGrid = () => (
 	</div>
 );
 
-const EmptyCreative = ({ searchActive }) => (
+const EmptyCreative = ({ filterActive }) => (
 	<div className="flex flex-col items-center justify-center py-24 text-center">
 		<div className="text-6xl mb-4 animate-pulse">🛰️</div>
 		<h2 className="text-2xl font-semibold text-gray-800 dark:text-gray-100 mb-2">
-			{searchActive ? 'No matches found' : 'No events yet'}
+			{filterActive ? 'No matches for filter' : 'No events yet'}
 		</h2>
 		<p className="text-sm text-gray-500 dark:text-gray-400 max-w-md">
-			{searchActive
-				? 'Try different keywords or remove filters.'
+			{filterActive
+				? 'Try selecting a different period.'
 				: 'Stay tuned. Fresh experiences are being prepared.'}
 		</p>
 		<div className="mt-6 text-xs text-gray-400 dark:text-gray-600">
@@ -100,18 +100,10 @@ const Pager = ({ page, totalPages, onPrev, onNext, disabledPrev, disabledNext })
 
 const EventPage = () => {
 	const [filter, setFilter] = useState('all');
-	const [search, setSearch] = useState('');
-	const [debouncedSearch, setDebouncedSearch] = useState('');
 	const [page, setPage] = useState(1);
 	const limit = 9;
 
-	// Debounce the search input to avoid firing queries every keystroke
-	useEffect(() => {
-		const id = setTimeout(() => setDebouncedSearch(search.trim()), 300);
-		return () => clearTimeout(id);
-	}, [search]);
-
-	// Use server-side search when debouncedSearch exists (reduces client-side compute)
+	// Query params: no search (search removed as requested)
 	const queryParams = useMemo(() => {
 		const p = {
 			page,
@@ -119,64 +111,30 @@ const EventPage = () => {
 			sortBy: 'eventDate',
 			sortOrder: 'desc',
 		};
-		if (debouncedSearch) p.search = debouncedSearch;
-		// if user selected a period filter and it's not 'all', pass to server as well
 		if (filter && filter !== 'all') p.period = filter;
 		return p;
-	}, [page, limit, debouncedSearch, filter]);
+	}, [page, limit, filter]);
 
 	const { data, isLoading, isError, error, refetch, isFetching } = useEvents(queryParams);
 
 	const events = data?.docs || [];
-	const {
-		totalDocs = events.length,
-		totalPages = 1,
-	} = data || {};
+	const { totalDocs = events.length, totalPages = 1 } = data || {};
 
-	// Categorize the events returned from server
+	// categorize returned events
 	const categorized = useMemo(() => categorize(events), [events]);
 
-	// When we used server search (debouncedSearch is set), we trust the server and avoid extra client filtering
-	const filtered = useMemo(() => {
-		// apply client-side basic filtering only when server search is not active
-		if (debouncedSearch) {
-			// when server search used, server already filtered; present categorized as returned
-			return categorized;
-		}
+	const empty =
+		(Object.values(categorized).reduce((sum, list) => sum + list.length, 0) || 0) === 0;
 
-		const applySearch = (list) =>
-			!search
-				? list
-				: list.filter((e) =>
-						[
-							e.title,
-							e.description,
-							e.venue,
-							...(e.tags || []),
-							(pickDate(e) && pickDate(e).toISOString().slice(0, 10)) || '',
-						]
-							.filter(Boolean)
-							.join(' ')
-							.toLowerCase()
-							.includes(search.toLowerCase())
-				  );
-
-		if (filter === 'all')
-			return {
-				ongoing: applySearch(categorized.ongoing),
-				upcoming: applySearch(categorized.upcoming),
-				past: applySearch(categorized.past),
-			};
-		return { [filter]: applySearch(categorized[filter]) };
-	}, [categorized, filter, search, debouncedSearch]);
-
-	const empty = Object.values(filtered).reduce((sum, list) => sum + list.length, 0) === 0;
-
-	// Memoized pager callbacks to avoid function recreation on each render
+	// Pager callbacks
 	const onPrev = useCallback(() => setPage((p) => Math.max(1, p - 1)), []);
-	const onNext = useCallback(() => setPage((p) => Math.min(totalPages || 1, p + 1)), [totalPages]);
+	const onNext = useCallback(
+		() => setPage((p) => Math.min(totalPages || 1, p + 1)),
+		[totalPages]
+	);
 
-	if (isError) return <ErrorBlock message={error?.message || 'Unknown error'} onRetry={refetch} />;
+	if (isError)
+		return <ErrorBlock message={error?.message || 'Unknown error'} onRetry={refetch} />;
 
 	return (
 		<div className="min-h-screen mx-auto max-w-7xl px-4 py-8 text-gray-900 dark:text-gray-100 bg-transparent">
@@ -189,56 +147,46 @@ const EventPage = () => {
 						</span>
 					</h1>
 					<p className="text-sm text-gray-600 dark:text-gray-400 max-w-xl">
-						{isFetching ? 'Loading…' : `Showing ${events.length} of ${totalDocs} events`}
+						{isFetching
+							? 'Loading…'
+							: `Showing ${events.length} of ${totalDocs} events`}
 					</p>
 				</div>
 
 				<div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-					<EventFilter activeFilter={filter} setActiveFilter={(f) => { setFilter(f); setPage(1); }} />
-					<div className="relative w-full md:w-72">
-						<input
-							type="text"
-							value={search}
-							onChange={(e) => {
-								setSearch(e.target.value);
-								setPage(1);
-							}}
-							placeholder="Search events..."
-							className="w-full px-3 py-2 rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-sm focus:ring-2 focus:ring-blue-500 outline-none"
-							aria-label="Search events"
-						/>
-						{search && (
-							<button
-								type="button"
-								aria-label="Clear search"
-								onClick={() => {
-									setSearch('');
-									setDebouncedSearch('');
-								}}
-								className="absolute top-1/2 -translate-y-1/2 right-2 text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 text-xs"
-							>
-								✕
-							</button>
-						)}
-					</div>
+					<EventFilter
+						activeFilter={filter}
+						setActiveFilter={(f) => {
+							setFilter(f);
+							setPage(1);
+						}}
+					/>
+					{/* Search removed per request: keep layout balanced */}
+					<div aria-hidden className="w-0 md:w-72" />
 				</div>
 			</header>
 
 			{isLoading ? (
 				<LoadingGrid />
 			) : empty ? (
-				<EmptyCreative searchActive={!!search || !!debouncedSearch} />
+				<EmptyCreative filterActive={filter !== 'all'} />
 			) : (
 				<>
 					{/* Render categories in a deterministic order */}
 					{['ongoing', 'upcoming', 'past'].map((category) => {
-						const list = filtered[category] || [];
+						const list = categorized[category] || [];
 						if (!list.length) return null;
 						return (
 							<section key={category} className="mb-10">
 								<h2 className="text-lg font-semibold mb-4 capitalize flex items-center gap-2">
-									{category === 'ongoing' ? '🔴 Live' : category === 'upcoming' ? '🚀 Upcoming' : '📚 Past'}
-									<span className="text-xs font-medium text-gray-500 dark:text-gray-400">({list.length})</span>
+									{category === 'ongoing'
+										? '🔴 Live'
+										: category === 'upcoming'
+										? '🚀 Upcoming'
+										: '📚 Past'}
+									<span className="text-xs font-medium text-gray-500 dark:text-gray-400">
+										({list.length})
+									</span>
 								</h2>
 								<div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-6">
 									{list.map((ev) => (
