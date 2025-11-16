@@ -70,7 +70,6 @@ const EditArvantis = ({ setDashboardError = () => {} }) => {
 				// auto-select first fest if nothing selected
 				if (!selectedFestId && docs.length > 0) {
 					setSelectedFestId(docs[0]._id);
-					// load details for first item
 					void loadFestDetails(docs[0]._id);
 				}
 			}
@@ -115,6 +114,7 @@ const EditArvantis = ({ setDashboardError = () => {} }) => {
 				events: data.events || [],
 				tracks: data.tracks || [],
 				faqs: data.faqs || [],
+				visibility: data.visibility || 'public',
 			};
 			if (mountedRef.current) {
 				setEditForm(normalized);
@@ -225,12 +225,35 @@ const EditArvantis = ({ setDashboardError = () => {} }) => {
 		fd.append('poster', file, safeFilename(file.name || 'poster'));
 		setActionBusy(true);
 		try {
-			await svc.updateFestPoster(editForm._id, fd);
+			// uploads to poster endpoint
+			await svc.addFestPoster(editForm._id, fd);
 			toast.success('Poster uploaded');
 			await loadFestDetails(editForm._id);
 		} catch (err) {
 			console.error('uploadPoster', err);
 			toast.error(getErrMsg(err, 'Poster upload failed'));
+		} finally {
+			if (mountedRef.current) setActionBusy(false);
+		}
+	};
+
+	const removePoster = async () => {
+		if (!editForm || !editForm._id || !editForm.poster?.publicId) return;
+		if (!window.confirm('Remove poster for this fest?')) return;
+		setActionBusy(true);
+		try {
+			await svc.removeFestPoster(editForm._id);
+			toast.success('Poster removed');
+			await loadFestDetails(editForm._id);
+			// ensure selection doesn't keep removed id
+			setMediaSelection((s) => {
+				const copy = new Set(s);
+				copy.delete(editForm.poster.publicId);
+				return copy;
+			});
+		} catch (err) {
+			console.error('removePoster', err);
+			toast.error(getErrMsg(err, 'Remove poster failed'));
 		} finally {
 			if (mountedRef.current) setActionBusy(false);
 		}
@@ -249,6 +272,27 @@ const EditArvantis = ({ setDashboardError = () => {} }) => {
 		} catch (err) {
 			console.error('uploadHero', err);
 			toast.error(getErrMsg(err, 'Hero upload failed'));
+		} finally {
+			if (mountedRef.current) setActionBusy(false);
+		}
+	};
+
+	const removeHero = async () => {
+		if (!editForm || !editForm._id || !editForm.hero?.publicId) return;
+		if (!window.confirm('Remove hero media for this fest?')) return;
+		setActionBusy(true);
+		try {
+			await svc.removeFestHero(editForm._id);
+			toast.success('Hero removed');
+			await loadFestDetails(editForm._id);
+			setMediaSelection((s) => {
+				const copy = new Set(s);
+				copy.delete(editForm.hero.publicId);
+				return copy;
+			});
+		} catch (err) {
+			console.error('removeHero', err);
+			toast.error(getErrMsg(err, 'Remove hero failed'));
 		} finally {
 			if (mountedRef.current) setActionBusy(false);
 		}
@@ -287,6 +331,11 @@ const EditArvantis = ({ setDashboardError = () => {} }) => {
 			await svc.removeGalleryMedia(editForm._id, publicId);
 			toast.success('Gallery item removed');
 			await loadFestDetails(editForm._id);
+			setMediaSelection((s) => {
+				const copy = new Set(s);
+				copy.delete(publicId);
+				return copy;
+			});
 		} catch (err) {
 			console.error('removeGalleryItem', err);
 			toast.error(getErrMsg(err, 'Remove failed'));
@@ -570,10 +619,13 @@ const EditArvantis = ({ setDashboardError = () => {} }) => {
 
 	// ----------------- Media bulk delete -----------------
 	const toggleMediaSelect = (publicId) => {
-		const s = new Set(mediaSelection);
-		if (s.has(publicId)) s.delete(publicId);
-		else s.add(publicId);
-		setMediaSelection(s);
+		if (!publicId) return;
+		setMediaSelection((prev) => {
+			const s = new Set(prev);
+			if (s.has(publicId)) s.delete(publicId);
+			else s.add(publicId);
+			return s;
+		});
 	};
 
 	const bulkDeleteSelectedMedia = async () => {
@@ -833,7 +885,6 @@ const EditArvantis = ({ setDashboardError = () => {} }) => {
 							/>
 						</div>
 
-						{/* Poster / Hero / Gallery / Partners / Events / Presentation / Tracks / FAQs / Media actions */}
 						{/* Poster */}
 						<div className="mb-4">
 							<h4 className="font-semibold text-white mb-2">Poster</h4>
@@ -846,6 +897,15 @@ const EditArvantis = ({ setDashboardError = () => {} }) => {
 									/>
 									<div className="text-sm text-gray-400">
 										{editForm.poster.caption || ''}
+									</div>
+									<div className="ml-auto flex gap-2">
+										<button
+											onClick={() => removePoster()}
+											disabled={actionBusy}
+											className="px-3 py-1 rounded bg-red-600 text-white"
+										>
+											Delete Poster
+										</button>
 									</div>
 								</div>
 							) : (
@@ -871,6 +931,15 @@ const EditArvantis = ({ setDashboardError = () => {} }) => {
 									/>
 									<div className="text-sm text-gray-400">
 										{editForm.hero.caption || ''}
+									</div>
+									<div className="ml-auto flex gap-2">
+										<button
+											onClick={() => removeHero()}
+											disabled={actionBusy}
+											className="px-3 py-1 rounded bg-red-600 text-white"
+										>
+											Delete Hero
+										</button>
 									</div>
 								</div>
 							) : (
@@ -1105,7 +1174,7 @@ const EditArvantis = ({ setDashboardError = () => {} }) => {
 													socialLinks: parsed,
 												}));
 											} catch (err) {
-												// do not update until valid JSON
+												// ignore until valid JSON
 											}
 										}}
 										className="p-3 bg-white/5 rounded w-full"
@@ -1319,7 +1388,7 @@ const EditArvantis = ({ setDashboardError = () => {} }) => {
 							</div>
 						</div>
 
-						{/* Media bulk actions */}
+						{/* Media bulk actions (includes poster & hero) */}
 						<div className="mb-4">
 							<div className="flex items-center justify-between mb-2">
 								<h4 className="font-semibold text-white">Media Actions</h4>
@@ -1341,6 +1410,65 @@ const EditArvantis = ({ setDashboardError = () => {} }) => {
 							</div>
 
 							<div className="flex gap-2 flex-wrap">
+								{/* Poster selectable */}
+								{editForm.poster?.publicId && (
+									<div className="relative w-24 h-24 bg-gray-800 rounded overflow-hidden">
+										{editForm.poster.url && (
+											<img
+												src={editForm.poster.url}
+												alt="poster"
+												className="object-cover w-full h-full"
+											/>
+										)}
+										<div className="absolute top-0 right-0 p-1">
+											<button
+												onClick={() =>
+													toggleMediaSelect(editForm.poster.publicId)
+												}
+												className={`p-1 rounded-full ${
+													mediaSelection.has(editForm.poster.publicId)
+														? 'bg-purple-600 text-white'
+														: 'bg-black/50 text-purple-600'
+												}`}
+												aria-label="Select poster"
+											>
+												{mediaSelection.has(editForm.poster.publicId)
+													? '✓'
+													: 'P'}
+											</button>
+										</div>
+									</div>
+								)}
+								{/* Hero selectable */}
+								{editForm.hero?.publicId && (
+									<div className="relative w-24 h-24 bg-gray-800 rounded overflow-hidden">
+										{editForm.hero.url && (
+											<img
+												src={editForm.hero.url}
+												alt="hero"
+												className="object-cover w-full h-full"
+											/>
+										)}
+										<div className="absolute top-0 right-0 p-1">
+											<button
+												onClick={() =>
+													toggleMediaSelect(editForm.hero.publicId)
+												}
+												className={`p-1 rounded-full ${
+													mediaSelection.has(editForm.hero.publicId)
+														? 'bg-purple-600 text-white'
+														: 'bg-black/50 text-purple-600'
+												}`}
+												aria-label="Select hero"
+											>
+												{mediaSelection.has(editForm.hero.publicId)
+													? '✓'
+													: 'H'}
+											</button>
+										</div>
+									</div>
+								)}
+								{/* Gallery selectable */}
 								{(editForm.gallery || []).map((g) => (
 									<div
 										key={g.publicId}
