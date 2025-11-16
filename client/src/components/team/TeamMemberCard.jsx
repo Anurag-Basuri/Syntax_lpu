@@ -10,6 +10,14 @@ import {
 	ShieldCheck,
 	Briefcase,
 } from 'lucide-react';
+import { Shield } from 'lucide-react';
+
+/**
+ * TeamMemberCard - compact, uniform card used in TeamGrid
+ * - Fixed height/width container provided by parent for consistent layout
+ * - Minimal details: avatar, name, role, department, leader badge
+ * - Entire card is a button for keyboard accessibility
+ */
 
 const FALLBACK_AVATAR = (name) =>
 	`https://api.dicebear.com/8.x/initials/svg?seed=${encodeURIComponent(name || '??')}`;
@@ -20,6 +28,12 @@ const getSocialIcon = (platform = '') => {
 	if (p.includes('linkedin')) return Linkedin;
 	if (p.includes('twitter')) return Twitter;
 	return Globe;
+};
+
+const getAvatar = (p, seed) => {
+	if (!p) return `https://api.dicebear.com/8.x/initials/svg?seed=${encodeURIComponent(seed)}`;
+	if (typeof p === 'string') return p;
+	return p?.url || `https://api.dicebear.com/8.x/initials/svg?seed=${encodeURIComponent(seed)}`;
 };
 
 const TeamMemberCard = React.memo(function TeamMemberCard({ member, onClick }) {
@@ -123,7 +137,11 @@ const TeamMemberCard = React.memo(function TeamMemberCard({ member, onClick }) {
 			<div className="pt-10 pb-4 px-4 sm:px-5">
 				<div className="flex items-start gap-3">
 					<div className="min-w-0 flex-1">
-						<h3 className="text-base sm:text-lg font-semibold leading-tight truncate" title={member.fullname} style={{ color: 'var(--text-primary)' }}>
+						<h3
+							className="text-base sm:text-lg font-semibold leading-tight truncate"
+							title={member.fullname}
+							style={{ color: 'var(--text-primary)' }}
+						>
 							{member.fullname}
 						</h3>
 						<div className="mt-1 text-sm text-[var(--text-secondary)] truncate">
@@ -139,7 +157,10 @@ const TeamMemberCard = React.memo(function TeamMemberCard({ member, onClick }) {
 				{Array.isArray(member.skills) && member.skills.length > 0 && (
 					<div className="mt-3 flex flex-wrap gap-2">
 						{member.skills.slice(0, 6).map((s, i) => (
-							<span key={i} className="text-xs px-2 py-1 rounded-full bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-200">
+							<span
+								key={i}
+								className="text-xs px-2 py-1 rounded-full bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-200"
+							>
 								{s}
 							</span>
 						))}
@@ -149,24 +170,27 @@ const TeamMemberCard = React.memo(function TeamMemberCard({ member, onClick }) {
 				{/* Footer with socials & quick actions */}
 				<div className="mt-4 flex items-center gap-2 justify-between">
 					<div className="flex items-center gap-2">
-						{Array.isArray(member.socialLinks) && member.socialLinks.slice(0, 3).map((s, i) => {
-							const Icon = getSocialIcon(s.platform);
-							const url = (s.url || '').startsWith('http') ? s.url : `https://${s.url || ''}`;
-							return (
-								<a
-									key={i}
-									href={url}
-									target="_blank"
-									rel="noopener noreferrer"
-									onClick={(e) => e.stopPropagation()}
-									className="inline-flex items-center justify-center w-8 h-8 rounded-md bg-white/6 hover:bg-white/10 transition-colors text-[var(--text-secondary)]"
-									aria-label={`${member.fullname} ${s.platform || 'profile'}`}
-									title={s.platform || 'profile'}
-								>
-									<Icon size={14} />
-								</a>
-							);
-						})}
+						{Array.isArray(member.socialLinks) &&
+							member.socialLinks.slice(0, 3).map((s, i) => {
+								const Icon = getSocialIcon(s.platform);
+								const url = (s.url || '').startsWith('http')
+									? s.url
+									: `https://${s.url || ''}`;
+								return (
+									<a
+										key={i}
+										href={url}
+										target="_blank"
+										rel="noopener noreferrer"
+										onClick={(e) => e.stopPropagation()}
+										className="inline-flex items-center justify-center w-8 h-8 rounded-md bg-white/6 hover:bg-white/10 transition-colors text-[var(--text-secondary)]"
+										aria-label={`${member.fullname} ${s.platform || 'profile'}`}
+										title={s.platform || 'profile'}
+									>
+										<Icon size={14} />
+									</a>
+								);
+							})}
 					</div>
 
 					{/* Hover actions */}
@@ -194,7 +218,10 @@ const TeamMemberCard = React.memo(function TeamMemberCard({ member, onClick }) {
 							</a>
 						)}
 						<button
-							onClick={(e) => { e.stopPropagation(); onClick?.(member); }}
+							onClick={(e) => {
+								e.stopPropagation();
+								onClick?.(member);
+							}}
 							className="inline-flex items-center gap-2 px-3 py-1 rounded-md bg-[linear-gradient(90deg,var(--accent-1),var(--accent-2))] text-white text-sm"
 							aria-label={`Open profile for ${member.fullname}`}
 						>
