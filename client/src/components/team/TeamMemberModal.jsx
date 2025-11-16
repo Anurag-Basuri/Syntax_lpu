@@ -83,8 +83,8 @@ const TeamMemberModal = ({ member, isOpen, onClose }) => {
 		const first = focusable[0];
 		const last = focusable[focusable.length - 1];
 		const handleKey = (e) => {
-			if (e.key === 'Escape') onClose();
-			if (e.key === 'Tab') {
+			if (e.key === 'Escape') onClose?.();
+			if (e.key === 'Tab' && focusable.length > 0) {
 				if (e.shiftKey && document.activeElement === first) {
 					e.preventDefault();
 					last.focus();
@@ -146,8 +146,6 @@ const TeamMemberModal = ({ member, isOpen, onClose }) => {
 		}`;
 		try {
 			await navigator.clipboard.writeText(text);
-			// small inline feedback could be added — for simplicity, use alert or console
-			// but try to be unobtrusive
 			if (typeof window !== 'undefined')
 				window.dispatchEvent(
 					new CustomEvent('toast', { detail: { message: 'Contact copied to clipboard' } })
@@ -177,7 +175,7 @@ const TeamMemberModal = ({ member, isOpen, onClose }) => {
 			aria-modal="true"
 			aria-label={`Profile of ${member.fullname}`}
 			onClick={(e) => {
-				if (e.target === e.currentTarget) onClose();
+				if (e.target === e.currentTarget) onClose?.();
 			}}
 		>
 			<div
@@ -278,7 +276,7 @@ const TeamMemberModal = ({ member, isOpen, onClose }) => {
 						</button>
 						<button
 							onClick={downloadVCard}
-							className="inline-flex items-center gap-2 px-3 py-2 rounded-md bg-[var(--glass-bg)] border border-[var,--glass-border)]"
+							className="inline-flex items-center gap-2 px-3 py-2 rounded-md bg-[var(--glass-bg)] border border-[var(--glass-border)]"
 						>
 							<FileText size={14} /> Download vCard
 						</button>
@@ -355,7 +353,7 @@ const TeamMemberModal = ({ member, isOpen, onClose }) => {
 										</div>
 									)}
 									{member.status && (
-										<div className="rounded-md p-3 bg-[var(--glass-bg)] border border-[var,--glass-border)] flex items-start gap-3">
+										<div className="rounded-md p-3 bg-[var(--glass-bg)] border border-[var(--glass-border)] flex items-start gap-3">
 											<Shield size={18} className="text-gray-600" />
 											<div>
 												<div className="text-xs text-[var(--text-muted)]">
@@ -522,7 +520,7 @@ const TeamMemberModal = ({ member, isOpen, onClose }) => {
 								)}
 								{member._id && (
 									<div className="rounded-md p-3 bg-[var(--glass-bg)] border border-[var,--glass-border)]">
-										<div className="text-xs text-[var(--text-muted)]">
+										<div className="text-xs text-[var,--text-muted]">
 											Database ID
 										</div>
 										<div className="font-mono mt-1">{member._id}</div>
