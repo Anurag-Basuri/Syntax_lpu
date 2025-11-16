@@ -1,13 +1,46 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import * as svc from '../../services/arvantisServices.js';
-import { publicClient } from '../../services/api.js';
-import GlassCard from '../../components/arvantis/GlassCard.jsx';
-import EmptyState from '../../components/arvantis/EmptyState.jsx';
-import LoadingSpinner from '../../components/arvantis/LoadingSpinner.jsx';
-import Badge from '../../components/arvantis/Badge.jsx';
-import PartnerQuickAdd from '../../components/arvantis/PartnerQuickAdd.jsx';
+import {
+	getAllFests,
+	getFestDetails,
+	createFest,
+	updateFestDetails,
+	deleteFest,
+	addFestPoster,
+	removeFestPoster,
+	updateFestHero,
+	removeFestHero,
+	addGalleryMedia,
+	removeGalleryMedia,
+	addPartner,
+	updatePartner,
+	removePartner,
+	reorderPartners as svcReorderPartners,
+	linkEventToFest,
+	unlinkEventFromFest,
+	exportFestsCSV,
+	downloadFestAnalytics,
+	downloadFestStatistics,
+	downloadFestReport,
+	updatePresentation,
+	updateSocialLinks,
+	updateThemeColors,
+	setVisibility as svcSetVisibility,
+	addTrack as svcAddTrack,
+	removeTrack as svcRemoveTrack,
+	reorderTracks as svcReorderTracks,
+	addFAQ as svcAddFAQ,
+	updateFAQ,
+	removeFAQ as svcRemoveFAQ,
+	reorderFAQs as svcReorderFAQs,
+	bulkDeleteMedia as svcBulkDeleteMedia,
+} from '../../services/arvantisServices.js';
 import { Download, Trash2, ArrowUp, ArrowDown } from 'lucide-react';
-import toast from 'react-hot-toast';
+import GlassCard from '../../components/arvantis/GlassCard';
+import EmptyState from '../../components/arvantis/EmptyState';
+import LoadingSpinner from '../../components/arvantis/LoadingSpinner';
+import Badge from '../../components/arvantis/Badge';
+import PartnerQuickAdd from '../../components/arvantis/PartnerQuickAdd';
+import Toast from '../../components/arvantis/Toast';
 
 const MAX_FILE_SIZE = 10 * 1024 * 1024;
 const FILE_TYPES_IMAGES = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp'];
@@ -44,6 +77,8 @@ const EditArvantis = ({ setDashboardError = () => {} }) => {
 	const [heroFile, setHeroFile] = useState(null);
 	const [heroCaption, setHeroCaption] = useState('');
 
+	const [toast, setToast] = useState(null);
+
 	const mountedRef = useRef(false);
 	const setDashboardErrorRef = useRef(setDashboardError);
 	useEffect(() => {
@@ -60,41 +95,54 @@ const EditArvantis = ({ setDashboardError = () => {} }) => {
 	const getErrMsg = (err, fallback = 'Request failed') =>
 		err?.response?.data?.message || err?.response?.data?.error || err?.message || fallback;
 
+	// Fetch fests (admin list)
 	const fetchFests = useCallback(async () => {
 		setLoading(true);
 		try {
-			const resp = await svc.getAllFests({ page: 1, limit: 200 }, { admin: true });
-			const docs = resp?.docs || [];
-			if (mountedRef.current) {
-				setFests(docs);
-				// preserve selection if exists, else auto-select first
-				if (!selectedFestId && docs.length > 0) {
-					const first = docs[0];
-					setSelectedFestId(first._id);
-					void loadFestDetails(first._id);
-				}
+			const pag = await getAllFests({ limit: 100 }, { admin: true });
+			const docs = pag.docs || [];
+			setFests(docs);
+			// if a selected fest is gone, clear selection
+			if (selectedFestId && !docs.some((d) => d._id === selectedFestId)) {
+				setSelectedFestId(null);
+				setEditForm(null);
 			}
 		} catch (err) {
-			console.error('fetchFests', err);
-			setDashboardErrorRef.current?.(getErrMsg(err, 'Failed to load fests'));
-			toast.error(getErrMsg(err, 'Failed to load fests'));
+			const msg = getErrMsg(err, 'Failed to load fests');
+			setDashboardErrorRef.current(msg);
 		} finally {
 			if (mountedRef.current) setLoading(false);
 		}
 		// eslint-disable-next-line react-hooks/exhaustive-deps
 	}, [selectedFestId]);
 
+	// Fetch events for linking
 	const fetchEvents = useCallback(async (signal) => {
 		try {
-			const resp = await publicClient.get('/api/v1/events', {
-				params: { page: 1, limit: 500 },
-				signal,
-			});
-			const docs = resp?.data?.data ?? resp?.data ?? [];
-			if (mountedRef.current) setEvents(Array.isArray(docs) ? docs : []);
+			// lightweight events fetch: reuse publicClient via arvantisServices isn't exposed;
+			// fallback: use public endpoint pattern used elsewhere (list events endpoint not included in attachments).
+			// To keep page functional, try to fetch via backend events endpoint if available:
+			const resp = await fetch(
+				`${
+					import.meta.env.VITE_BACKEND_URL || 'http://localhost:8000'
+				}/api/v1/events?limit=200`,
+				{
+					signal,
+					credentials: 'include',
+				}
+			);
+			if (!resp.ok) {
+				setEvents([]);
+				return;
+			}
+			const body = await resp.json();
+			const evs = body?.data?.docs || body?.data || body?.docs || [];
+			setEvents(evs);
 		} catch (err) {
-			if (err?.name === 'CanceledError' || err?.name === 'AbortError') return;
-			console.error('fetchEvents', err);
+			// ignore aborts
+			if (err.name !== 'AbortError') {
+				console.warn('fetchEvents failed', err);
+			}
 		}
 	}, []);
 
@@ -118,23 +166,18 @@ const EditArvantis = ({ setDashboardError = () => {} }) => {
 		if (!identifier) return;
 		setActionBusy(true);
 		try {
-			const data = await svc.getFestDetails(identifier, { admin: true });
-			if (!data) throw new Error('No data returned');
-			const normalized = normalizeFest(data);
-			if (mountedRef.current) {
-				setEditForm(normalized);
-				setSelectedFestId(normalized._id);
-				setPresentationDraft({
-					themeColors: normalized.themeColors || {},
-					socialLinks: normalized.socialLinks || {},
-				});
-				setHeroCaption(normalized.hero?.caption || '');
-				// clear media selection
-				setMediaSelection(new Set());
-			}
+			const data = await getFestDetails(identifier, { admin: true });
+			const norm = normalizeFest(data);
+			setEditForm(norm);
+			setSelectedFestId(norm?._id || null);
+			// seed presentationDraft from fest
+			setPresentationDraft({
+				themeColors: norm?.themeColors || {},
+				socialLinks: norm?.socialLinks || {},
+			});
+			setHeroCaption(norm?.hero?.caption || '');
 		} catch (err) {
-			console.error('loadFestDetails', err);
-			toast.error(getErrMsg(err, 'Failed to load fest details'));
+			setDashboardErrorRef.current(getErrMsg(err, 'Failed to load fest details'));
 		} finally {
 			if (mountedRef.current) setActionBusy(false);
 		}
@@ -153,25 +196,14 @@ const EditArvantis = ({ setDashboardError = () => {} }) => {
 		setCreateLoading(true);
 		setLocalError('');
 		try {
-			const payload = {
-				year: Number(createForm.year),
-				name: createForm.name,
-				description: createForm.description,
-				startDate: createForm.startDate || null,
-				endDate: createForm.endDate || null,
-			};
-			const created = await svc.createFest(payload);
-			toast.success('Fest created');
+			const created = await createFest(createForm);
+			setToast({ type: 'success', message: 'Fest created' });
 			await fetchFests();
 			setCreateOpen(false);
-			if (created?._id) {
-				await loadFestDetails(created._id);
-			}
+			// auto-open created
+			if (created?._id) await loadFestDetails(created._id);
 		} catch (err) {
-			console.error('createFest', err);
-			const msg = getErrMsg(err, 'Create failed');
-			setLocalError(msg);
-			toast.error(msg);
+			setLocalError(getErrMsg(err, 'Create failed'));
 		} finally {
 			if (mountedRef.current) setCreateLoading(false);
 		}
@@ -182,23 +214,21 @@ const EditArvantis = ({ setDashboardError = () => {} }) => {
 		if (!editForm || !editForm._id) return;
 		setActionBusy(true);
 		try {
-			// prepare payload: only fields editable in UI
+			// send only allowed fields (backend prevents critical changes already)
 			const payload = {
 				description: editForm.description,
 				location: editForm.location,
 				contactEmail: editForm.contactEmail,
-				contactPhone: editForm.contactPhone,
-				startDate: editForm.startDate || null,
-				endDate: editForm.endDate || null,
+				startDate: editForm.startDate,
+				endDate: editForm.endDate,
 				status: editForm.status,
 			};
-			await svc.updateFestDetails(editForm._id, payload);
-			toast.success('Fest updated');
+			const updated = await updateFestDetails(editForm._id, payload);
+			setEditForm(normalizeFest(updated));
+			setToast({ type: 'success', message: 'Saved fest details' });
 			await fetchFests();
-			await loadFestDetails(editForm._id);
 		} catch (err) {
-			console.error('saveEdit', err);
-			toast.error(getErrMsg(err, 'Failed to save fest'));
+			setDashboardErrorRef.current(getErrMsg(err, 'Failed to save'));
 		} finally {
 			if (mountedRef.current) setActionBusy(false);
 		}
@@ -210,14 +240,13 @@ const EditArvantis = ({ setDashboardError = () => {} }) => {
 		if (!window.confirm('Delete fest? This is irreversible.')) return;
 		setActionBusy(true);
 		try {
-			await svc.deleteFest(fest._id);
-			toast.success('Fest deleted');
-			await fetchFests();
+			await deleteFest(fest._id);
+			setToast({ type: 'success', message: 'Fest deleted' });
 			setEditForm(null);
 			setSelectedFestId(null);
+			await fetchFests();
 		} catch (err) {
-			console.error('removeFest', err);
-			toast.error(getErrMsg(err, 'Failed to delete fest'));
+			setDashboardErrorRef.current(getErrMsg(err, 'Failed to delete fest'));
 		} finally {
 			if (mountedRef.current) setActionBusy(false);
 		}
@@ -229,26 +258,18 @@ const EditArvantis = ({ setDashboardError = () => {} }) => {
 		const arr = Array.isArray(files) ? files : [files];
 		const fd = new FormData();
 		for (const f of arr) {
-			if (!f) continue;
-			if (f.size > MAX_FILE_SIZE) {
-				toast.error(`File ${f.name} too large (max 10MB)`);
-				continue;
-			}
-			if (!FILE_TYPES_IMAGES.includes(f.type)) {
-				toast.error(`Invalid image type: ${f.name}`);
-				continue;
-			}
 			fd.append('posters', f, safeFilename(f.name || 'poster'));
 		}
 		if (![...fd.keys()].length) return;
 		setActionBusy(true);
 		try {
-			await svc.addFestPoster(editForm._id, fd);
-			toast.success('Poster(s) uploaded');
-			await loadFestDetails(editForm._id);
+			const items = await addFestPoster(editForm._id, fd);
+			// merge returned posters
+			setEditForm((s) => ({ ...s, posters: [...(s.posters || []), ...(items || [])] }));
+			setToast({ type: 'success', message: 'Poster(s) uploaded' });
+			await fetchFests();
 		} catch (err) {
-			console.error('uploadPoster', err);
-			toast.error(getErrMsg(err, 'Poster upload failed'));
+			setDashboardErrorRef.current(getErrMsg(err, 'Failed to upload posters'));
 		} finally {
 			if (mountedRef.current) setActionBusy(false);
 		}
@@ -259,17 +280,20 @@ const EditArvantis = ({ setDashboardError = () => {} }) => {
 		if (!window.confirm('Remove poster?')) return;
 		setActionBusy(true);
 		try {
-			await svc.removeFestPoster(editForm._id, publicId);
-			toast.success('Poster removed');
+			await removeFestPoster(editForm._id, publicId);
+			setEditForm((s) => ({
+				...s,
+				posters: (s.posters || []).filter((p) => p.publicId !== publicId),
+			}));
 			setMediaSelection((s) => {
-				const copy = new Set(s);
-				copy.delete(publicId);
-				return copy;
+				const c = new Set(s);
+				c.delete(publicId);
+				return c;
 			});
-			await loadFestDetails(editForm._id);
+			setToast({ type: 'success', message: 'Poster removed' });
+			await fetchFests();
 		} catch (err) {
-			console.error('removePoster', err);
-			toast.error(getErrMsg(err, 'Remove poster failed'));
+			setDashboardErrorRef.current(getErrMsg(err, 'Failed to remove poster'));
 		} finally {
 			if (mountedRef.current) setActionBusy(false);
 		}
@@ -279,11 +303,11 @@ const EditArvantis = ({ setDashboardError = () => {} }) => {
 	const uploadHero = async (file, caption) => {
 		if (!file || !editForm || !editForm._id) return;
 		if (file.size > MAX_FILE_SIZE) {
-			toast.error('Hero file too large');
+			setDashboardErrorRef.current('File too large');
 			return;
 		}
 		if (!FILE_TYPES_IMAGES.includes(file.type)) {
-			toast.error('Invalid hero file type');
+			setDashboardErrorRef.current('Unsupported file type');
 			return;
 		}
 		const fd = new FormData();
@@ -291,14 +315,12 @@ const EditArvantis = ({ setDashboardError = () => {} }) => {
 		if (caption) fd.append('caption', caption);
 		setActionBusy(true);
 		try {
-			await svc.updateFestHero(editForm._id, fd);
-			toast.success('Hero updated');
-			setHeroFile(null);
-			setHeroCaption('');
-			await loadFestDetails(editForm._id);
+			const updated = await updateFestHero(editForm._id, fd);
+			setEditForm((s) => ({ ...s, hero: updated }));
+			setToast({ type: 'success', message: 'Hero uploaded' });
+			await fetchFests();
 		} catch (err) {
-			console.error('uploadHero', err);
-			toast.error(getErrMsg(err, 'Hero upload failed'));
+			setDashboardErrorRef.current(getErrMsg(err, 'Failed to upload hero'));
 		} finally {
 			if (mountedRef.current) setActionBusy(false);
 		}
@@ -309,12 +331,12 @@ const EditArvantis = ({ setDashboardError = () => {} }) => {
 		if (!window.confirm('Remove hero media for this fest?')) return;
 		setActionBusy(true);
 		try {
-			await svc.removeFestHero(editForm._id);
-			toast.success('Hero removed');
-			await loadFestDetails(editForm._id);
+			await removeFestHero(editForm._id);
+			setEditForm((s) => ({ ...s, hero: undefined }));
+			setToast({ type: 'success', message: 'Hero removed' });
+			await fetchFests();
 		} catch (err) {
-			console.error('removeHero', err);
-			toast.error(getErrMsg(err, 'Failed to remove hero'));
+			setDashboardErrorRef.current(getErrMsg(err, 'Failed to remove hero'));
 		} finally {
 			if (mountedRef.current) setActionBusy(false);
 		}
@@ -324,23 +346,15 @@ const EditArvantis = ({ setDashboardError = () => {} }) => {
 	const addGallery = async (files) => {
 		if (!files || files.length === 0 || !editForm || !editForm._id) return;
 		const fd = new FormData();
-		for (const f of files) {
-			if (!f) continue;
-			if (f.size > MAX_FILE_SIZE) {
-				toast.error(`File ${f.name} too large (max 10MB)`);
-				continue;
-			}
-			fd.append('media', f, safeFilename(f.name || 'media'));
-		}
+		for (const f of files) fd.append('media', f, safeFilename(f.name || 'media'));
 		if (![...fd.keys()].length) return;
 		setActionBusy(true);
 		try {
-			await svc.addGalleryMedia(editForm._id, fd);
-			toast.success('Gallery media added');
-			await loadFestDetails(editForm._id);
+			const items = await addGalleryMedia(editForm._id, fd);
+			setEditForm((s) => ({ ...s, gallery: [...(s.gallery || []), ...(items || [])] }));
+			setToast({ type: 'success', message: 'Gallery updated' });
 		} catch (err) {
-			console.error('addGallery', err);
-			toast.error(getErrMsg(err, 'Add gallery failed'));
+			setDashboardErrorRef.current(getErrMsg(err, 'Failed to add gallery media'));
 		} finally {
 			if (mountedRef.current) setActionBusy(false);
 		}
@@ -351,12 +365,14 @@ const EditArvantis = ({ setDashboardError = () => {} }) => {
 		if (!window.confirm('Remove gallery item?')) return;
 		setActionBusy(true);
 		try {
-			await svc.removeGalleryMedia(editForm._id, publicId);
-			toast.success('Gallery item removed');
-			await loadFestDetails(editForm._id);
+			await removeGalleryMedia(editForm._id, publicId);
+			setEditForm((s) => ({
+				...s,
+				gallery: (s.gallery || []).filter((g) => g.publicId !== publicId),
+			}));
+			setToast({ type: 'success', message: 'Gallery item removed' });
 		} catch (err) {
-			console.error('removeGalleryItem', err);
-			toast.error(getErrMsg(err, 'Remove gallery failed'));
+			setDashboardErrorRef.current(getErrMsg(err, 'Failed to remove gallery item'));
 		} finally {
 			if (mountedRef.current) setActionBusy(false);
 		}
@@ -367,12 +383,11 @@ const EditArvantis = ({ setDashboardError = () => {} }) => {
 		if (!editForm || !editForm._id) return;
 		setActionBusy(true);
 		try {
-			await svc.addPartner(editForm._id, formData);
-			toast.success('Partner added');
-			await loadFestDetails(editForm._id);
+			const added = await addPartner(editForm._id, formData);
+			setEditForm((s) => ({ ...s, partners: [...(s.partners || []), added] }));
+			setToast({ type: 'success', message: 'Partner added' });
 		} catch (err) {
-			console.error('addNewPartner', err);
-			toast.error(getErrMsg(err, 'Add partner failed'));
+			setDashboardErrorRef.current(getErrMsg(err, 'Failed to add partner'));
 			throw err;
 		} finally {
 			if (mountedRef.current) setActionBusy(false);
@@ -384,12 +399,14 @@ const EditArvantis = ({ setDashboardError = () => {} }) => {
 		const data = updates instanceof FormData ? updates : updates;
 		setActionBusy(true);
 		try {
-			await svc.updatePartner(editForm._id, partnerName, data);
-			toast.success('Partner updated');
-			await loadFestDetails(editForm._id);
+			const updated = await updatePartner(editForm._id, partnerName, data);
+			setEditForm((s) => ({
+				...s,
+				partners: (s.partners || []).map((p) => (p.name === partnerName ? updated : p)),
+			}));
+			setToast({ type: 'success', message: 'Partner updated' });
 		} catch (err) {
-			console.error('updateExistingPartner', err);
-			toast.error(getErrMsg(err, 'Update partner failed'));
+			setDashboardErrorRef.current(getErrMsg(err, 'Failed to update partner'));
 		} finally {
 			if (mountedRef.current) setActionBusy(false);
 		}
@@ -400,12 +417,14 @@ const EditArvantis = ({ setDashboardError = () => {} }) => {
 		if (!window.confirm(`Remove partner "${partnerName}"?`)) return;
 		setActionBusy(true);
 		try {
-			await svc.removePartner(editForm._id, partnerName);
-			toast.success('Partner removed');
-			await loadFestDetails(editForm._id);
+			await removePartner(editForm._id, partnerName);
+			setEditForm((s) => ({
+				...s,
+				partners: (s.partners || []).filter((p) => p.name !== partnerName),
+			}));
+			setToast({ type: 'success', message: 'Partner removed' });
 		} catch (err) {
-			console.error('removeExistingPartner', err);
-			toast.error(getErrMsg(err, 'Remove partner failed'));
+			setDashboardErrorRef.current(getErrMsg(err, 'Failed to remove partner'));
 		} finally {
 			if (mountedRef.current) setActionBusy(false);
 		}
@@ -420,13 +439,14 @@ const EditArvantis = ({ setDashboardError = () => {} }) => {
 		const tmp = copy[i];
 		copy.splice(i, 1);
 		copy.splice(j, 0, tmp);
+		// call backend with order of names
 		try {
 			const order = copy.map((p) => p.name);
-			await svc.reorderPartners(editForm._id, order);
-			await loadFestDetails(editForm._id);
+			await svcReorderPartners(editForm._id, order);
+			setEditForm((s) => ({ ...s, partners: copy }));
+			setToast({ type: 'success', message: 'Partners reordered' });
 		} catch (err) {
-			console.error('reorderPartners', err);
-			toast.error(getErrMsg(err, 'Reorder partners failed'));
+			setDashboardErrorRef.current(getErrMsg(err, 'Failed to reorder partners'));
 		}
 	};
 
@@ -435,12 +455,12 @@ const EditArvantis = ({ setDashboardError = () => {} }) => {
 		if (!eventId || !editForm || !editForm._id) return;
 		setActionBusy(true);
 		try {
-			await svc.linkEventToFest(editForm._id, eventId);
-			toast.success('Event linked');
+			const res = await linkEventToFest(editForm._id, eventId);
+			// backend returns list of event ids; fetch full details again
 			await loadFestDetails(editForm._id);
+			setToast({ type: 'success', message: 'Event linked' });
 		} catch (err) {
-			console.error('handleLinkEvent', err);
-			toast.error(getErrMsg(err, 'Link event failed'));
+			setDashboardErrorRef.current(getErrMsg(err, 'Failed to link event'));
 		} finally {
 			if (mountedRef.current) setActionBusy(false);
 		}
@@ -451,12 +471,14 @@ const EditArvantis = ({ setDashboardError = () => {} }) => {
 		if (!window.confirm('Unlink event from fest?')) return;
 		setActionBusy(true);
 		try {
-			await svc.unlinkEventFromFest(editForm._id, eventId);
-			toast.success('Event unlinked');
-			await loadFestDetails(editForm._id);
+			await unlinkEventFromFest(editForm._id, eventId);
+			setEditForm((s) => ({
+				...s,
+				events: (s.events || []).filter((e) => String(e._id || e) !== String(eventId)),
+			}));
+			setToast({ type: 'success', message: 'Event unlinked' });
 		} catch (err) {
-			console.error('handleUnlinkEvent', err);
-			toast.error(getErrMsg(err, 'Unlink event failed'));
+			setDashboardErrorRef.current(getErrMsg(err, 'Failed to unlink event'));
 		} finally {
 			if (mountedRef.current) setActionBusy(false);
 		}
@@ -466,9 +488,9 @@ const EditArvantis = ({ setDashboardError = () => {} }) => {
 	const exportCSV = async () => {
 		setDownloadingCSV(true);
 		try {
-			const blob = await svc.exportFestsCSV();
-			// blob may be arraybuffer / blob
-			const url = window.URL.createObjectURL(blob instanceof Blob ? blob : new Blob([blob]));
+			const blob = await exportFestsCSV();
+			// create download
+			const url = window.URL.createObjectURL(new Blob([blob], { type: 'text/csv' }));
 			const a = document.createElement('a');
 			a.href = url;
 			a.download = `arvantis-fests-${new Date().toISOString()}.csv`;
@@ -476,10 +498,9 @@ const EditArvantis = ({ setDashboardError = () => {} }) => {
 			a.click();
 			a.remove();
 			window.URL.revokeObjectURL(url);
-			toast.success('CSV downloaded');
+			setToast({ type: 'success', message: 'CSV exported' });
 		} catch (err) {
-			console.error('exportCSV', err);
-			toast.error(getErrMsg(err, 'Export failed'));
+			setDashboardErrorRef.current(getErrMsg(err, 'Failed to export CSV'));
 		} finally {
 			if (mountedRef.current) setDownloadingCSV(false);
 		}
@@ -490,16 +511,14 @@ const EditArvantis = ({ setDashboardError = () => {} }) => {
 		if (!editForm || !editForm._id) return;
 		setActionBusy(true);
 		try {
-			const payload = {
+			await updatePresentation(editForm._id, {
 				themeColors: presentationDraft.themeColors,
 				socialLinks: presentationDraft.socialLinks,
-			};
-			await svc.updatePresentation(editForm._id, payload);
-			toast.success('Presentation saved');
+			});
 			await loadFestDetails(editForm._id);
+			setToast({ type: 'success', message: 'Presentation saved' });
 		} catch (err) {
-			console.error('savePresentation', err);
-			toast.error(getErrMsg(err, 'Save presentation failed'));
+			setDashboardErrorRef.current(getErrMsg(err, 'Failed to save presentation'));
 		} finally {
 			if (mountedRef.current) setActionBusy(false);
 		}
@@ -509,12 +528,11 @@ const EditArvantis = ({ setDashboardError = () => {} }) => {
 		if (!editForm || !editForm._id) return;
 		setActionBusy(true);
 		try {
-			await svc.updateSocialLinks(editForm._id, presentationDraft.socialLinks);
-			toast.success('Social links saved');
+			await updateSocialLinks(editForm._id, presentationDraft.socialLinks || {});
 			await loadFestDetails(editForm._id);
+			setToast({ type: 'success', message: 'Social links saved' });
 		} catch (err) {
-			console.error('saveSocialLinks', err);
-			toast.error(getErrMsg(err, 'Save social links failed'));
+			setDashboardErrorRef.current(getErrMsg(err, 'Failed to save social links'));
 		} finally {
 			if (mountedRef.current) setActionBusy(false);
 		}
@@ -524,12 +542,11 @@ const EditArvantis = ({ setDashboardError = () => {} }) => {
 		if (!editForm || !editForm._id) return;
 		setActionBusy(true);
 		try {
-			await svc.updateThemeColors(editForm._id, presentationDraft.themeColors);
-			toast.success('Theme colors saved');
+			await updateThemeColors(editForm._id, presentationDraft.themeColors || {});
 			await loadFestDetails(editForm._id);
+			setToast({ type: 'success', message: 'Theme colors saved' });
 		} catch (err) {
-			console.error('saveThemeColors', err);
-			toast.error(getErrMsg(err, 'Save theme failed'));
+			setDashboardErrorRef.current(getErrMsg(err, 'Failed to save theme colors'));
 		} finally {
 			if (mountedRef.current) setActionBusy(false);
 		}
@@ -539,12 +556,11 @@ const EditArvantis = ({ setDashboardError = () => {} }) => {
 		if (!editForm || !editForm._id) return;
 		setActionBusy(true);
 		try {
-			await svc.setVisibility(editForm._id, visibility);
-			toast.success('Visibility updated');
-			await loadFestDetails(editForm._id);
+			await svcSetVisibility(editForm._id, visibility);
+			setEditForm((s) => ({ ...s, visibility }));
+			setToast({ type: 'success', message: 'Visibility updated' });
 		} catch (err) {
-			console.error('handleSetVisibility', err);
-			toast.error(getErrMsg(err, 'Failure'));
+			setDashboardErrorRef.current(getErrMsg(err, 'Failed to set visibility'));
 		} finally {
 			if (mountedRef.current) setActionBusy(false);
 		}
@@ -555,12 +571,11 @@ const EditArvantis = ({ setDashboardError = () => {} }) => {
 		if (!editForm || !editForm._id) return;
 		setActionBusy(true);
 		try {
-			await svc.addTrack(editForm._id, payload);
-			toast.success('Track added');
-			await loadFestDetails(editForm._id);
+			const added = await svcAddTrack(editForm._id, payload);
+			setEditForm((s) => ({ ...s, tracks: [...(s.tracks || []), added] }));
+			setToast({ type: 'success', message: 'Track added' });
 		} catch (err) {
-			console.error('addTrack', err);
-			toast.error(getErrMsg(err, 'Add track failed'));
+			setDashboardErrorRef.current(getErrMsg(err, 'Failed to add track'));
 		} finally {
 			if (mountedRef.current) setActionBusy(false);
 		}
@@ -571,12 +586,14 @@ const EditArvantis = ({ setDashboardError = () => {} }) => {
 		if (!window.confirm('Remove track?')) return;
 		setActionBusy(true);
 		try {
-			await svc.removeTrack(editForm._id, trackKey);
-			toast.success('Track removed');
-			await loadFestDetails(editForm._id);
+			await svcRemoveTrack(editForm._id, trackKey);
+			setEditForm((s) => ({
+				...s,
+				tracks: (s.tracks || []).filter((t) => t.key !== trackKey),
+			}));
+			setToast({ type: 'success', message: 'Track removed' });
 		} catch (err) {
-			console.error('removeExistingTrack', err);
-			toast.error(getErrMsg(err, 'Remove track failed'));
+			setDashboardErrorRef.current(getErrMsg(err, 'Failed to remove track'));
 		} finally {
 			if (mountedRef.current) setActionBusy(false);
 		}
@@ -590,18 +607,14 @@ const EditArvantis = ({ setDashboardError = () => {} }) => {
 		const [moved] = reordered.splice(fromIdx, 1);
 		reordered.splice(toIdx, 0, moved);
 		const order = reordered.map((t) => t?.key).filter(Boolean);
-		if (order.length === 0) {
-			toast.error('Cannot reorder: tracks missing keys.');
-			return;
-		}
+		if (order.length === 0) return;
 		setActionBusy(true);
 		try {
-			await svc.reorderTracks(editForm._id, order);
-			toast.success('Tracks reordered');
-			await loadFestDetails(editForm._id);
+			await svcReorderTracks(editForm._id, order);
+			setEditForm((s) => ({ ...s, tracks: reordered }));
+			setToast({ type: 'success', message: 'Tracks reordered' });
 		} catch (err) {
-			console.error('reorderTracks', err);
-			toast.error(getErrMsg(err, 'Reorder failed'));
+			setDashboardErrorRef.current(getErrMsg(err, 'Failed to reorder tracks'));
 		} finally {
 			if (mountedRef.current) setActionBusy(false);
 		}
@@ -612,12 +625,11 @@ const EditArvantis = ({ setDashboardError = () => {} }) => {
 		if (!editForm || !editForm._id) return;
 		setActionBusy(true);
 		try {
-			await svc.addFAQ(editForm._id, payload);
-			toast.success('FAQ added');
-			await loadFestDetails(editForm._id);
+			const added = await svcAddFAQ(editForm._id, payload);
+			setEditForm((s) => ({ ...s, faqs: [...(s.faqs || []), added] }));
+			setToast({ type: 'success', message: 'FAQ added' });
 		} catch (err) {
-			console.error('addFaq', err);
-			toast.error(getErrMsg(err, 'Add FAQ failed'));
+			setDashboardErrorRef.current(getErrMsg(err, 'Failed to add FAQ'));
 		} finally {
 			if (mountedRef.current) setActionBusy(false);
 		}
@@ -628,12 +640,14 @@ const EditArvantis = ({ setDashboardError = () => {} }) => {
 		if (!window.confirm('Remove FAQ?')) return;
 		setActionBusy(true);
 		try {
-			await svc.removeFAQ(editForm._id, faqId);
-			toast.success('FAQ removed');
-			await loadFestDetails(editForm._id);
+			await svcRemoveFAQ(editForm._id, faqId);
+			setEditForm((s) => ({
+				...s,
+				faqs: (s.faqs || []).filter((f) => String(f._id || f.id) !== String(faqId)),
+			}));
+			setToast({ type: 'success', message: 'FAQ removed' });
 		} catch (err) {
-			console.error('removeExistingFaq', err);
-			toast.error(getErrMsg(err, 'Remove FAQ failed'));
+			setDashboardErrorRef.current(getErrMsg(err, 'Failed to remove FAQ'));
 		} finally {
 			if (mountedRef.current) setActionBusy(false);
 		}
@@ -649,12 +663,11 @@ const EditArvantis = ({ setDashboardError = () => {} }) => {
 		const order = copy.map((f) => String(f._id || f.id));
 		setActionBusy(true);
 		try {
-			await svc.reorderFAQs(editForm._id, order);
-			toast.success('FAQs reordered');
-			await loadFestDetails(editForm._id);
+			await svcReorderFAQs(editForm._id, order);
+			setEditForm((s) => ({ ...s, faqs: copy }));
+			setToast({ type: 'success', message: 'FAQs reordered' });
 		} catch (err) {
-			console.error('reorderFaqs', err);
-			toast.error(getErrMsg(err, 'Reorder FAQs failed'));
+			setDashboardErrorRef.current(getErrMsg(err, 'Failed to reorder FAQs'));
 		} finally {
 			if (mountedRef.current) setActionBusy(false);
 		}
@@ -664,30 +677,40 @@ const EditArvantis = ({ setDashboardError = () => {} }) => {
 	const toggleMediaSelect = (publicId) => {
 		if (!publicId) return;
 		setMediaSelection((prev) => {
-			const copy = new Set(prev);
-			if (copy.has(publicId)) copy.delete(publicId);
-			else copy.add(publicId);
-			return copy;
+			const s = new Set(prev);
+			if (s.has(publicId)) s.delete(publicId);
+			else s.add(publicId);
+			return s;
 		});
 	};
 
 	const bulkDeleteSelectedMedia = async () => {
 		if (!editForm || !editForm._id) return;
 		const ids = Array.from(mediaSelection);
-		if (ids.length === 0) {
-			toast.error('No media selected');
-			return;
-		}
+		if (ids.length === 0) return;
 		if (!window.confirm(`Delete ${ids.length} media items? This cannot be undone.`)) return;
 		setBulkDeleting(true);
 		try {
-			await svc.bulkDeleteMedia(editForm._id, ids);
-			toast.success('Media deleted');
+			await svcBulkDeleteMedia(editForm._id, ids);
+			// filter locally
+			setEditForm((s) => ({
+				...s,
+				gallery: (s.gallery || []).filter((g) => !ids.includes(g.publicId)),
+				posters: (s.posters || []).filter((p) => !ids.includes(p.publicId)),
+				partners: (s.partners || []).map((p) => {
+					if (p.logo?.publicId && ids.includes(p.logo.publicId)) {
+						const plain = { ...p };
+						plain.logo = undefined;
+						return plain;
+					}
+					return p;
+				}),
+				hero: s.hero && ids.includes(s.hero.publicId) ? undefined : s.hero,
+			}));
 			setMediaSelection(new Set());
-			await loadFestDetails(editForm._id);
+			setToast({ type: 'success', message: 'Media deleted' });
 		} catch (err) {
-			console.error('bulkDeleteSelectedMedia', err);
-			toast.error(getErrMsg(err, 'Bulk delete failed'));
+			setDashboardErrorRef.current(getErrMsg(err, 'Failed to bulk delete media'));
 		} finally {
 			if (mountedRef.current) setBulkDeleting(false);
 		}
@@ -776,10 +799,13 @@ const EditArvantis = ({ setDashboardError = () => {} }) => {
 						<button
 							onClick={async () => {
 								try {
-									await svc.downloadFestAnalytics();
-									toast.success('Analytics downloaded');
+									await downloadFestAnalytics();
+									setToast({ type: 'success', message: 'Analytics downloaded' });
 								} catch (err) {
-									toast.error(getErrMsg(err, 'Failed to download analytics'));
+									setToast({
+										type: 'error',
+										message: getErrMsg(err, 'Failed to download analytics'),
+									});
 								}
 							}}
 							className="py-2 rounded bg-blue-600 text-white"
@@ -798,10 +824,13 @@ const EditArvantis = ({ setDashboardError = () => {} }) => {
 						<button
 							onClick={async () => {
 								try {
-									await svc.downloadFestStatistics();
-									toast.success('Statistics downloaded');
+									await downloadFestStatistics();
+									setToast({ type: 'success', message: 'Statistics downloaded' });
 								} catch (err) {
-									toast.error(getErrMsg(err, 'Failed to download statistics'));
+									setToast({
+										type: 'error',
+										message: getErrMsg(err, 'Failed to download statistics'),
+									});
 								}
 							}}
 							className="py-2 rounded bg-indigo-700 text-white"
@@ -852,12 +881,19 @@ const EditArvantis = ({ setDashboardError = () => {} }) => {
 								<button
 									onClick={async () => {
 										try {
-											await svc.downloadFestReport(editForm._id);
-											toast.success('Report downloaded');
+											await downloadFestReport(editForm._id);
+											setToast({
+												type: 'success',
+												message: 'Report downloaded',
+											});
 										} catch (err) {
-											toast.error(
-												getErrMsg(err, 'Failed to download report')
-											);
+											setToast({
+												type: 'error',
+												message: getErrMsg(
+													err,
+													'Failed to download report'
+												),
+											});
 										}
 									}}
 									disabled={actionBusy}
@@ -1047,7 +1083,7 @@ const EditArvantis = ({ setDashboardError = () => {} }) => {
 						<div className="mb-4">
 							<h4 className="font-semibold text-white mb-2">Gallery</h4>
 							<div className="flex gap-2 flex-wrap mb-2">
-								{(editForm.gallery || []).map((g, i) => (
+								{editForm.gallery?.map((g, i) => (
 									<div
 										key={g.publicId || i}
 										className="relative w-36 h-24 bg-gray-800 rounded overflow-hidden"
@@ -1068,7 +1104,7 @@ const EditArvantis = ({ setDashboardError = () => {} }) => {
 										</button>
 									</div>
 								))}
-								{(editForm.gallery || []).length === 0 && (
+								{editForm.gallery?.length === 0 && (
 									<div className="text-sm text-gray-400">No gallery items</div>
 								)}
 							</div>
@@ -1498,6 +1534,81 @@ const EditArvantis = ({ setDashboardError = () => {} }) => {
 							</button>
 						</div>
 
+						{/* Tracks block */}
+						{editForm && (
+							<div className="mb-4">
+								<div className="flex items-center justify-between mb-2">
+									<h4 className="font-semibold text-white">
+										Tracks ({(editForm.tracks || []).length})
+									</h4>
+									<button
+										onClick={async () => {
+											const title = prompt('Track title');
+											if (!title) return;
+											const color =
+												prompt('Optional color (hex)', '#ffffff') || '';
+											await addTrack({ title, description: '', color });
+										}}
+										className="px-3 py-1 rounded bg-emerald-600 text-white text-sm"
+										disabled={actionBusy}
+									>
+										Add Track
+									</button>
+								</div>
+								<div className="space-y-2">
+									{(editForm.tracks || []).map((t, idx) => (
+										<div
+											key={t.key || idx}
+											className="flex items-center justify-between p-3 bg-white/3 rounded"
+										>
+											<div>
+												<div className="font-medium text-white">
+													{t.title}
+												</div>
+												<div className="text-sm text-gray-400">
+													{t.description}
+												</div>
+											</div>
+											<div className="flex gap-2 items-center">
+												<button
+													onClick={() => removeExistingTrack(t.key)}
+													className="text-red-400"
+													disabled={actionBusy}
+												>
+													Remove
+												</button>
+												<button
+													onClick={() => reorderTracks(idx, idx - 1)}
+													disabled={idx === 0 || actionBusy}
+													className="text-gray-400"
+													title="Move up"
+												>
+													<ArrowUp className="w-5 h-5" />
+												</button>
+												<button
+													onClick={() => reorderTracks(idx, idx + 1)}
+													disabled={
+														idx ===
+															(editForm.tracks || []).length - 1 ||
+														actionBusy
+													}
+													className="text-gray-400"
+													title="Move down"
+												>
+													<ArrowDown className="w-5 h-5" />
+												</button>
+											</div>
+										</div>
+									))}
+									{(editForm.tracks || []).length === 0 && (
+										<div className="text-sm text-gray-400">
+											No tracks defined
+										</div>
+									)}
+								</div>
+							</div>
+						)}
+
 						{/* FAQs */}
 						<div className="mb-4">
 							<div className="flex items-center justify-between mb-2">
@@ -1537,7 +1648,7 @@ const EditArvantis = ({ setDashboardError = () => {} }) => {
 														faq.answer
 													);
 													if (newAnswer && newAnswer !== faq.answer)
-														svc.updateFAQ(
+														updateFAQ(
 															editForm._id,
 															faq._id || faq.id,
 															{ answer: newAnswer }
@@ -1546,12 +1657,13 @@ const EditArvantis = ({ setDashboardError = () => {} }) => {
 																loadFestDetails(editForm._id)
 															)
 															.catch((err) =>
-																toast.error(
-																	getErrMsg(
+																setToast({
+																	type: 'error',
+																	message: getErrMsg(
 																		err,
 																		'Failed to update FAQ'
-																	)
-																)
+																	),
+																})
 															);
 												}}
 												className="text-blue-400"
@@ -1592,6 +1704,17 @@ const EditArvantis = ({ setDashboardError = () => {} }) => {
 								))}
 							</div>
 						</div>
+
+						{/* Toast */}
+						{toast && (
+							<div className="fixed bottom-6 right-6 z-50">
+								<Toast
+									message={toast.message}
+									type={toast.type}
+									onDismiss={() => setToast(null)}
+								/>
+							</div>
+						)}
 					</GlassCard>
 				)}
 			</div>
