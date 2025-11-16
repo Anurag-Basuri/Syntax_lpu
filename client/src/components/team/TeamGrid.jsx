@@ -3,14 +3,12 @@ import { AnimatePresence, motion } from 'framer-motion';
 import TeamMemberCard from './TeamMemberCard.jsx';
 import { Users } from 'lucide-react';
 
-const containerVariants = {
+const container = {
 	hidden: {},
-	visible: {
-		transition: { staggerChildren: 0.04 },
-	},
+	visible: { transition: { staggerChildren: 0.04 } },
 };
 
-const TeamGrid = ({ members, onCardClick }) => {
+const TeamGrid = ({ members = [], onCardClick }) => {
 	if (!members || members.length === 0) {
 		return (
 			<div className="team-grid-empty">
@@ -22,7 +20,7 @@ const TeamGrid = ({ members, onCardClick }) => {
 						No members found
 					</h3>
 					<p className="max-w-lg text-sm" style={{ color: 'var(--text-secondary)' }}>
-						Try adjusting your search or filters. We couldn't find anyone matching the current criteria.
+						Try adjusting filters or search — we couldn't find anyone matching the current criteria.
 					</p>
 				</div>
 			</div>
@@ -30,23 +28,18 @@ const TeamGrid = ({ members, onCardClick }) => {
 	}
 
 	return (
-		<motion.div
-			className="team-grid px-2 sm:px-0"
-			variants={containerVariants}
-			initial="hidden"
-			animate="visible"
-		>
-			<div className="grid gap-6 sm:gap-8 grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
-				<AnimatePresence mode="popLayout">
-					{members.map((member) => (
-						<motion.div key={member._id} layout>
-							<TeamMemberCard member={member} onClick={onCardClick} />
+		<motion.div className="team-grid" variants={container} initial="hidden" animate="visible">
+			<AnimatePresence mode="popLayout">
+				<div className="grid gap-6 sm:gap-8 grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
+					{members.map((m) => (
+						<motion.div key={m._id} layout initial={{ opacity: 0, scale: 0.98 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.98 }} transition={{ duration: 0.22 }}>
+							<TeamMemberCard member={m} onClick={onCardClick} />
 						</motion.div>
 					))}
-				</AnimatePresence>
-			</div>
+				</div>
+			</AnimatePresence>
 		</motion.div>
 	);
 };
 
-export default TeamGrid;
+export default React.memo(TeamGrid);
