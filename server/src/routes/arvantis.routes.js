@@ -231,39 +231,61 @@ router.delete(
 	unlinkEventFromFest
 );
 
-// Media management
-router.patch(
-	'/:identifier/posters',
+// Media management (added gallery, hero and bulk-delete, tracks/reorder)
+router.post(
+	'/:identifier/gallery',
 	(req, res, next) => {
 		/* eslint-disable no-console */
-		console.log('[ROUTE] PATCH /:identifier/posters', {
+		console.log('[ROUTE] POST /:identifier/gallery', {
 			identifier: req.params.identifier,
 			contentType: req.headers['content-type'],
 		});
 		/* eslint-enable no-console */
 		next();
 	},
-	// accept multiple poster uploads now
-	uploadFile('posters', { multiple: true, maxCount: 20 }),
+	uploadFile('media', { multiple: true, maxCount: 20 }),
 	validate([param('identifier').notEmpty().withMessage('Fest identifier is required')]),
-	addFestPoster
+	addGalleryMedia
 );
 
-// Delete poster (legacy body-based)
 router.delete(
-	'/:identifier/poster',
-	validate([param('identifier').notEmpty().withMessage('Fest identifier is required')]),
-	removeFestPoster
-);
-
-// Delete poster by publicId (recommended)
-router.delete(
-	'/:identifier/posters/:publicId',
+	'/:identifier/gallery/:publicId',
 	validate([
 		param('identifier').notEmpty().withMessage('Fest identifier is required'),
-		param('publicId').notEmpty().withMessage('Poster public ID is required'),
+		param('publicId').notEmpty().withMessage('Media publicId is required'),
 	]),
-	removeFestPoster
+	removeGalleryMedia
+);
+
+// Hero
+router.patch(
+	'/:identifier/hero',
+	uploadFile('hero', { multiple: false, maxCount: 1 }),
+	validate([param('identifier').notEmpty().withMessage('Fest identifier is required')]),
+	updateFestHero
+);
+
+router.delete(
+	'/:identifier/hero',
+	validate([param('identifier').notEmpty().withMessage('Fest identifier is required')]),
+	removeFestHero
+);
+
+// Bulk delete media
+router.post(
+	'/:identifier/media/bulk-delete',
+	validate([param('identifier').notEmpty().withMessage('Fest identifier is required')]),
+	bulkDeleteMedia
+);
+
+// Reorder tracks
+router.patch(
+	'/:identifier/tracks/reorder',
+	validate([
+		param('identifier').notEmpty().withMessage('Fest identifier is required'),
+		body('order').isArray().withMessage('order must be an array of track keys'),
+	]),
+	reorderTracks
 );
 
 // Tracks CRUD (note: update/reorder handlers not implemented in controller - only add/remove present)
