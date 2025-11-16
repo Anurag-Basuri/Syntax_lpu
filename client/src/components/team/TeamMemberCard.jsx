@@ -10,7 +10,6 @@ import {
 	ShieldCheck,
 	Briefcase,
 } from 'lucide-react';
-import { Shield } from 'lucide-react';
 
 /**
  * TeamMemberCard - compact, uniform card used in TeamGrid
@@ -28,12 +27,6 @@ const getSocialIcon = (platform = '') => {
 	if (p.includes('linkedin')) return Linkedin;
 	if (p.includes('twitter')) return Twitter;
 	return Globe;
-};
-
-const getAvatar = (p, seed) => {
-	if (!p) return `https://api.dicebear.com/8.x/initials/svg?seed=${encodeURIComponent(seed)}`;
-	if (typeof p === 'string') return p;
-	return p?.url || `https://api.dicebear.com/8.x/initials/svg?seed=${encodeURIComponent(seed)}`;
 };
 
 const TeamMemberCard = React.memo(function TeamMemberCard({ member, onClick }) {
