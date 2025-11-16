@@ -3,8 +3,7 @@ import { useMembers } from '../hooks/useMembers.js';
 import TeamGrid from '../components/team/TeamGrid.jsx';
 import TeamMemberModal from '../components/team/TeamMemberModal.jsx';
 import TeamSkeleton from '../components/team/TeamSkeleton.jsx';
-import { Search, X, Users, Star, Filter } from 'lucide-react';
-import { isLeadershipRole } from '../constants/team.js';
+import { Search, X, Users, Filter } from 'lucide-react';
 
 const ErrorBlock = ({ message, onRetry }) => (
 	<div className="flex flex-col items-center justify-center text-center py-24 px-4">
@@ -43,7 +42,7 @@ const SearchBar = ({ value, onChange, onClear }) => (
 	</div>
 );
 
-const Sidebar = ({ departments, activeFilter, setActiveFilter, totalCount, enrichedMembers }) => (
+const Sidebar = ({ departments, activeFilter, setActiveFilter, totalCount }) => (
 	<aside className="hidden lg:block lg:col-span-1">
 		<div className="sticky top-[calc(var(--navbar-height,4.5rem)+1rem)] space-y-4">
 			<h4 className="text-sm font-semibold">Departments</h4>
@@ -61,11 +60,7 @@ const Sidebar = ({ departments, activeFilter, setActiveFilter, totalCount, enric
 					>
 						<span>{dept}</span>
 						<span className="text-xs text-[var(--text-muted)]">
-							{dept === 'All'
-								? totalCount
-								: dept === 'Leadership'
-								? enrichedMembers.filter((m) => m.isLeader).length
-								: departments.counts.get(dept) || 0}
+							{departments.counts.get(dept) || (dept === 'All' ? totalCount : 0)}
 						</span>
 					</button>
 				))}
@@ -74,14 +69,7 @@ const Sidebar = ({ departments, activeFilter, setActiveFilter, totalCount, enric
 	</aside>
 );
 
-const MobileFilters = ({
-	open,
-	onClose,
-	departments,
-	setActiveFilter,
-	totalCount,
-	enrichedMembers,
-}) => {
+const MobileFilters = ({ open, onClose, departments, setActiveFilter, totalCount }) => {
 	useEffect(() => {
 		document.body.style.overflow = open ? 'hidden' : '';
 		return () => {
@@ -114,11 +102,8 @@ const MobileFilters = ({
 							>
 								<span>{dept}</span>
 								<span className="text-xs text-[var(--text-muted)]">
-									{dept === 'All'
-										? totalCount
-										: dept === 'Leadership'
-										? enrichedMembers.filter((m) => m.isLeader).length
-										: departments.counts.get(dept) || 0}
+									{departments.counts.get(dept) ||
+										(dept === 'All' ? totalCount : 0)}
 								</span>
 							</button>
 						))}
@@ -154,15 +139,12 @@ const TeamsPage = () => {
 			const department = Array.isArray(m.department) ? m.department[0] : m.department;
 			const primaryDept = m.primaryDepartment || department || 'Other';
 			const primaryRole = m.primaryDesignation || designation || 'Member';
-			const isLeader = !!(
-				m.isLeader || isLeadershipRole(designation || m.primaryDesignation)
-			);
 			const skills = Array.isArray(m.skills) ? m.skills : [];
 			const haystack = [m.fullname, primaryDept, primaryRole, ...skills]
 				.filter(Boolean)
 				.join(' ')
 				.toLowerCase();
-			return { ...m, isLeader, primaryDept, primaryRole, _searchHaystack: haystack };
+			return { ...m, primaryDept, primaryRole, _searchHaystack: haystack };
 		});
 	}, [membersRaw]);
 
@@ -171,7 +153,7 @@ const TeamsPage = () => {
 		enrichedMembers.forEach((m) =>
 			depts.set(m.primaryDept, (depts.get(m.primaryDept) || 0) + 1)
 		);
-		const list = ['All', 'Leadership', ...Array.from(depts.keys()).sort()];
+		const list = ['All', ...Array.from(depts.keys()).sort()];
 		return { list, counts: depts };
 	}, [enrichedMembers]);
 
@@ -179,8 +161,7 @@ const TeamsPage = () => {
 		const q = query || '';
 		let filtered = enrichedMembers;
 		if (q) filtered = filtered.filter((m) => m._searchHaystack.includes(q));
-		if (activeFilter === 'Leadership') filtered = filtered.filter((m) => m.isLeader);
-		else if (activeFilter !== 'All')
+		if (activeFilter !== 'All')
 			filtered = filtered.filter((m) => m.primaryDept === activeFilter);
 
 		const by = (v) => (v || '').toString().toLowerCase();
@@ -230,9 +211,6 @@ const TeamsPage = () => {
 							<span className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/90 dark:bg-white/6">
 								<Users size={16} /> <strong>{totalCount}</strong> members
 							</span>
-							<span className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/90 dark:bg-white/6">
-								<Star size={16} /> Leadership highlighted
-							</span>
 						</div>
 					</div>
 
@@ -279,29 +257,12 @@ const TeamsPage = () => {
 					activeFilter={activeFilter}
 					setActiveFilter={setActiveFilter}
 					totalCount={totalCount}
-					enrichedMembers={enrichedMembers}
 				/>
 
 				<main className="lg:col-span-4">
 					<div className="mb-4 flex items-center justify-between gap-3">
 						<div className="text-sm text-[var(--text-secondary)] hidden md:block">
 							{resultCount} result{resultCount !== 1 ? 's' : ''} • {totalCount} total
-						</div>
-
-						<div className="flex items-center gap-2">
-							{/* mobile sort */}
-							<div className="md:hidden inline-flex items-center gap-2">
-								<select
-									value={sortBy}
-									onChange={(e) => setSortBy(e.target.value)}
-									className="rounded-md border border-[var(--glass-border)] py-2 px-3 bg-[var(--input-bg)]"
-									aria-label="Sort members"
-								>
-									<option value="name">Name</option>
-									<option value="role">Role</option>
-									<option value="dept">Department</option>
-								</select>
-							</div>
 						</div>
 					</div>
 
@@ -347,7 +308,6 @@ const TeamsPage = () => {
 				departments={departments}
 				setActiveFilter={setActiveFilter}
 				totalCount={totalCount}
-				enrichedMembers={enrichedMembers}
 			/>
 
 			<TeamMemberModal
