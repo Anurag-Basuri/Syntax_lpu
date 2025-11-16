@@ -1,15 +1,15 @@
 import React, { useEffect, useState, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useQuery } from '@tanstack/react-query';
-import { X, Calendar, MapPin, Tag, Users, Globe, Copy } from 'lucide-react';
+import { X, Calendar, MapPin, Tag, Users, Globe, Copy, CreditCard } from 'lucide-react';
 import { getEventById } from '../../services/eventServices.js';
 
 /*
- EventDetailModal - full details
- - Uses getEventById to fetch the complete event document by id
- - Renders a readable breakdown (meta, registration, speakers, partners, resources)
- - Shows raw JSON (copyable) for "everything literally"
- - Keeps responsive two-column layout and accessibility from previous version
+ EventDetailModal - visual refresh
+ - clearer light/dark color choices using Tailwind utility combos
+ - prominent price display (shows "Free" when 0)
+ - partners shown as large logo tiles in a responsive grid (no counts)
+ - improved spacing, hierarchy and CTA emphasis
 */
 
 const fetchEvent = async (id, signal) => {
@@ -19,10 +19,12 @@ const fetchEvent = async (id, signal) => {
 
 const DetailRow = ({ icon: Icon, label, children }) => (
 	<div className="flex items-start gap-3">
-		<Icon className="text-indigo-500 mt-1" />
+		<div className="p-1 rounded bg-white/10 dark:bg-white/6">
+			<Icon className="text-indigo-400" />
+		</div>
 		<div>
-			<div className="text-xs text-[var(--text-muted)]">{label}</div>
-			<div className="font-medium mt-0.5">{children}</div>
+			<div className="text-xs text-slate-400 dark:text-slate-300">{label}</div>
+			<div className="font-medium text-slate-900 dark:text-white mt-0.5">{children}</div>
 		</div>
 	</div>
 );
@@ -34,17 +36,38 @@ const prettyDate = (d) => {
 	return dt.toLocaleString();
 };
 
+const PricePill = ({ price }) => {
+	const isFree = typeof price === 'number' ? price === 0 : !price;
+	return (
+		<div
+			className={`inline-flex items-baseline gap-2 px-4 py-2 rounded-xl font-semibold shadow-sm
+        ${
+			isFree
+				? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300'
+				: 'bg-gradient-to-r from-indigo-600 to-purple-600 text-white'
+		}`}
+			aria-hidden
+		>
+			{isFree ? (
+				<>
+					<span className="text-sm">Free</span>
+				</>
+			) : (
+				<>
+					<CreditCard size={16} />
+					<span className="text-sm opacity-80">₹</span>
+					<span className="text-lg tracking-wider">{price}</span>
+				</>
+			)}
+		</div>
+	);
+};
+
 const EventDetailModal = ({ event: initialEvent, isOpen, onClose }) => {
 	const id = initialEvent?._id || initialEvent?.id;
 	const [showRaw, setShowRaw] = useState(false);
 
-	// always call hooks in same order
-	const {
-		data: event,
-		isLoading,
-		isError,
-		refetch,
-	} = useQuery({
+	const { data: event } = useQuery({
 		queryKey: ['event-full', id],
 		queryFn: ({ signal }) => fetchEvent(id, signal),
 		enabled: !!isOpen && !!id,
@@ -52,7 +75,7 @@ const EventDetailModal = ({ event: initialEvent, isOpen, onClose }) => {
 		refetchOnWindowFocus: false,
 	});
 
-	// compute payload and rawJson before any early returns so hooks stay stable
+	// stable derived data
 	const payload = event || initialEvent || {};
 	const rawJson = useMemo(() => {
 		try {
@@ -89,6 +112,8 @@ const EventDetailModal = ({ event: initialEvent, isOpen, onClose }) => {
 	const coOrganizers = Array.isArray(payload.coOrganizers) ? payload.coOrganizers : [];
 	const desc = payload.description || payload.summary || 'No description available.';
 	const registrationInfo = payload.registrationInfo || payload.registration || {};
+	const price =
+		typeof payload.ticketPrice === 'number' ? payload.ticketPrice : payload.ticketPrice ?? null;
 
 	const copyRaw = async () => {
 		try {
@@ -114,24 +139,24 @@ const EventDetailModal = ({ event: initialEvent, isOpen, onClose }) => {
 					initial={{ opacity: 0 }}
 					animate={{ opacity: 1 }}
 					exit={{ opacity: 0 }}
-					className="absolute inset-0 bg-black/50 backdrop-blur-sm"
+					className="absolute inset-0 bg-black/40 dark:bg-black/60 backdrop-blur-sm"
 					onClick={onClose}
 				/>
 
 				{/* modal */}
 				<motion.div
-					initial={{ y: 20, scale: 0.98, opacity: 0 }}
+					initial={{ y: 18, scale: 0.99, opacity: 0 }}
 					animate={{ y: 0, scale: 1, opacity: 1 }}
-					exit={{ y: 20, scale: 0.98, opacity: 0 }}
-					transition={{ duration: 0.22 }}
-					className="relative z-10 w-full max-w-6xl max-h-[92vh] bg-[var(--card-bg)] rounded-2xl shadow-xl overflow-hidden grid grid-cols-1 lg:grid-cols-3"
+					exit={{ y: 18, scale: 0.99, opacity: 0 }}
+					transition={{ duration: 0.2 }}
+					className="relative z-10 w-full max-w-6xl max-h-[92vh] rounded-2xl shadow-2xl overflow-hidden grid grid-cols-1 lg:grid-cols-3 bg-white dark:bg-slate-900"
 					role="dialog"
 					aria-modal="true"
 					aria-label={`Event details: ${title}`}
 				>
-					{/* left: poster + quick meta */}
-					<div className="col-span-1 bg-gradient-to-br from-slate-800 via-slate-900 to-black flex flex-col">
-						<div className="relative h-56 sm:h-72 lg:h-full w-full overflow-hidden">
+					{/* left: hero poster + condensed meta (dark overlay) */}
+					<div className="col-span-1 bg-gradient-to-br from-indigo-700 to-purple-700 text-white flex flex-col">
+						<div className="relative h-64 sm:h-72 lg:h-full w-full overflow-hidden">
 							{poster ? (
 								<img
 									src={poster}
@@ -142,29 +167,27 @@ const EventDetailModal = ({ event: initialEvent, isOpen, onClose }) => {
 								/>
 							) : (
 								<div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-indigo-600 to-purple-600">
-									<div className="text-6xl text-white opacity-90">🎭</div>
+									<div className="text-6xl text-white/90">🎭</div>
 								</div>
 							)}
 							<div className="absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-transparent" />
 						</div>
 
-						<div className="p-4 md:p-6 text-sm text-white/90 bg-gradient-to-t from-black/60">
-							<DetailRow icon={Calendar} label="When">
-								{dateLabel}
-							</DetailRow>
-							<div className="mt-3">
+						<div className="p-5 md:p-6 text-sm bg-gradient-to-t from-black/40">
+							<div className="space-y-3">
+								<DetailRow icon={Calendar} label="When">
+									{dateLabel}
+								</DetailRow>
 								<DetailRow icon={MapPin} label="Where">
 									{venue} {payload.room ? `• ${payload.room}` : ''}
 								</DetailRow>
-							</div>
-							<div className="mt-3">
 								<DetailRow icon={Users} label="Organizer">
 									{organizer}
 								</DetailRow>
 							</div>
 
-							{/* small extra meta */}
-							<div className="mt-4 grid grid-cols-2 gap-2 text-xs text-white/80">
+							{/* subtle meta */}
+							<div className="mt-5 grid grid-cols-2 gap-3 text-xs text-white/80">
 								<div>
 									<div className="text-[10px] text-white/70">Category</div>
 									<div className="font-medium">{payload.category || '—'}</div>
@@ -182,8 +205,10 @@ const EventDetailModal = ({ event: initialEvent, isOpen, onClose }) => {
 								<div>
 									<div className="text-[10px] text-white/70">Price</div>
 									<div className="font-medium">
-										{typeof payload.ticketPrice === 'number'
-											? `₹${payload.ticketPrice}`
+										{typeof price === 'number'
+											? price === 0
+												? 'Free'
+												: `₹${price}`
 											: '—'}
 									</div>
 								</div>
@@ -195,38 +220,43 @@ const EventDetailModal = ({ event: initialEvent, isOpen, onClose }) => {
 					<div className="col-span-2 p-6 overflow-y-auto">
 						<div className="flex items-start justify-between gap-4">
 							<div className="min-w-0">
-								<h2 className="text-2xl font-extrabold leading-tight">{title}</h2>
-								<div className="mt-2 flex items-center gap-2 flex-wrap">
+								<h2 className="text-2xl font-extrabold leading-tight text-slate-900 dark:text-white">
+									{title}
+								</h2>
+
+								{/* tags + price compact row */}
+								<div className="mt-3 flex items-center gap-3 flex-wrap">
 									{tags.slice(0, 8).map((t) => (
 										<span
 											key={t}
-											className="text-xs px-2 py-1 rounded-full bg-[var(--glass-bg)] border border-[var(--glass-border)]"
+											className="flex items-center gap-2 text-xs px-2 py-1 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-slate-700"
 										>
-											<Tag className="inline-block mr-1" /> {t}
+											<Tag className="w-3 h-3" /> {t}
 										</span>
 									))}
+									<div className="ml-auto">
+										<PricePill price={price} />
+									</div>
 								</div>
 							</div>
 
 							<div className="flex items-center gap-2">
 								<button
-									onClick={() => {
-										copyRaw();
-									}}
+									onClick={copyRaw}
 									title="Copy full JSON"
-									className="p-2 rounded-md text-[var(--text-muted)] hover:bg-gray-100"
+									className="p-2 rounded-md text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800"
 								>
 									<Copy size={18} />
 								</button>
 								<button
 									onClick={() => setShowRaw((s) => !s)}
-									className="px-3 py-1 rounded-md border text-sm"
+									className="px-3 py-1 rounded-md border text-sm bg-transparent"
 								>
 									{showRaw ? 'Hide raw' : 'Show raw'}
 								</button>
 								<button
 									onClick={onClose}
-									className="p-2 rounded-md text-[var(--text-muted)] hover:bg-gray-100"
+									className="p-2 rounded-md text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800"
 									aria-label="Close event details"
 								>
 									<X size={20} />
@@ -234,40 +264,43 @@ const EventDetailModal = ({ event: initialEvent, isOpen, onClose }) => {
 							</div>
 						</div>
 
-						{/* registration & meta */}
-						<div className="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-4">
-							<div className="rounded-md p-3 bg-[var(--glass-bg)] border border-[var(--glass-border)]">
-								<div className="text-xs text-[var(--text-muted)]">Registration</div>
-								<div className="mt-1">
-									<div className="font-medium">
+						{/* registration & key stats */}
+						<div className="mt-5 grid grid-cols-1 sm:grid-cols-2 gap-4">
+							<div className="rounded-xl p-4 bg-slate-50 dark:bg-slate-800 border border-slate-100 dark:border-slate-700">
+								<div className="text-xs text-slate-500 dark:text-slate-300">
+									Registration
+								</div>
+								<div className="mt-2 flex items-center gap-3">
+									<div className="font-medium text-slate-900 dark:text-white">
 										{registrationInfo?.actionLabel ||
 											registrationInfo?.actionUrl ||
 											'No registration'}
 									</div>
+
 									{registrationInfo?.isOpen && registrationInfo?.actionUrl && (
 										<a
 											href={registrationInfo.actionUrl}
 											target="_blank"
 											rel="noreferrer"
-											className="inline-flex items-center gap-2 mt-2 px-3 py-1 rounded bg-emerald-600 text-white text-sm"
+											className="ml-auto inline-flex items-center gap-2 px-3 py-1 rounded-lg bg-emerald-600 text-white text-sm shadow-sm"
 										>
-											{registrationInfo.actionLabel || 'Register'}{' '}
+											{registrationInfo.actionLabel || 'Register'}
 											<Globe size={14} />
 										</a>
 									)}
-									{registrationInfo?.message && (
-										<div className="mt-2 text-xs text-[var(--text-muted)]">
-											{registrationInfo.message}
-										</div>
-									)}
 								</div>
+								{registrationInfo?.message && (
+									<div className="mt-2 text-xs text-slate-500 dark:text-slate-300">
+										{registrationInfo.message}
+									</div>
+								)}
 							</div>
 
-							<div className="rounded-md p-3 bg-[var(--glass-bg)] border border-[var(--glass-border)]">
-								<div className="text-xs text-[var(--text-muted)]">
+							<div className="rounded-xl p-4 bg-slate-50 dark:bg-slate-800 border border-slate-100 dark:border-slate-700">
+								<div className="text-xs text-slate-500 dark:text-slate-300">
 									Capacity & Tickets
 								</div>
-								<div className="mt-1 text-sm">
+								<div className="mt-2 text-sm text-slate-700 dark:text-slate-200">
 									<div>
 										Total spots: <strong>{payload.totalSpots ?? '—'}</strong>
 									</div>
@@ -286,7 +319,7 @@ const EventDetailModal = ({ event: initialEvent, isOpen, onClose }) => {
 										</strong>
 									</div>
 									{payload.isFull && (
-										<div className="mt-1 text-red-600 font-semibold">
+										<div className="mt-2 text-red-600 font-semibold">
 											Event full
 										</div>
 									)}
@@ -296,8 +329,10 @@ const EventDetailModal = ({ event: initialEvent, isOpen, onClose }) => {
 
 						{/* description */}
 						<div className="mt-6">
-							<h3 className="text-lg font-semibold mb-2">About</h3>
-							<p className="text-sm text-[var(--text-secondary)] leading-relaxed whitespace-pre-wrap">
+							<h3 className="text-lg font-semibold mb-2 text-slate-900 dark:text-white">
+								About
+							</h3>
+							<p className="text-sm text-slate-600 dark:text-slate-300 leading-relaxed whitespace-pre-wrap">
 								{desc}
 							</p>
 						</div>
@@ -305,12 +340,14 @@ const EventDetailModal = ({ event: initialEvent, isOpen, onClose }) => {
 						{/* speakers */}
 						{speakers.length > 0 && (
 							<div className="mt-6">
-								<h3 className="text-lg font-semibold mb-3">Speakers</h3>
+								<h3 className="text-lg font-semibold mb-3 text-slate-900 dark:text-white">
+									Speakers
+								</h3>
 								<div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
 									{speakers.map((s, idx) => (
 										<div
 											key={idx}
-											className="flex items-start gap-3 p-3 rounded-md bg-[var(--glass-bg)] border border-[var(--glass-border)]"
+											className="flex items-start gap-3 p-3 rounded-md bg-slate-50 dark:bg-slate-800 border border-slate-100 dark:border-slate-700"
 										>
 											{s.photo?.url ? (
 												<img
@@ -324,18 +361,15 @@ const EventDetailModal = ({ event: initialEvent, isOpen, onClose }) => {
 												</div>
 											)}
 											<div>
-												<div className="font-medium">{s.name}</div>
-												<div className="text-xs text-[var(--text-muted)]">
+												<div className="font-medium text-slate-900 dark:text-white">
+													{s.name}
+												</div>
+												<div className="text-xs text-slate-500 dark:text-slate-300">
 													{s.title}
 												</div>
 												{s.bio && (
-													<div className="text-xs mt-1 text-[var(--text-secondary)] line-clamp-3">
+													<div className="text-xs mt-1 text-slate-600 dark:text-slate-300 line-clamp-3">
 														{s.bio}
-													</div>
-												)}
-												{Array.isArray(s.links) && (
-													<div className="text-xs mt-1 text-[var(--text-muted)]">
-														Links: {JSON.stringify(s.links)}
 													</div>
 												)}
 											</div>
@@ -345,31 +379,35 @@ const EventDetailModal = ({ event: initialEvent, isOpen, onClose }) => {
 							</div>
 						)}
 
-						{/* partners */}
+						{/* partners: visually prominent grid of logos (no counts) */}
 						{partners.length > 0 && (
 							<div className="mt-6">
-								<h3 className="text-lg font-semibold mb-3">Partners</h3>
-								<div className="flex gap-3 flex-wrap items-center">
+								<h3 className="text-lg font-semibold mb-3 text-slate-900 dark:text-white">
+									Partners
+								</h3>
+								<div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4 items-center">
 									{partners.map((p, i) => (
 										<a
 											key={i}
 											href={p.website || '#'}
 											target="_blank"
 											rel="noreferrer"
-											className="inline-flex items-center gap-3 p-2 rounded-md bg-[var(--glass-bg)] border border-[var(--glass-border)]"
+											className="flex flex-col items-center gap-2 p-3 rounded-lg bg-slate-50 dark:bg-slate-800 border border-slate-100 dark:border-slate-700 hover:scale-105 transition-transform"
 										>
 											{p.logo?.url ? (
 												<img
 													src={p.logo.url}
 													alt={p.name}
-													className="w-10 h-10 object-contain"
+													className="w-20 h-12 object-contain"
 												/>
 											) : (
-												<div className="w-10 h-10 rounded bg-gray-200 flex items-center justify-center text-xs">
-													{p.name?.slice(0, 2)}
+												<div className="w-20 h-12 rounded bg-slate-200 dark:bg-slate-700 flex items-center justify-center text-xs text-slate-700 dark:text-slate-200 font-medium">
+													{p.name?.slice(0, 2) ?? '—'}
 												</div>
 											)}
-											<div className="text-sm">{p.name}</div>
+											<div className="text-sm text-slate-700 dark:text-slate-200">
+												{p.name}
+											</div>
 										</a>
 									))}
 								</div>
@@ -380,11 +418,11 @@ const EventDetailModal = ({ event: initialEvent, isOpen, onClose }) => {
 						{(coOrganizers.length > 0 || resources.length > 0) && (
 							<div className="mt-6 grid grid-cols-1 sm:grid-cols-2 gap-4">
 								{coOrganizers.length > 0 && (
-									<div className="rounded-md p-3 bg-[var(--glass-bg)] border border-[var(--glass-border)]">
-										<div className="text-xs text-[var(--text-muted)]">
+									<div className="rounded-md p-3 bg-slate-50 dark:bg-slate-800 border border-slate-100 dark:border-slate-700">
+										<div className="text-xs text-slate-500 dark:text-slate-300">
 											Co-organizers
 										</div>
-										<ul className="mt-2 list-disc list-inside text-sm">
+										<ul className="mt-2 list-disc list-inside text-sm text-slate-700 dark:text-slate-200">
 											{coOrganizers.map((c, i) => (
 												<li key={i}>{c}</li>
 											))}
@@ -393,8 +431,8 @@ const EventDetailModal = ({ event: initialEvent, isOpen, onClose }) => {
 								)}
 
 								{resources.length > 0 && (
-									<div className="rounded-md p-3 bg-[var(--glass-bg)] border border-[var(--glass-border)]">
-										<div className="text-xs text-[var(--text-muted)]">
+									<div className="rounded-md p-3 bg-slate-50 dark:bg-slate-800 border border-slate-100 dark:border-slate-700">
+										<div className="text-xs text-slate-500 dark:text-slate-300">
 											Resources
 										</div>
 										<ul className="mt-2 space-y-2 text-sm">
@@ -404,7 +442,7 @@ const EventDetailModal = ({ event: initialEvent, isOpen, onClose }) => {
 														href={r.url}
 														target="_blank"
 														rel="noreferrer"
-														className="text-indigo-600 underline"
+														className="text-indigo-600 dark:text-indigo-400 underline"
 													>
 														{r.title || r.url}
 													</a>
@@ -419,8 +457,10 @@ const EventDetailModal = ({ event: initialEvent, isOpen, onClose }) => {
 						{/* raw JSON */}
 						{showRaw && (
 							<div className="mt-6">
-								<h3 className="text-lg font-semibold mb-2">Raw event JSON</h3>
-								<pre className="bg-black/5 p-3 rounded text-xs overflow-auto max-h-60">
+								<h3 className="text-lg font-semibold mb-2 text-slate-900 dark:text-white">
+									Raw event JSON
+								</h3>
+								<pre className="bg-slate-100 dark:bg-slate-800 p-3 rounded text-xs overflow-auto max-h-60 text-slate-800 dark:text-slate-200">
 									{rawJson}
 								</pre>
 							</div>
