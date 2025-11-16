@@ -38,9 +38,9 @@ const TeamGrid = ({ members = [], onCardClick }) => {
 	const rest = members.filter((m) => !m.isLeader);
 
 	// Grid classes ensure uniform card slots and equal heights.
-	// Each item wrapper is fixed height so all cards match size.
+	// Use fixed row height wrappers (responsive) instead of auto-rows to avoid shrink.
 	const gridClass =
-		'grid gap-6 sm:gap-8 grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 auto-rows-fr';
+		'grid gap-6 sm:gap-8 grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4';
 
 	return (
 		<motion.div
@@ -63,8 +63,8 @@ const TeamGrid = ({ members = [], onCardClick }) => {
 									animate={{ opacity: 1 }}
 									exit={{ opacity: 0 }}
 								>
-									{/* fixed height wrapper so leader cards align with grid */}
-									<div className="h-56">
+									{/* responsive fixed height wrapper so leader cards align with grid */}
+									<div className="h-64 sm:h-72 lg:h-80">
 										<TeamMemberCard member={m} onClick={onCardClick} />
 									</div>
 								</motion.div>
@@ -87,8 +87,8 @@ const TeamGrid = ({ members = [], onCardClick }) => {
 								exit={{ opacity: 0, scale: 0.98 }}
 								transition={{ duration: 0.22 }}
 							>
-								{/* uniform wrapper ensures equal card size */}
-								<div className="h-56">
+								{/* uniform responsive wrapper ensures equal card size */}
+								<div className="h-64 sm:h-72 lg:h-80">
 									<TeamMemberCard member={m} onClick={onCardClick} />
 								</div>
 							</motion.div>
