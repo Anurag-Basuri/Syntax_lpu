@@ -283,23 +283,36 @@ export const unlinkEventFromFest = async (identifier, eventId) => {
 export const addFestPoster = async (identifier, formData) => {
 	if (!identifier) throw new Error('Fest identifier is required.');
 	try {
+		// server expects PATCH /posters (field name "posters", accepts multiple)
 		const resp = await apiClient.patch(
-			`/api/v1/arvantis/${encodeURIComponent(identifier)}/poster`,
+			`/api/v1/arvantis/${encodeURIComponent(identifier)}/posters`,
 			formData
 		);
 		return resp.data?.data;
 	} catch (err) {
-		throw new Error(extractError(err, 'Failed to upload poster.'));
+		throw new Error(extractError(err, 'Failed to upload poster(s).'));
 	}
 };
 export const updateFestPoster = addFestPoster; // alias
 
-export const removeFestPoster = async (identifier) => {
+// removeFestPoster: prefer publicId param -> DELETE /posters/:publicId
+// fallback: legacy DELETE /poster (no publicId) kept for compatibility
+export const removeFestPoster = async (identifier, publicId) => {
 	if (!identifier) throw new Error('Identifier required.');
 	try {
-		const resp = await apiClient.delete(
-			`/api/v1/arvantis/${encodeURIComponent(identifier)}/poster`
-		);
+		let resp;
+		if (publicId) {
+			resp = await apiClient.delete(
+				`/api/v1/arvantis/${encodeURIComponent(identifier)}/posters/${encodeURIComponent(
+					publicId
+				)}`
+			);
+		} else {
+			// legacy route (body-based) - call without body
+			resp = await apiClient.delete(
+				`/api/v1/arvantis/${encodeURIComponent(identifier)}/poster`
+			);
+		}
 		return resp.status === 204 ? { success: true } : resp.data;
 	} catch (err) {
 		throw new Error(extractError(err, 'Failed to remove poster.'));
