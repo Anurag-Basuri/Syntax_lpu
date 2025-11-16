@@ -86,10 +86,11 @@ const TeamMemberCard = React.memo(function TeamMemberCard({ member, onClick }) {
 			role="button"
 			tabIndex={0}
 			aria-label={`Open profile for ${member.fullname}`}
-			className="group relative rounded-2xl overflow-hidden bg-[var(--card-bg)] border border-[var(--card-border)] shadow-[var(--shadow-sm)] hover:shadow-[var(--shadow-md)] focus:shadow-[var(--shadow-md)] transition-transform transform hover:-translate-y-1 focus:-translate-y-1 cursor-pointer"
+			// make card fill parent wrapper and use column flexbox so content stretches evenly
+			className="group relative rounded-2xl overflow-hidden bg-[var(--card-bg)] border border-[var(--card-border)] shadow-[var(--shadow-sm)] hover:shadow-[var(--shadow-md)] focus:shadow-[var(--shadow-md)] transition-transform transform hover:-translate-y-1 focus:-translate-y-1 cursor-pointer flex flex-col h-full"
 		>
-			{/* Cover */}
-			<div className="relative h-36 sm:h-40 bg-gradient-to-br from-indigo-50 to-purple-50 dark:from-indigo-900/8 dark:to-purple-900/8">
+			{/* Cover - smaller fixed height so body can grow */}
+			<div className="relative h-28 sm:h-32 bg-gradient-to-br from-indigo-50 to-purple-50 dark:from-indigo-900/8 dark:to-purple-900/8 flex-shrink-0">
 				{!imageError ? (
 					<img
 						src={avatar}
@@ -105,8 +106,8 @@ const TeamMemberCard = React.memo(function TeamMemberCard({ member, onClick }) {
 					</div>
 				)}
 
-				{/* Overlapping avatar */}
-				<div className="absolute left-4 -bottom-8">
+				{/* Overlapping avatar - moved slightly lower to avoid clipping */}
+				<div className="absolute left-4 -bottom-10">
 					<div className="w-16 h-16 sm:w-20 sm:h-20 rounded-full ring-2 ring-white dark:ring-gray-900 overflow-hidden bg-gray-100 shadow-lg">
 						{!imageError ? (
 							<img
@@ -133,8 +134,8 @@ const TeamMemberCard = React.memo(function TeamMemberCard({ member, onClick }) {
 				)}
 			</div>
 
-			{/* Body */}
-			<div className="pt-10 pb-4 px-4 sm:px-5">
+			{/* Body - allow to grow so footer sits at bottom */}
+			<div className="flex-1 pt-12 pb-4 px-4 sm:px-5 flex flex-col">
 				<div className="flex items-start gap-3">
 					<div className="min-w-0 flex-1">
 						<h3
@@ -153,7 +154,7 @@ const TeamMemberCard = React.memo(function TeamMemberCard({ member, onClick }) {
 					</div>
 				</div>
 
-				{/* Skills */}
+				{/* Skills (optional) */}
 				{Array.isArray(member.skills) && member.skills.length > 0 && (
 					<div className="mt-3 flex flex-wrap gap-2">
 						{member.skills.slice(0, 6).map((s, i) => (
@@ -167,8 +168,8 @@ const TeamMemberCard = React.memo(function TeamMemberCard({ member, onClick }) {
 					</div>
 				)}
 
-				{/* Footer with socials & quick actions */}
-				<div className="mt-4 flex items-center gap-2 justify-between">
+				{/* Footer with socials & quick actions - pinned to bottom */}
+				<div className="mt-auto flex items-center gap-2 justify-between">
 					<div className="flex items-center gap-2">
 						{Array.isArray(member.socialLinks) &&
 							member.socialLinks.slice(0, 3).map((s, i) => {
