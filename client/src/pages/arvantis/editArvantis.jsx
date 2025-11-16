@@ -97,18 +97,23 @@ const EditArvantis = ({ setDashboardError = () => {} }) => {
 		}
 	}, []);
 
+	// loadFestDetails: normalize posters array (new backend shape)
 	const loadFestDetails = useCallback(async (identifier) => {
 		if (!identifier) return;
 		setActionBusy(true);
 		try {
 			const data = await svc.getFestDetails(identifier, { admin: true });
 			if (!data) throw new Error('No data returned');
-			// normalize fields the UI expects
 			const normalized = {
 				...data,
 				_id: data._id || data.id,
-				poster: data.poster || data.posterMedia || data.poster,
-				hero: data.hero || data.heroMedia || data.hero,
+				// prefer explicit arrays provided by backend
+				posters: Array.isArray(data.posters)
+					? data.posters
+					: data.poster
+					? [data.poster]
+					: [],
+				hero: data.hero || data.heroMedia || null,
 				gallery: data.gallery || [],
 				partners: data.partners || [],
 				events: data.events || [],
@@ -217,17 +222,32 @@ const EditArvantis = ({ setDashboardError = () => {} }) => {
 	};
 
 	// ----------------- Media -----------------
-	const uploadPoster = async (file) => {
-		if (!file || !editForm || !editForm._id) return;
-		if (file.size > MAX_FILE_SIZE) return toast.error('File too large (max 10MB)');
-		if (!FILE_TYPES_IMAGES.includes(file.type)) return toast.error('Invalid image type');
+	// Posters (now multiple)
+	const uploadPoster = async (files) => {
+		if (!files || files.length === 0 || !editForm || !editForm._id) return;
+		// files may be a single File or an array
+		const arr = Array.isArray(files) ? files : [files];
 		const fd = new FormData();
-		fd.append('poster', file, safeFilename(file.name || 'poster'));
+		for (const f of arr) {
+			if (!f) continue;
+			if (f.size > MAX_FILE_SIZE) {
+				toast.error(`File ${f.name} too large (max 10MB)`);
+				continue;
+			}
+			if (!FILE_TYPES_IMAGES.includes(f.type)) {
+				toast.error(`Invalid image type: ${f.name}`);
+				continue;
+			}
+			// server expects field name "posters" (multiple)
+			fd.append('posters', f, safeFilename(f.name || 'poster'));
+		}
+		if (![...fd.keys()].length) {
+			return;
+		}
 		setActionBusy(true);
 		try {
-			// uploads to poster endpoint
 			await svc.addFestPoster(editForm._id, fd);
-			toast.success('Poster uploaded');
+			toast.success('Poster(s) uploaded');
 			await loadFestDetails(editForm._id);
 		} catch (err) {
 			console.error('uploadPoster', err);
@@ -237,20 +257,21 @@ const EditArvantis = ({ setDashboardError = () => {} }) => {
 		}
 	};
 
-	const removePoster = async () => {
-		if (!editForm || !editForm._id || !editForm.poster?.publicId) return;
-		if (!window.confirm('Remove poster for this fest?')) return;
+	// remove a specific poster by publicId
+	const removePoster = async (publicId) => {
+		if (!publicId || !editForm || !editForm._id) return;
+		if (!window.confirm('Remove poster?')) return;
 		setActionBusy(true);
 		try {
-			await svc.removeFestPoster(editForm._id);
+			await svc.removeFestPoster(editForm._id, publicId);
 			toast.success('Poster removed');
-			await loadFestDetails(editForm._id);
-			// ensure selection doesn't keep removed id
+			// clear selection if present
 			setMediaSelection((s) => {
 				const copy = new Set(s);
-				copy.delete(editForm.poster.publicId);
+				copy.delete(publicId);
 				return copy;
 			});
+			await loadFestDetails(editForm._id);
 		} catch (err) {
 			console.error('removePoster', err);
 			toast.error(getErrMsg(err, 'Remove poster failed'));
@@ -885,36 +906,63 @@ const EditArvantis = ({ setDashboardError = () => {} }) => {
 							/>
 						</div>
 
-						{/* Poster */}
+						{/* Posters (multiple) */}
 						<div className="mb-4">
-							<h4 className="font-semibold text-white mb-2">Poster</h4>
-							{editForm.poster ? (
-								<div className="flex items-center gap-4 mb-2">
-									<img
-										src={editForm.poster.url}
-										alt="poster"
-										className="w-40 h-24 object-cover rounded"
-									/>
-									<div className="text-sm text-gray-400">
-										{editForm.poster.caption || ''}
+							<h4 className="font-semibold text-white mb-2">Posters</h4>
+
+							<div className="flex gap-2 flex-wrap mb-3">
+								{(editForm.posters || []).length === 0 && (
+									<div className="text-sm text-gray-400">No posters uploaded</div>
+								)}
+								{(editForm.posters || []).map((p) => (
+									<div
+										key={p.publicId}
+										className="relative w-36 h-48 bg-gray-800 rounded overflow-hidden"
+									>
+										{p.url && (
+											<img
+												src={p.url}
+												alt={p.caption || ''}
+												className="object-cover w-full h-full"
+											/>
+										)}
+										<div className="absolute bottom-0 left-0 right-0 p-2 bg-black/40 flex items-center justify-between gap-2">
+											<div className="text-xs text-white truncate">
+												{p.caption || p.publicId}
+											</div>
+											<div className="flex gap-2">
+												<button
+													onClick={() => removePoster(p.publicId)}
+													disabled={actionBusy}
+													className="text-red-400 p-1"
+													title="Delete poster"
+												>
+													<Trash2 className="w-4 h-4" />
+												</button>
+												<button
+													onClick={() => toggleMediaSelect(p.publicId)}
+													className={`p-1 rounded-full ${
+														mediaSelection.has(p.publicId)
+															? 'bg-purple-600 text-white'
+															: 'bg-black/50 text-purple-600'
+													}`}
+													aria-label="Select poster"
+												>
+													{mediaSelection.has(p.publicId) ? '✓' : 'P'}
+												</button>
+											</div>
+										</div>
 									</div>
-									<div className="ml-auto flex gap-2">
-										<button
-											onClick={() => removePoster()}
-											disabled={actionBusy}
-											className="px-3 py-1 rounded bg-red-600 text-white"
-										>
-											Delete Poster
-										</button>
-									</div>
-								</div>
-							) : (
-								<div className="text-sm text-gray-400 mb-2">No poster</div>
-							)}
+								))}
+							</div>
+
 							<input
 								type="file"
+								multiple
 								accept="image/*"
-								onChange={(e) => void uploadPoster(e.target.files?.[0])}
+								onChange={(e) =>
+									void uploadPoster(Array.from(e.target.files || []))
+								}
 								disabled={actionBusy}
 							/>
 						</div>
@@ -1388,7 +1436,7 @@ const EditArvantis = ({ setDashboardError = () => {} }) => {
 							</div>
 						</div>
 
-						{/* Media bulk actions (includes poster & hero) */}
+						{/* Media bulk actions (includes posters & hero) */}
 						<div className="mb-4">
 							<div className="flex items-center justify-between mb-2">
 								<h4 className="font-semibold text-white">Media Actions</h4>
@@ -1410,35 +1458,34 @@ const EditArvantis = ({ setDashboardError = () => {} }) => {
 							</div>
 
 							<div className="flex gap-2 flex-wrap">
-								{/* Poster selectable */}
-								{editForm.poster?.publicId && (
-									<div className="relative w-24 h-24 bg-gray-800 rounded overflow-hidden">
-										{editForm.poster.url && (
+								{/* Posters selectable */}
+								{(editForm.posters || []).map((p) => (
+									<div
+										key={p.publicId}
+										className="relative w-24 h-24 bg-gray-800 rounded overflow-hidden"
+									>
+										{p.url && (
 											<img
-												src={editForm.poster.url}
-												alt="poster"
+												src={p.url}
+												alt={p.caption || ''}
 												className="object-cover w-full h-full"
 											/>
 										)}
 										<div className="absolute top-0 right-0 p-1">
 											<button
-												onClick={() =>
-													toggleMediaSelect(editForm.poster.publicId)
-												}
+												onClick={() => toggleMediaSelect(p.publicId)}
 												className={`p-1 rounded-full ${
-													mediaSelection.has(editForm.poster.publicId)
+													mediaSelection.has(p.publicId)
 														? 'bg-purple-600 text-white'
 														: 'bg-black/50 text-purple-600'
 												}`}
 												aria-label="Select poster"
 											>
-												{mediaSelection.has(editForm.poster.publicId)
-													? '✓'
-													: 'P'}
+												{mediaSelection.has(p.publicId) ? '✓' : 'P'}
 											</button>
 										</div>
 									</div>
-								)}
+								))}
 								{/* Hero selectable */}
 								{editForm.hero?.publicId && (
 									<div className="relative w-24 h-24 bg-gray-800 rounded overflow-hidden">
