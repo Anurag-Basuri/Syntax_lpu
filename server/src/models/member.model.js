@@ -111,6 +111,9 @@ const memberSchema = new mongoose.Schema(
 				'BH-5',
 				'BH-6',
 				'BH-7',
+				'BH-8',
+				'BH-9',
+				'BH-10',
 				'GH-1',
 				'GH-2',
 				'GH-3',
@@ -118,6 +121,9 @@ const memberSchema = new mongoose.Schema(
 				'GH-5',
 				'GH-6',
 				'GH-7',
+				'GH-8',
+				'GH-9',
+				'Appartment',
 			],
 		},
 		password: {
@@ -161,6 +167,7 @@ const memberSchema = new mongoose.Schema(
 						'Design',
 						'Coordinator',
 						'Public Speaking',
+						'Outreach',
 					];
 					return (
 						Array.isArray(v) &&
