@@ -599,8 +599,12 @@ const EditArvantis = ({ setDashboardError = () => {} }) => {
 		const [moved] = reordered.splice(fromIdx, 1);
 		reordered.splice(toIdx, 0, moved);
 
-		// prepare order array of keys
-		const order = reordered.map((t) => t.key);
+		// prepare order array of keys, filter out falsy to avoid server errors
+		const order = reordered.map((t) => t?.key).filter(Boolean);
+		if (order.length === 0) {
+			toast.error('Cannot reorder: tracks missing keys.');
+			return;
+		}
 
 		setActionBusy(true);
 		try {
