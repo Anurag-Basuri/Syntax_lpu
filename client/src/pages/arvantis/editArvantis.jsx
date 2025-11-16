@@ -590,19 +590,24 @@ const EditArvantis = ({ setDashboardError = () => {} }) => {
 		if (!editForm || !editForm._id) return;
 		const tracks = editForm.tracks || [];
 		if (fromIdx < 0 || toIdx < 0 || fromIdx >= tracks.length || toIdx >= tracks.length) return;
+
 		const reordered = tracks.slice();
 		const [moved] = reordered.splice(fromIdx, 1);
 		reordered.splice(toIdx, 0, moved);
+
+		// prepare order array of keys
+		const order = reordered.map((t) => t.key);
+
+		setActionBusy(true);
 		try {
-			await svc.reorderTracks(
-				editForm._id,
-				reordered.map((t) => t.key)
-			);
-			toast.success('Tracks reordered');
+			await svc.reorderTracks(editForm._id, order);
 			await loadFestDetails(editForm._id);
+			toast.success('Tracks reordered');
 		} catch (err) {
 			console.error('reorderTracks', err);
 			toast.error(getErrMsg(err, 'Reorder failed'));
+		} finally {
+			if (mountedRef.current) setActionBusy(false);
 		}
 	};
 
