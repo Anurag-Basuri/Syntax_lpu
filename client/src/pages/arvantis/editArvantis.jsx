@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { publicClient } from '../../services/api.js';
 import * as svc from '../../services/arvantisServices.js';
+import { publicClient } from '../../services/api.js';
 import GlassCard from '../../components/arvantis/GlassCard.jsx';
 import EmptyState from '../../components/arvantis/EmptyState.jsx';
 import LoadingSpinner from '../../components/arvantis/LoadingSpinner.jsx';
@@ -15,7 +15,6 @@ const FILE_TYPES_IMAGES = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 
 const safeFilename = (s = '') => String(s).replace(/[:]/g, '-').replace(/\s+/g, '-');
 
 const EditArvantis = ({ setDashboardError = () => {} }) => {
-	// --- state ---
 	const [fests, setFests] = useState([]);
 	const [loading, setLoading] = useState(true);
 	const [events, setEvents] = useState([]);
@@ -26,7 +25,6 @@ const EditArvantis = ({ setDashboardError = () => {} }) => {
 	const [localError, setLocalError] = useState('');
 	const [downloadingCSV, setDownloadingCSV] = useState(false);
 
-	// admin UI state
 	const [mediaSelection, setMediaSelection] = useState(new Set());
 	const [bulkDeleting, setBulkDeleting] = useState(false);
 
@@ -43,7 +41,6 @@ const EditArvantis = ({ setDashboardError = () => {} }) => {
 	});
 	const [editForm, setEditForm] = useState(null);
 
-	// new local UI helpers for hero upload & richer presentation editing
 	const [heroFile, setHeroFile] = useState(null);
 	const [heroCaption, setHeroCaption] = useState('');
 
@@ -63,7 +60,6 @@ const EditArvantis = ({ setDashboardError = () => {} }) => {
 	const getErrMsg = (err, fallback = 'Request failed') =>
 		err?.response?.data?.message || err?.response?.data?.error || err?.message || fallback;
 
-	// ----------------- server calls -----------------
 	const fetchFests = useCallback(async () => {
 		setLoading(true);
 		try {
@@ -71,10 +67,11 @@ const EditArvantis = ({ setDashboardError = () => {} }) => {
 			const docs = resp?.docs || [];
 			if (mountedRef.current) {
 				setFests(docs);
-				// auto-select first fest if nothing selected
+				// preserve selection if exists, else auto-select first
 				if (!selectedFestId && docs.length > 0) {
-					setSelectedFestId(docs[0]._id);
-					void loadFestDetails(docs[0]._id);
+					const first = docs[0];
+					setSelectedFestId(first._id);
+					void loadFestDetails(first._id);
 				}
 			}
 		} catch (err) {
@@ -85,7 +82,7 @@ const EditArvantis = ({ setDashboardError = () => {} }) => {
 			if (mountedRef.current) setLoading(false);
 		}
 		// eslint-disable-next-line react-hooks/exhaustive-deps
-	}, [selectedFestId]); // selectedFestId used to decide auto-select behaviour
+	}, [selectedFestId]);
 
 	const fetchEvents = useCallback(async (signal) => {
 		try {
@@ -94,36 +91,36 @@ const EditArvantis = ({ setDashboardError = () => {} }) => {
 				signal,
 			});
 			const docs = resp?.data?.data ?? resp?.data ?? [];
-			if (mountedRef.current) setEvents(Array.isArray(docs) ? docs : docs.docs || []);
+			if (mountedRef.current) setEvents(Array.isArray(docs) ? docs : []);
 		} catch (err) {
 			if (err?.name === 'CanceledError' || err?.name === 'AbortError') return;
 			console.error('fetchEvents', err);
 		}
 	}, []);
 
-	// loadFestDetails: normalize posters array (new backend shape)
+	const normalizeFest = (data) => {
+		if (!data) return null;
+		return {
+			...data,
+			_id: data._id || data.id,
+			posters: Array.isArray(data.posters) ? data.posters : data.poster ? [data.poster] : [],
+			hero: data.hero || data.heroMedia || data.heroMedia || null,
+			gallery: data.gallery || [],
+			partners: data.partners || [],
+			events: data.events || [],
+			tracks: data.tracks || [],
+			faqs: data.faqs || [],
+			visibility: data.visibility || 'public',
+		};
+	};
+
 	const loadFestDetails = useCallback(async (identifier) => {
 		if (!identifier) return;
 		setActionBusy(true);
 		try {
 			const data = await svc.getFestDetails(identifier, { admin: true });
 			if (!data) throw new Error('No data returned');
-			const normalized = {
-				...data,
-				_id: data._id || data.id,
-				posters: Array.isArray(data.posters)
-					? data.posters
-					: data.poster
-					? [data.poster]
-					: [],
-				hero: data.hero || data.heroMedia || null,
-				gallery: data.gallery || [],
-				partners: data.partners || [],
-				events: data.events || [],
-				tracks: data.tracks || [],
-				faqs: data.faqs || [],
-				visibility: data.visibility || 'public',
-			};
+			const normalized = normalizeFest(data);
 			if (mountedRef.current) {
 				setEditForm(normalized);
 				setSelectedFestId(normalized._id);
@@ -131,8 +128,9 @@ const EditArvantis = ({ setDashboardError = () => {} }) => {
 					themeColors: normalized.themeColors || {},
 					socialLinks: normalized.socialLinks || {},
 				});
-				// keep any pending hero UI in sync
 				setHeroCaption(normalized.hero?.caption || '');
+				// clear media selection
+				setMediaSelection(new Set());
 			}
 		} catch (err) {
 			console.error('loadFestDetails', err);
@@ -149,7 +147,7 @@ const EditArvantis = ({ setDashboardError = () => {} }) => {
 		return () => ac.abort();
 	}, [fetchFests, fetchEvents]);
 
-	// ----------------- Create -----------------
+	// Create
 	const handleCreateSubmit = async (e) => {
 		e?.preventDefault();
 		setCreateLoading(true);
@@ -167,7 +165,7 @@ const EditArvantis = ({ setDashboardError = () => {} }) => {
 			await fetchFests();
 			setCreateOpen(false);
 			if (created?._id) {
-				void loadFestDetails(created._id);
+				await loadFestDetails(created._id);
 			}
 		} catch (err) {
 			console.error('createFest', err);
@@ -179,18 +177,20 @@ const EditArvantis = ({ setDashboardError = () => {} }) => {
 		}
 	};
 
-	// ----------------- Update core details -----------------
+	// Update core details
 	const saveEdit = async () => {
 		if (!editForm || !editForm._id) return;
 		setActionBusy(true);
 		try {
+			// prepare payload: only fields editable in UI
 			const payload = {
 				description: editForm.description,
+				location: editForm.location,
+				contactEmail: editForm.contactEmail,
+				contactPhone: editForm.contactPhone,
 				startDate: editForm.startDate || null,
 				endDate: editForm.endDate || null,
 				status: editForm.status,
-				location: editForm.location,
-				contactEmail: editForm.contactEmail,
 			};
 			await svc.updateFestDetails(editForm._id, payload);
 			toast.success('Fest updated');
@@ -198,13 +198,13 @@ const EditArvantis = ({ setDashboardError = () => {} }) => {
 			await loadFestDetails(editForm._id);
 		} catch (err) {
 			console.error('saveEdit', err);
-			toast.error(getErrMsg(err, 'Update failed'));
+			toast.error(getErrMsg(err, 'Failed to save fest'));
 		} finally {
 			if (mountedRef.current) setActionBusy(false);
 		}
 	};
 
-	// ----------------- Delete fest -----------------
+	// Delete fest
 	const removeFest = async (fest) => {
 		if (!fest || !fest._id) return;
 		if (!window.confirm('Delete fest? This is irreversible.')) return;
@@ -213,23 +213,19 @@ const EditArvantis = ({ setDashboardError = () => {} }) => {
 			await svc.deleteFest(fest._id);
 			toast.success('Fest deleted');
 			await fetchFests();
-			if (mountedRef.current) {
-				setEditForm(null);
-				setSelectedFestId(null);
-			}
+			setEditForm(null);
+			setSelectedFestId(null);
 		} catch (err) {
 			console.error('removeFest', err);
-			toast.error(getErrMsg(err, 'Delete failed'));
+			toast.error(getErrMsg(err, 'Failed to delete fest'));
 		} finally {
 			if (mountedRef.current) setActionBusy(false);
 		}
 	};
 
-	// ----------------- Media -----------------
-	// Posters (now multiple)
+	// Media - Posters
 	const uploadPoster = async (files) => {
 		if (!files || files.length === 0 || !editForm || !editForm._id) return;
-		// files may be a single File or an array
 		const arr = Array.isArray(files) ? files : [files];
 		const fd = new FormData();
 		for (const f of arr) {
@@ -242,12 +238,9 @@ const EditArvantis = ({ setDashboardError = () => {} }) => {
 				toast.error(`Invalid image type: ${f.name}`);
 				continue;
 			}
-			// server expects field name "posters" (multiple)
 			fd.append('posters', f, safeFilename(f.name || 'poster'));
 		}
-		if (![...fd.keys()].length) {
-			return;
-		}
+		if (![...fd.keys()].length) return;
 		setActionBusy(true);
 		try {
 			await svc.addFestPoster(editForm._id, fd);
@@ -261,7 +254,6 @@ const EditArvantis = ({ setDashboardError = () => {} }) => {
 		}
 	};
 
-	// remove a specific poster by publicId
 	const removePoster = async (publicId) => {
 		if (!publicId || !editForm || !editForm._id) return;
 		if (!window.confirm('Remove poster?')) return;
@@ -269,7 +261,6 @@ const EditArvantis = ({ setDashboardError = () => {} }) => {
 		try {
 			await svc.removeFestPoster(editForm._id, publicId);
 			toast.success('Poster removed');
-			// clear selection if present
 			setMediaSelection((s) => {
 				const copy = new Set(s);
 				copy.delete(publicId);
@@ -284,15 +275,26 @@ const EditArvantis = ({ setDashboardError = () => {} }) => {
 		}
 	};
 
+	// Hero
 	const uploadHero = async (file, caption) => {
 		if (!file || !editForm || !editForm._id) return;
+		if (file.size > MAX_FILE_SIZE) {
+			toast.error('Hero file too large');
+			return;
+		}
+		if (!FILE_TYPES_IMAGES.includes(file.type)) {
+			toast.error('Invalid hero file type');
+			return;
+		}
 		const fd = new FormData();
 		fd.append('hero', file, safeFilename(file.name || 'hero'));
 		if (caption) fd.append('caption', caption);
 		setActionBusy(true);
 		try {
 			await svc.updateFestHero(editForm._id, fd);
-			toast.success('Hero uploaded');
+			toast.success('Hero updated');
+			setHeroFile(null);
+			setHeroCaption('');
 			await loadFestDetails(editForm._id);
 		} catch (err) {
 			console.error('uploadHero', err);
@@ -310,14 +312,9 @@ const EditArvantis = ({ setDashboardError = () => {} }) => {
 			await svc.removeFestHero(editForm._id);
 			toast.success('Hero removed');
 			await loadFestDetails(editForm._id);
-			setMediaSelection((s) => {
-				const copy = new Set(s);
-				copy.delete(editForm.hero.publicId);
-				return copy;
-			});
 		} catch (err) {
 			console.error('removeHero', err);
-			toast.error(getErrMsg(err, 'Remove hero failed'));
+			toast.error(getErrMsg(err, 'Failed to remove hero'));
 		} finally {
 			if (mountedRef.current) setActionBusy(false);
 		}
@@ -328,6 +325,7 @@ const EditArvantis = ({ setDashboardError = () => {} }) => {
 		if (!files || files.length === 0 || !editForm || !editForm._id) return;
 		const fd = new FormData();
 		for (const f of files) {
+			if (!f) continue;
 			if (f.size > MAX_FILE_SIZE) {
 				toast.error(`File ${f.name} too large (max 10MB)`);
 				continue;
@@ -338,11 +336,11 @@ const EditArvantis = ({ setDashboardError = () => {} }) => {
 		setActionBusy(true);
 		try {
 			await svc.addGalleryMedia(editForm._id, fd);
-			toast.success('Gallery uploaded');
+			toast.success('Gallery media added');
 			await loadFestDetails(editForm._id);
 		} catch (err) {
 			console.error('addGallery', err);
-			toast.error(getErrMsg(err, 'Gallery upload failed'));
+			toast.error(getErrMsg(err, 'Add gallery failed'));
 		} finally {
 			if (mountedRef.current) setActionBusy(false);
 		}
@@ -356,22 +354,17 @@ const EditArvantis = ({ setDashboardError = () => {} }) => {
 			await svc.removeGalleryMedia(editForm._id, publicId);
 			toast.success('Gallery item removed');
 			await loadFestDetails(editForm._id);
-			setMediaSelection((s) => {
-				const copy = new Set(s);
-				copy.delete(publicId);
-				return copy;
-			});
 		} catch (err) {
 			console.error('removeGalleryItem', err);
-			toast.error(getErrMsg(err, 'Remove failed'));
+			toast.error(getErrMsg(err, 'Remove gallery failed'));
 		} finally {
 			if (mountedRef.current) setActionBusy(false);
 		}
 	};
 
-	// ----------------- Partners -----------------
+	// Partners
 	const addNewPartner = async (formData) => {
-		if (!editForm || !editForm._id) throw new Error('No active fest');
+		if (!editForm || !editForm._id) return;
 		setActionBusy(true);
 		try {
 			await svc.addPartner(editForm._id, formData);
@@ -388,10 +381,10 @@ const EditArvantis = ({ setDashboardError = () => {} }) => {
 
 	const updateExistingPartner = async (partnerName, updates) => {
 		if (!partnerName || !editForm || !editForm._id) return;
-		const fd = updates instanceof FormData ? updates : updates;
+		const data = updates instanceof FormData ? updates : updates;
 		setActionBusy(true);
 		try {
-			await svc.updatePartner(editForm._id, partnerName, fd);
+			await svc.updatePartner(editForm._id, partnerName, data);
 			toast.success('Partner updated');
 			await loadFestDetails(editForm._id);
 		} catch (err) {
@@ -428,19 +421,16 @@ const EditArvantis = ({ setDashboardError = () => {} }) => {
 		copy.splice(i, 1);
 		copy.splice(j, 0, tmp);
 		try {
-			await svc.reorderPartners(
-				editForm._id,
-				copy.map((p) => p.name)
-			);
-			toast.success('Partners reordered');
+			const order = copy.map((p) => p.name);
+			await svc.reorderPartners(editForm._id, order);
 			await loadFestDetails(editForm._id);
 		} catch (err) {
 			console.error('reorderPartners', err);
-			toast.error(getErrMsg(err, 'Reorder failed'));
+			toast.error(getErrMsg(err, 'Reorder partners failed'));
 		}
 	};
 
-	// ----------------- Events linking -----------------
+	// Events linking
 	const handleLinkEvent = async (eventId) => {
 		if (!eventId || !editForm || !editForm._id) return;
 		setActionBusy(true);
@@ -450,7 +440,7 @@ const EditArvantis = ({ setDashboardError = () => {} }) => {
 			await loadFestDetails(editForm._id);
 		} catch (err) {
 			console.error('handleLinkEvent', err);
-			toast.error(getErrMsg(err, 'Link failed'));
+			toast.error(getErrMsg(err, 'Link event failed'));
 		} finally {
 			if (mountedRef.current) setActionBusy(false);
 		}
@@ -466,18 +456,19 @@ const EditArvantis = ({ setDashboardError = () => {} }) => {
 			await loadFestDetails(editForm._id);
 		} catch (err) {
 			console.error('handleUnlinkEvent', err);
-			toast.error(getErrMsg(err, 'Unlink failed'));
+			toast.error(getErrMsg(err, 'Unlink event failed'));
 		} finally {
 			if (mountedRef.current) setActionBusy(false);
 		}
 	};
 
-	// ----------------- Export CSV -----------------
+	// Export CSV
 	const exportCSV = async () => {
 		setDownloadingCSV(true);
 		try {
 			const blob = await svc.exportFestsCSV();
-			const url = window.URL.createObjectURL(new Blob([blob], { type: 'text/csv' }));
+			// blob may be arraybuffer / blob
+			const url = window.URL.createObjectURL(blob instanceof Blob ? blob : new Blob([blob]));
 			const a = document.createElement('a');
 			a.href = url;
 			a.download = `arvantis-fests-${new Date().toISOString()}.csv`;
@@ -485,7 +476,7 @@ const EditArvantis = ({ setDashboardError = () => {} }) => {
 			a.click();
 			a.remove();
 			window.URL.revokeObjectURL(url);
-			toast.success('CSV exported');
+			toast.success('CSV downloaded');
 		} catch (err) {
 			console.error('exportCSV', err);
 			toast.error(getErrMsg(err, 'Export failed'));
@@ -494,20 +485,21 @@ const EditArvantis = ({ setDashboardError = () => {} }) => {
 		}
 	};
 
-	// ----------------- Presentation / social / theme -----------------
+	// Presentation / social / theme
 	const savePresentation = async () => {
 		if (!editForm || !editForm._id) return;
 		setActionBusy(true);
 		try {
-			await svc.updatePresentation(editForm._id, {
+			const payload = {
 				themeColors: presentationDraft.themeColors,
 				socialLinks: presentationDraft.socialLinks,
-			});
+			};
+			await svc.updatePresentation(editForm._id, payload);
 			toast.success('Presentation saved');
 			await loadFestDetails(editForm._id);
 		} catch (err) {
 			console.error('savePresentation', err);
-			toast.error(getErrMsg(err, 'Save failed'));
+			toast.error(getErrMsg(err, 'Save presentation failed'));
 		} finally {
 			if (mountedRef.current) setActionBusy(false);
 		}
@@ -522,7 +514,7 @@ const EditArvantis = ({ setDashboardError = () => {} }) => {
 			await loadFestDetails(editForm._id);
 		} catch (err) {
 			console.error('saveSocialLinks', err);
-			toast.error(getErrMsg(err, 'Save failed'));
+			toast.error(getErrMsg(err, 'Save social links failed'));
 		} finally {
 			if (mountedRef.current) setActionBusy(false);
 		}
@@ -537,7 +529,7 @@ const EditArvantis = ({ setDashboardError = () => {} }) => {
 			await loadFestDetails(editForm._id);
 		} catch (err) {
 			console.error('saveThemeColors', err);
-			toast.error(getErrMsg(err, 'Save failed'));
+			toast.error(getErrMsg(err, 'Save theme failed'));
 		} finally {
 			if (mountedRef.current) setActionBusy(false);
 		}
@@ -552,13 +544,13 @@ const EditArvantis = ({ setDashboardError = () => {} }) => {
 			await loadFestDetails(editForm._id);
 		} catch (err) {
 			console.error('handleSetVisibility', err);
-			toast.error(getErrMsg(err, 'Update failed'));
+			toast.error(getErrMsg(err, 'Failure'));
 		} finally {
 			if (mountedRef.current) setActionBusy(false);
 		}
 	};
 
-	// ----------------- Tracks & FAQs (basic) -----------------
+	// Tracks & FAQs
 	const addTrack = async (payload) => {
 		if (!editForm || !editForm._id) return;
 		setActionBusy(true);
@@ -568,7 +560,7 @@ const EditArvantis = ({ setDashboardError = () => {} }) => {
 			await loadFestDetails(editForm._id);
 		} catch (err) {
 			console.error('addTrack', err);
-			toast.error(getErrMsg(err, 'Add failed'));
+			toast.error(getErrMsg(err, 'Add track failed'));
 		} finally {
 			if (mountedRef.current) setActionBusy(false);
 		}
@@ -584,7 +576,7 @@ const EditArvantis = ({ setDashboardError = () => {} }) => {
 			await loadFestDetails(editForm._id);
 		} catch (err) {
 			console.error('removeExistingTrack', err);
-			toast.error(getErrMsg(err, 'Remove failed'));
+			toast.error(getErrMsg(err, 'Remove track failed'));
 		} finally {
 			if (mountedRef.current) setActionBusy(false);
 		}
@@ -594,23 +586,19 @@ const EditArvantis = ({ setDashboardError = () => {} }) => {
 		if (!editForm || !editForm._id) return;
 		const tracks = editForm.tracks || [];
 		if (fromIdx < 0 || toIdx < 0 || fromIdx >= tracks.length || toIdx >= tracks.length) return;
-
 		const reordered = tracks.slice();
 		const [moved] = reordered.splice(fromIdx, 1);
 		reordered.splice(toIdx, 0, moved);
-
-		// prepare order array of keys, filter out falsy to avoid server errors
 		const order = reordered.map((t) => t?.key).filter(Boolean);
 		if (order.length === 0) {
 			toast.error('Cannot reorder: tracks missing keys.');
 			return;
 		}
-
 		setActionBusy(true);
 		try {
 			await svc.reorderTracks(editForm._id, order);
-			await loadFestDetails(editForm._id);
 			toast.success('Tracks reordered');
+			await loadFestDetails(editForm._id);
 		} catch (err) {
 			console.error('reorderTracks', err);
 			toast.error(getErrMsg(err, 'Reorder failed'));
@@ -629,7 +617,7 @@ const EditArvantis = ({ setDashboardError = () => {} }) => {
 			await loadFestDetails(editForm._id);
 		} catch (err) {
 			console.error('addFaq', err);
-			toast.error(getErrMsg(err, 'Add failed'));
+			toast.error(getErrMsg(err, 'Add FAQ failed'));
 		} finally {
 			if (mountedRef.current) setActionBusy(false);
 		}
@@ -645,13 +633,12 @@ const EditArvantis = ({ setDashboardError = () => {} }) => {
 			await loadFestDetails(editForm._id);
 		} catch (err) {
 			console.error('removeExistingFaq', err);
-			toast.error(getErrMsg(err, 'Remove failed'));
+			toast.error(getErrMsg(err, 'Remove FAQ failed'));
 		} finally {
 			if (mountedRef.current) setActionBusy(false);
 		}
 	};
 
-	// reorder FAQs
 	const reorderFaqs = async (fromIdx, toIdx) => {
 		if (!editForm || !editForm._id) return;
 		const faqs = editForm.faqs || [];
@@ -663,24 +650,24 @@ const EditArvantis = ({ setDashboardError = () => {} }) => {
 		setActionBusy(true);
 		try {
 			await svc.reorderFAQs(editForm._id, order);
-			await loadFestDetails(editForm._id);
 			toast.success('FAQs reordered');
+			await loadFestDetails(editForm._id);
 		} catch (err) {
 			console.error('reorderFaqs', err);
-			toast.error(getErrMsg(err, 'Failed to reorder FAQs'));
+			toast.error(getErrMsg(err, 'Reorder FAQs failed'));
 		} finally {
 			if (mountedRef.current) setActionBusy(false);
 		}
 	};
 
-	// ----------------- Media bulk delete -----------------
+	// Media bulk delete
 	const toggleMediaSelect = (publicId) => {
 		if (!publicId) return;
 		setMediaSelection((prev) => {
-			const s = new Set(prev);
-			if (s.has(publicId)) s.delete(publicId);
-			else s.add(publicId);
-			return s;
+			const copy = new Set(prev);
+			if (copy.has(publicId)) copy.delete(publicId);
+			else copy.add(publicId);
+			return copy;
 		});
 	};
 
@@ -688,14 +675,14 @@ const EditArvantis = ({ setDashboardError = () => {} }) => {
 		if (!editForm || !editForm._id) return;
 		const ids = Array.from(mediaSelection);
 		if (ids.length === 0) {
-			toast('No media selected', { icon: 'ℹ️' });
+			toast.error('No media selected');
 			return;
 		}
 		if (!window.confirm(`Delete ${ids.length} media items? This cannot be undone.`)) return;
 		setBulkDeleting(true);
 		try {
 			await svc.bulkDeleteMedia(editForm._id, ids);
-			toast.success('Selected media deleted');
+			toast.success('Media deleted');
 			setMediaSelection(new Set());
 			await loadFestDetails(editForm._id);
 		} catch (err) {
@@ -706,7 +693,6 @@ const EditArvantis = ({ setDashboardError = () => {} }) => {
 		}
 	};
 
-	// ----------------- UI helpers -----------------
 	const visibleFests = useMemo(() => fests || [], [fests]);
 
 	if (loading) return <LoadingSpinner text="Loading fests..." />;
@@ -938,10 +924,9 @@ const EditArvantis = ({ setDashboardError = () => {} }) => {
 							/>
 						</div>
 
-						{/* Posters (multiple) */}
+						{/* Posters */}
 						<div className="mb-4">
 							<h4 className="font-semibold text-white mb-2">Posters</h4>
-
 							<div className="flex gap-2 flex-wrap mb-3">
 								{(editForm.posters || []).length === 0 && (
 									<div className="text-sm text-gray-400">No posters uploaded</div>
@@ -987,7 +972,6 @@ const EditArvantis = ({ setDashboardError = () => {} }) => {
 									</div>
 								))}
 							</div>
-
 							<input
 								type="file"
 								multiple
@@ -1137,18 +1121,10 @@ const EditArvantis = ({ setDashboardError = () => {} }) => {
 														'New partner name',
 														p.name
 													);
-													if (newName && newName !== p.name) {
+													if (newName && newName !== p.name)
 														updateExistingPartner(p.name, {
 															name: newName,
-														}).catch((err) =>
-															toast.error(
-																getErrMsg(
-																	err,
-																	'Failed to update partner'
-																)
-															)
-														);
-													}
+														});
 												}}
 												className="text-blue-400"
 											>
@@ -1269,7 +1245,7 @@ const EditArvantis = ({ setDashboardError = () => {} }) => {
 									</select>
 								</div>
 
-								{/* Social links structured inputs */}
+								{/* Social links */}
 								<div className="col-span-2 grid grid-cols-2 gap-3">
 									<div>
 										<label className="block text-sm text-gray-400 mb-1">
@@ -1368,7 +1344,7 @@ const EditArvantis = ({ setDashboardError = () => {} }) => {
 									</div>
 								</div>
 
-								{/* Theme color pickers */}
+								{/* Theme colors */}
 								<div className="col-span-2 grid grid-cols-3 gap-3">
 									<div>
 										<label className="block text-sm text-gray-400 mb-1">
@@ -1408,7 +1384,6 @@ const EditArvantis = ({ setDashboardError = () => {} }) => {
 											/>
 										</div>
 									</div>
-
 									<div>
 										<label className="block text-sm text-gray-400 mb-1">
 											Accent
@@ -1447,7 +1422,6 @@ const EditArvantis = ({ setDashboardError = () => {} }) => {
 											/>
 										</div>
 									</div>
-
 									<div>
 										<label className="block text-sm text-gray-400 mb-1">
 											Background
@@ -1510,6 +1484,112 @@ const EditArvantis = ({ setDashboardError = () => {} }) => {
 								>
 									Save Theme Colors
 								</button>
+							</div>
+						</div>
+
+						{/* Bulk delete actions */}
+						<div className="flex gap-2 mt-4">
+							<button
+								onClick={() => bulkDeleteSelectedMedia()}
+								disabled={bulkDeleting || mediaSelection.size === 0}
+								className="px-4 py-2 bg-red-600 text-white rounded"
+							>
+								Delete Selected ({mediaSelection.size})
+							</button>
+						</div>
+
+						{/* FAQs */}
+						<div className="mb-4">
+							<div className="flex items-center justify-between mb-2">
+								<h4 className="font-semibold text-white">
+									FAQs ({(editForm.faqs || []).length})
+								</h4>
+								<button
+									onClick={() => {
+										const question = prompt('Enter FAQ question');
+										const answer = question ? prompt('Enter FAQ answer') : null;
+										if (question && answer) void addFaq({ question, answer });
+									}}
+									className="px-3 py-1 rounded bg-emerald-600 text-white text-sm"
+								>
+									Add FAQ
+								</button>
+							</div>
+							<div className="space-y-2">
+								{(editForm.faqs || []).map((faq, idx) => (
+									<div
+										key={String(faq._id || faq.id)}
+										className="flex items-center justify-between p-3 bg-white/3 rounded"
+									>
+										<div className="flex-1">
+											<div className="font-medium text-white">
+												{faq.question}
+											</div>
+											<div className="text-sm text-gray-400">
+												{faq.answer}
+											</div>
+										</div>
+										<div className="flex gap-2 items-center">
+											<button
+												onClick={() => {
+													const newAnswer = prompt(
+														'Enter new answer',
+														faq.answer
+													);
+													if (newAnswer && newAnswer !== faq.answer)
+														svc.updateFAQ(
+															editForm._id,
+															faq._id || faq.id,
+															{ answer: newAnswer }
+														)
+															.then(() =>
+																loadFestDetails(editForm._id)
+															)
+															.catch((err) =>
+																toast.error(
+																	getErrMsg(
+																		err,
+																		'Failed to update FAQ'
+																	)
+																)
+															);
+												}}
+												className="text-blue-400"
+												title="Edit FAQ"
+											>
+												Edit
+											</button>
+											<button
+												onClick={() =>
+													void removeExistingFaq(faq._id || faq.id)
+												}
+												className="text-red-400"
+												title="Remove FAQ"
+											>
+												<Trash2 className="w-5 h-5" />
+											</button>
+											<button
+												onClick={() => reorderFaqs(idx, idx - 1)}
+												disabled={idx === 0 || actionBusy}
+												className="text-gray-400"
+												title="Move up"
+											>
+												<ArrowUp className="w-5 h-5" />
+											</button>
+											<button
+												onClick={() => reorderFaqs(idx, idx + 1)}
+												disabled={
+													idx === (editForm.faqs || []).length - 1 ||
+													actionBusy
+												}
+												className="text-gray-400"
+												title="Move down"
+											>
+												<ArrowDown className="w-5 h-5" />
+											</button>
+										</div>
+									</div>
+								))}
 							</div>
 						</div>
 					</GlassCard>
