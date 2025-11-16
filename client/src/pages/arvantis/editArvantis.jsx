@@ -638,6 +638,28 @@ const EditArvantis = ({ setDashboardError = () => {} }) => {
 		}
 	};
 
+	// reorder FAQs
+	const reorderFaqs = async (fromIdx, toIdx) => {
+		if (!editForm || !editForm._id) return;
+		const faqs = editForm.faqs || [];
+		if (fromIdx < 0 || toIdx < 0 || fromIdx >= faqs.length || toIdx >= faqs.length) return;
+		const copy = faqs.slice();
+		const [moved] = copy.splice(fromIdx, 1);
+		copy.splice(toIdx, 0, moved);
+		const order = copy.map((f) => String(f._id || f.id));
+		setActionBusy(true);
+		try {
+			await svc.reorderFAQs(editForm._id, order);
+			await loadFestDetails(editForm._id);
+			toast.success('FAQs reordered');
+		} catch (err) {
+			console.error('reorderFaqs', err);
+			toast.error(getErrMsg(err, 'Failed to reorder FAQs'));
+		} finally {
+			if (mountedRef.current) setActionBusy(false);
+		}
+	};
+
 	// ----------------- Media bulk delete -----------------
 	const toggleMediaSelect = (publicId) => {
 		if (!publicId) return;
@@ -755,16 +777,15 @@ const EditArvantis = ({ setDashboardError = () => {} }) => {
 						<button
 							onClick={async () => {
 								try {
-									const analytics = await svc.getFestAnalytics();
-									console.log('Analytics', analytics);
-									toast.success('Analytics loaded (see console)');
+									await svc.downloadFestAnalytics();
+									toast.success('Analytics downloaded');
 								} catch (err) {
-									toast.error(getErrMsg(err, 'Failed to load analytics'));
+									toast.error(getErrMsg(err, 'Failed to download analytics'));
 								}
 							}}
 							className="py-2 rounded bg-blue-600 text-white"
 						>
-							Load Analytics
+							Download Analytics
 						</button>
 						<button
 							onClick={() => {
@@ -778,16 +799,15 @@ const EditArvantis = ({ setDashboardError = () => {} }) => {
 						<button
 							onClick={async () => {
 								try {
-									const stats = await svc.getFestStatistics();
-									console.log('Statistics', stats);
-									toast.success('Statistics loaded (see console)');
+									await svc.downloadFestStatistics();
+									toast.success('Statistics downloaded');
 								} catch (err) {
-									toast.error(getErrMsg(err, 'Failed to load statistics'));
+									toast.error(getErrMsg(err, 'Failed to download statistics'));
 								}
 							}}
 							className="py-2 rounded bg-indigo-700 text-white"
 						>
-							Load Statistics
+							Download Statistics
 						</button>
 					</div>
 				</GlassCard>
@@ -833,19 +853,18 @@ const EditArvantis = ({ setDashboardError = () => {} }) => {
 								<button
 									onClick={async () => {
 										try {
-											const report = await svc.generateFestReport(
-												editForm._id
-											);
-											console.log('Report', report);
-											toast.success('Report generated (see console)');
+											await svc.downloadFestReport(editForm._id);
+											toast.success('Report downloaded');
 										} catch (err) {
-											toast.error(getErrMsg(err, 'Report failed'));
+											toast.error(
+												getErrMsg(err, 'Failed to download report')
+											);
 										}
 									}}
 									disabled={actionBusy}
 									className="px-4 py-2 bg-gray-800 text-white rounded"
 								>
-									Report
+									Download Report
 								</button>
 							</div>
 						</div>
@@ -1385,7 +1404,7 @@ const EditArvantis = ({ setDashboardError = () => {} }) => {
 								</button>
 							</div>
 							<div className="space-y-2">
-								{(editForm.faqs || []).map((faq) => (
+								{(editForm.faqs || []).map((faq, idx) => (
 									<div
 										key={String(faq._id || faq.id)}
 										className="flex items-center justify-between p-3 bg-white/3 rounded"
@@ -1398,7 +1417,7 @@ const EditArvantis = ({ setDashboardError = () => {} }) => {
 												{faq.answer}
 											</div>
 										</div>
-										<div className="flex gap-2">
+										<div className="flex gap-2 items-center">
 											<button
 												onClick={() => {
 													const newAnswer = prompt(
@@ -1429,6 +1448,26 @@ const EditArvantis = ({ setDashboardError = () => {} }) => {
 												title="Remove FAQ"
 											>
 												<Trash2 className="w-5 h-5" />
+											</button>
+
+											<button
+												onClick={() => reorderFaqs(idx, idx - 1)}
+												disabled={idx === 0 || actionBusy}
+												className="text-gray-400"
+												title="Move up"
+											>
+												<ArrowUp className="w-5 h-5" />
+											</button>
+											<button
+												onClick={() => reorderFaqs(idx, idx + 1)}
+												disabled={
+													idx === (editForm.faqs || []).length - 1 ||
+													actionBusy
+												}
+												className="text-gray-400"
+												title="Move down"
+											>
+												<ArrowDown className="w-5 h-5" />
 											</button>
 										</div>
 									</div>
