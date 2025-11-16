@@ -38,6 +38,7 @@ const EventDetailModal = ({ event: initialEvent, isOpen, onClose }) => {
 	const id = initialEvent?._id || initialEvent?.id;
 	const [showRaw, setShowRaw] = useState(false);
 
+	// always call hooks in same order
 	const {
 		data: event,
 		isLoading,
@@ -50,6 +51,16 @@ const EventDetailModal = ({ event: initialEvent, isOpen, onClose }) => {
 		staleTime: 60_000,
 		refetchOnWindowFocus: false,
 	});
+
+	// compute payload and rawJson before any early returns so hooks stay stable
+	const payload = event || initialEvent || {};
+	const rawJson = useMemo(() => {
+		try {
+			return JSON.stringify(payload, null, 2);
+		} catch {
+			return String(payload);
+		}
+	}, [payload]);
 
 	useEffect(() => {
 		if (!isOpen) return;
@@ -66,9 +77,6 @@ const EventDetailModal = ({ event: initialEvent, isOpen, onClose }) => {
 
 	if (!isOpen) return null;
 
-	// use listing as fallback
-	const payload = event || initialEvent || {};
-
 	const poster = payload.posters?.[0]?.url || payload.posters?.[0]?.secure_url || null;
 	const title = payload.title || 'Untitled Event';
 	const dateLabel = payload.eventDate ? prettyDate(payload.eventDate) : 'TBD';
@@ -81,14 +89,6 @@ const EventDetailModal = ({ event: initialEvent, isOpen, onClose }) => {
 	const coOrganizers = Array.isArray(payload.coOrganizers) ? payload.coOrganizers : [];
 	const desc = payload.description || payload.summary || 'No description available.';
 	const registrationInfo = payload.registrationInfo || payload.registration || {};
-
-	const rawJson = useMemo(() => {
-		try {
-			return JSON.stringify(payload, null, 2);
-		} catch {
-			return String(payload);
-		}
-	}, [payload]);
 
 	const copyRaw = async () => {
 		try {
