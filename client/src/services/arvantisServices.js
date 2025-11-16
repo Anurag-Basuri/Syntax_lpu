@@ -15,7 +15,7 @@ const normalizePagination = (raw) => {
 			docs,
 			totalDocs: pagination.totalDocs ?? pagination.total ?? docs.length,
 			page: pagination.page ?? pagination.currentPage ?? 1,
-			totalPages: pagination.totalPages ?? pagination.totalPages ?? 1,
+			totalPages: pagination.totalPages ?? pagination.total ?? 1,
 			limit: pagination.limit ?? pagination.perPage ?? docs.length,
 			hasPrevPage: !!pagination.hasPrevPage,
 			hasNextPage: !!pagination.hasNextPage,
@@ -130,10 +130,87 @@ export const deleteFest = async (identifier) => {
 	}
 };
 
+export const duplicateFest = async (identifier, year) => {
+	if (!identifier || !year) throw new Error('Identifier and target year required.');
+	try {
+		const resp = await apiClient.post(
+			`/api/v1/arvantis/${encodeURIComponent(identifier)}/duplicate`,
+			{ year }
+		);
+		return resp.data?.data;
+	} catch (err) {
+		throw new Error(extractError(err, 'Failed to duplicate fest.'));
+	}
+};
+
+export const setFestStatus = async (identifier, status) => {
+	if (!identifier || !status) throw new Error('Identifier and status required.');
+	try {
+		const resp = await apiClient.patch(
+			`/api/v1/arvantis/${encodeURIComponent(identifier)}/status`,
+			{ status }
+		);
+		return resp.data?.data;
+	} catch (err) {
+		throw new Error(extractError(err, 'Failed to set fest status.'));
+	}
+};
+
+export const updatePresentation = async (identifier, data) => {
+	if (!identifier || !data) throw new Error('Identifier and presentation data required.');
+	try {
+		const resp = await apiClient.patch(
+			`/api/v1/arvantis/${encodeURIComponent(identifier)}/presentation`,
+			data
+		);
+		return resp.data?.data;
+	} catch (err) {
+		throw new Error(extractError(err, 'Failed to update presentation.'));
+	}
+};
+
+export const updateSocialLinks = async (identifier, socialLinks) => {
+	if (!identifier || !socialLinks) throw new Error('Identifier and socialLinks required.');
+	try {
+		const resp = await apiClient.patch(
+			`/api/v1/arvantis/${encodeURIComponent(identifier)}/social-links`,
+			socialLinks
+		);
+		return resp.data?.data;
+	} catch (err) {
+		throw new Error(extractError(err, 'Failed to update social links.'));
+	}
+};
+
+export const updateThemeColors = async (identifier, themeColors) => {
+	if (!identifier || !themeColors) throw new Error('Identifier and themeColors required.');
+	try {
+		const resp = await apiClient.patch(
+			`/api/v1/arvantis/${encodeURIComponent(identifier)}/theme`,
+			themeColors
+		);
+		return resp.data?.data;
+	} catch (err) {
+		throw new Error(extractError(err, 'Failed to update theme colors.'));
+	}
+};
+
+export const setVisibility = async (identifier, visibility) => {
+	if (!identifier || !visibility) throw new Error('Identifier and visibility required.');
+	try {
+		const resp = await apiClient.patch(
+			`/api/v1/arvantis/${encodeURIComponent(identifier)}/visibility`,
+			{ visibility }
+		);
+		return resp.data?.data ?? resp.data;
+	} catch (err) {
+		throw new Error(extractError(err, 'Failed to update visibility.'));
+	}
+};
+
 export const addPartner = async (identifier, formData) => {
 	if (!identifier) throw new Error('Fest identifier is required.');
 	try {
-		// formData should be FormData with field "logo" or plain object not supported for file
 		const resp = await apiClient.post(
 			`/api/v1/arvantis/${encodeURIComponent(identifier)}/partners`,
 			formData
@@ -141,6 +218,21 @@ export const addPartner = async (identifier, formData) => {
 		return resp.data?.data;
 	} catch (err) {
 		throw new Error(extractError(err, 'Failed to add partner.'));
+	}
+};
+
+export const updatePartner = async (identifier, partnerName, formData) => {
+	if (!identifier || !partnerName) throw new Error('Identifier and partnerName required.');
+	try {
+		const resp = await apiClient.patch(
+			`/api/v1/arvantis/${encodeURIComponent(identifier)}/partners/${encodeURIComponent(
+				partnerName
+			)}`,
+			formData
+		);
+		return resp.data?.data;
+	} catch (err) {
+		throw new Error(extractError(err, 'Failed to update partner.'));
 	}
 };
 
@@ -155,6 +247,20 @@ export const removePartner = async (identifier, partnerName) => {
 		return resp.status === 204 ? { success: true } : resp.data;
 	} catch (err) {
 		throw new Error(extractError(err, 'Failed to remove partner.'));
+	}
+};
+
+export const reorderPartners = async (identifier, order) => {
+	if (!identifier || !Array.isArray(order))
+		throw new Error('Identifier and order array required.');
+	try {
+		const resp = await apiClient.patch(
+			`/api/v1/arvantis/${encodeURIComponent(identifier)}/partners/reorder`,
+			{ order }
+		);
+		return resp.data?.data;
+	} catch (err) {
+		throw new Error(extractError(err, 'Failed to reorder partners.'));
 	}
 };
 
@@ -198,6 +304,20 @@ export const updateFestPoster = async (identifier, formData) => {
 	}
 };
 
+export const updateFestHero = async (identifier, formData) => {
+	if (!identifier) throw new Error('Fest identifier is required.');
+	try {
+		// route: PATCH /api/v1/arvantis/:identifier/hero  (controller supports hero update)
+		const resp = await apiClient.patch(
+			`/api/v1/arvantis/${encodeURIComponent(identifier)}/hero`,
+			formData
+		);
+		return resp.data?.data;
+	} catch (err) {
+		throw new Error(extractError(err, 'Failed to update hero media.'));
+	}
+};
+
 export const addGalleryMedia = async (identifier, formData) => {
 	if (!identifier) throw new Error('Fest identifier is required.');
 	try {
@@ -222,6 +342,58 @@ export const removeGalleryMedia = async (identifier, publicId) => {
 		return resp.status === 204 ? { success: true } : resp.data;
 	} catch (err) {
 		throw new Error(extractError(err, 'Failed to remove gallery media.'));
+	}
+};
+
+export const reorderGallery = async (identifier, order) => {
+	if (!identifier || !Array.isArray(order))
+		throw new Error('Identifier and order array required.');
+	try {
+		const resp = await apiClient.patch(
+			`/api/v1/arvantis/${encodeURIComponent(identifier)}/gallery/reorder`,
+			{ order }
+		);
+		return resp.data?.data;
+	} catch (err) {
+		throw new Error(extractError(err, 'Failed to reorder gallery.'));
+	}
+};
+
+export const bulkDeleteMedia = async (identifier, publicIds) => {
+	if (!identifier || !Array.isArray(publicIds))
+		throw new Error('Identifier and publicIds array required.');
+	try {
+		const resp = await apiClient.post(
+			`/api/v1/arvantis/${encodeURIComponent(identifier)}/media/bulk-delete`,
+			{ publicIds }
+		);
+		return resp.data?.data ?? resp.data;
+	} catch (err) {
+		throw new Error(extractError(err, 'Failed to bulk delete media.'));
+	}
+};
+
+export const removeFestPoster = async (identifier) => {
+	if (!identifier) throw new Error('Identifier required.');
+	try {
+		const resp = await apiClient.delete(
+			`/api/v1/arvantis/${encodeURIComponent(identifier)}/poster`
+		);
+		return resp.status === 204 ? { success: true } : resp.data;
+	} catch (err) {
+		throw new Error(extractError(err, 'Failed to remove poster.'));
+	}
+};
+
+export const removeFestHero = async (identifier) => {
+	if (!identifier) throw new Error('Identifier required.');
+	try {
+		const resp = await apiClient.delete(
+			`/api/v1/arvantis/${encodeURIComponent(identifier)}/hero`
+		);
+		return resp.status === 204 ? { success: true } : resp.data;
+	} catch (err) {
+		throw new Error(extractError(err, 'Failed to remove hero media.'));
 	}
 };
 
@@ -264,22 +436,114 @@ export const generateFestReport = async (identifier) => {
 	}
 };
 
-export default {
-	getArvantisLandingData,
-	getAllFests,
-	getFestDetails,
-	createFest,
-	updateFestDetails,
-	deleteFest,
-	addPartner,
-	removePartner,
-	linkEventToFest,
-	unlinkEventFromFest,
-	updateFestPoster,
-	addGalleryMedia,
-	removeGalleryMedia,
-	exportFestsCSV,
-	getFestAnalytics,
-	getFestStatistics,
-	generateFestReport,
+/* Tracks CRUD */
+export const addTrack = async (identifier, payload) => {
+	if (!identifier || !payload?.title) throw new Error('Identifier and track title required.');
+	try {
+		const resp = await apiClient.post(
+			`/api/v1/arvantis/${encodeURIComponent(identifier)}/tracks`,
+			payload
+		);
+		return resp.data?.data;
+	} catch (err) {
+		throw new Error(extractError(err, 'Failed to add track.'));
+	}
 };
+
+export const updateTrack = async (identifier, trackKey, payload) => {
+	if (!identifier || !trackKey) throw new Error('Identifier and trackKey required.');
+	try {
+		const resp = await apiClient.patch(
+			`/api/v1/arvantis/${encodeURIComponent(identifier)}/tracks/${encodeURIComponent(
+				trackKey
+			)}`,
+			payload
+		);
+		return resp.data?.data;
+	} catch (err) {
+		throw new Error(extractError(err, 'Failed to update track.'));
+	}
+};
+
+export const removeTrack = async (identifier, trackKey) => {
+	if (!identifier || !trackKey) throw new Error('Identifier and trackKey required.');
+	try {
+		const resp = await apiClient.delete(
+			`/api/v1/arvantis/${encodeURIComponent(identifier)}/tracks/${encodeURIComponent(
+				trackKey
+			)}`
+		);
+		return resp.status === 204 ? { success: true } : resp.data;
+	} catch (err) {
+		throw new Error(extractError(err, 'Failed to remove track.'));
+	}
+};
+
+export const reorderTracks = async (identifier, order) => {
+	if (!identifier || !Array.isArray(order))
+		throw new Error('Identifier and order array required.');
+	try {
+		const resp = await apiClient.patch(
+			`/api/v1/arvantis/${encodeURIComponent(identifier)}/tracks/reorder`,
+			{ order }
+		);
+		return resp.data?.data;
+	} catch (err) {
+		throw new Error(extractError(err, 'Failed to reorder tracks.'));
+	}
+};
+
+/* FAQs CRUD */
+export const addFAQ = async (identifier, payload) => {
+	if (!identifier || !payload?.question || !payload?.answer)
+		throw new Error('Identifier, question and answer required.');
+	try {
+		const resp = await apiClient.post(
+			`/api/v1/arvantis/${encodeURIComponent(identifier)}/faqs`,
+			payload
+		);
+		return resp.data?.data;
+	} catch (err) {
+		throw new Error(extractError(err, 'Failed to add FAQ.'));
+	}
+};
+
+export const updateFAQ = async (identifier, faqId, payload) => {
+	if (!identifier || !faqId) throw new Error('Identifier and faqId required.');
+	try {
+		const resp = await apiClient.patch(
+			`/api/v1/arvantis/${encodeURIComponent(identifier)}/faqs/${encodeURIComponent(faqId)}`,
+			payload
+		);
+		return resp.data?.data;
+	} catch (err) {
+		throw new Error(extractError(err, 'Failed to update FAQ.'));
+	}
+};
+
+export const removeFAQ = async (identifier, faqId) => {
+	if (!identifier || !faqId) throw new Error('Identifier and faqId required.');
+	try {
+		const resp = await apiClient.delete(
+			`/api/v1/arvantis/${encodeURIComponent(identifier)}/faqs/${encodeURIComponent(faqId)}`
+		);
+		return resp.status === 204 ? { success: true } : resp.data;
+	} catch (err) {
+		throw new Error(extractError(err, 'Failed to remove FAQ.'));
+	}
+};
+
+export const reorderFAQs = async (identifier, order) => {
+	if (!identifier || !Array.isArray(order))
+		throw new Error('Identifier and order array required.');
+	try {
+		const resp = await apiClient.patch(
+			`/api/v1/arvantis/${encodeURIComponent(identifier)}/faqs/reorder`,
+			{ order }
+		);
+		return resp.data?.data;
+	} catch (err) {
+		throw new Error(extractError(err, 'Failed to reorder FAQs.'));
+	}
+};
+
