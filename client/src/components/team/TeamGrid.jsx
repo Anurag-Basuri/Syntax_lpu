@@ -3,9 +3,11 @@ import { AnimatePresence, motion } from 'framer-motion';
 import TeamMemberCard from './TeamMemberCard.jsx';
 import { Users } from 'lucide-react';
 
-const container = {
+const containerVariants = {
 	hidden: {},
-	visible: { transition: { staggerChildren: 0.04 } },
+	visible: {
+		transition: { staggerChildren: 0.04 },
+	},
 };
 
 const TeamGrid = ({ members = [], onCardClick }) => {
@@ -27,17 +29,40 @@ const TeamGrid = ({ members = [], onCardClick }) => {
 		);
 	}
 
+	// Optionally surface leaders first
+	const leaders = members.filter((m) => m.isLeader);
+	const rest = members.filter((m) => !m.isLeader);
+
 	return (
-		<motion.div className="team-grid" variants={container} initial="hidden" animate="visible">
-			<AnimatePresence mode="popLayout">
-				<div className="grid gap-6 sm:gap-8 grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
-					{members.map((m) => (
-						<motion.div key={m._id} layout initial={{ opacity: 0, scale: 0.98 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.98 }} transition={{ duration: 0.22 }}>
-							<TeamMemberCard member={m} onClick={onCardClick} />
-						</motion.div>
-					))}
+		<motion.div className="team-grid" variants={containerVariants} initial="hidden" animate="visible">
+			{/* Featured leaders row */}
+			{leaders.length > 0 && (
+				<section className="mb-6">
+					<h3 className="text-lg font-semibold mb-3">Leadership</h3>
+					<div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
+						<AnimatePresence mode="popLayout">
+							{leaders.map((m) => (
+								<motion.div key={m._id} layout initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
+									<TeamMemberCard member={m} onClick={onCardClick} />
+								</motion.div>
+							))}
+						</AnimatePresence>
+					</div>
+				</section>
+			)}
+
+			{/* Main grid */}
+			<section>
+				<div className="grid gap-6 sm:gap-8 grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 auto-rows-min">
+					<AnimatePresence mode="popLayout">
+						{rest.map((m) => (
+							<motion.div key={m._id} layout initial={{ opacity: 0, scale: 0.98 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.98 }} transition={{ duration: 0.22 }}>
+								<TeamMemberCard member={m} onClick={onCardClick} />
+							</motion.div>
+						))}
+					</AnimatePresence>
 				</div>
-			</AnimatePresence>
+			</section>
 		</motion.div>
 	);
 };
