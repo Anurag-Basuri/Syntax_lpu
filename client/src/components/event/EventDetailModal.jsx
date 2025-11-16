@@ -5,11 +5,12 @@ import { X, Calendar, MapPin, Tag, Users, Globe, Copy, CreditCard } from 'lucide
 import { getEventById } from '../../services/eventServices.js';
 
 /*
- EventDetailModal - visual refresh
- - clearer light/dark color choices using Tailwind utility combos
- - prominent price display (shows "Free" when 0)
- - partners shown as large logo tiles in a responsive grid (no counts)
- - improved spacing, hierarchy and CTA emphasis
+ EventDetailModal (responsive + navbar-aware)
+ - Respects --navbar-height CSS variable so modal doesn't hide behind navbar
+ - Modal max-height calculates available viewport below navbar
+ - Improved small-screen stacking & spacing for price, tags and partners
+ - Price shows "Free" when 0 and is visually prominent
+ - Partners rendered as logo tiles with responsive columns
 */
 
 const fetchEvent = async (id, signal) => {
@@ -49,9 +50,7 @@ const PricePill = ({ price }) => {
 			aria-hidden
 		>
 			{isFree ? (
-				<>
-					<span className="text-sm">Free</span>
-				</>
+				<span className="text-sm">Free</span>
 			) : (
 				<>
 					<CreditCard size={16} />
@@ -126,13 +125,20 @@ const EventDetailModal = ({ event: initialEvent, isOpen, onClose }) => {
 		}
 	};
 
+	// Respect navbar height variable and keep modal below nav on all viewports
+	const modalMaxHeight = 'calc(100vh - var(--navbar-height, 4.5rem) - 2rem)';
+
 	return (
 		<AnimatePresence>
 			<motion.div
 				initial={{ opacity: 0 }}
 				animate={{ opacity: 1 }}
 				exit={{ opacity: 0 }}
-				className="fixed inset-0 z-50 flex items-center justify-center p-4"
+				className="fixed inset-0 z-50 flex items-start justify-center"
+				style={{
+					paddingTop: 'calc(var(--navbar-height, 4.5rem) + 0.75rem)',
+					paddingBottom: '1rem',
+				}}
 			>
 				{/* backdrop */}
 				<motion.div
@@ -149,12 +155,13 @@ const EventDetailModal = ({ event: initialEvent, isOpen, onClose }) => {
 					animate={{ y: 0, scale: 1, opacity: 1 }}
 					exit={{ y: 18, scale: 0.99, opacity: 0 }}
 					transition={{ duration: 0.2 }}
-					className="relative z-10 w-full max-w-6xl max-h-[92vh] rounded-2xl shadow-2xl overflow-hidden grid grid-cols-1 lg:grid-cols-3 bg-white dark:bg-slate-900"
+					className="relative z-10 w-full max-w-6xl rounded-2xl shadow-2xl overflow-hidden grid grid-cols-1 lg:grid-cols-3 bg-white dark:bg-slate-900"
 					role="dialog"
 					aria-modal="true"
 					aria-label={`Event details: ${title}`}
+					style={{ maxHeight: modalMaxHeight }}
 				>
-					{/* left: hero poster + condensed meta (dark overlay) */}
+					{/* left: hero poster + condensed meta */}
 					<div className="col-span-1 bg-gradient-to-br from-indigo-700 to-purple-700 text-white flex flex-col">
 						<div className="relative h-64 sm:h-72 lg:h-full w-full overflow-hidden">
 							{poster ? (
@@ -179,7 +186,8 @@ const EventDetailModal = ({ event: initialEvent, isOpen, onClose }) => {
 									{dateLabel}
 								</DetailRow>
 								<DetailRow icon={MapPin} label="Where">
-									{venue} {payload.room ? `• ${payload.room}` : ''}
+									{venue}
+									{payload.room ? ` • ${payload.room}` : ''}
 								</DetailRow>
 								<DetailRow icon={Users} label="Organizer">
 									{organizer}
@@ -217,24 +225,31 @@ const EventDetailModal = ({ event: initialEvent, isOpen, onClose }) => {
 					</div>
 
 					{/* right: full details */}
-					<div className="col-span-2 p-6 overflow-y-auto">
-						<div className="flex items-start justify-between gap-4">
+					<div
+						className="col-span-2 p-6 overflow-y-auto"
+						style={{ maxHeight: modalMaxHeight }}
+					>
+						<div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
 							<div className="min-w-0">
 								<h2 className="text-2xl font-extrabold leading-tight text-slate-900 dark:text-white">
 									{title}
 								</h2>
 
-								{/* tags + price compact row */}
-								<div className="mt-3 flex items-center gap-3 flex-wrap">
-									{tags.slice(0, 8).map((t) => (
-										<span
-											key={t}
-											className="flex items-center gap-2 text-xs px-2 py-1 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-slate-700"
-										>
-											<Tag className="w-3 h-3" /> {t}
-										</span>
-									))}
-									<div className="ml-auto">
+								{/* tags + price row: stack on small screens */}
+								<div className="mt-3 flex flex-col sm:flex-row items-start sm:items-center gap-3">
+									<div className="flex flex-wrap gap-2">
+										{tags.slice(0, 8).map((t) => (
+											<span
+												key={t}
+												className="flex items-center gap-2 text-xs px-2 py-1 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-slate-700"
+											>
+												<Tag className="w-3 h-3" /> {t}
+											</span>
+										))}
+									</div>
+
+									{/* price aligned right on wide screens, below tags on small */}
+									<div className="sm:ml-auto mt-2 sm:mt-0">
 										<PricePill price={price} />
 									</div>
 								</div>
@@ -276,7 +291,6 @@ const EventDetailModal = ({ event: initialEvent, isOpen, onClose }) => {
 											registrationInfo?.actionUrl ||
 											'No registration'}
 									</div>
-
 									{registrationInfo?.isOpen && registrationInfo?.actionUrl && (
 										<a
 											href={registrationInfo.actionUrl}
@@ -284,7 +298,7 @@ const EventDetailModal = ({ event: initialEvent, isOpen, onClose }) => {
 											rel="noreferrer"
 											className="ml-auto inline-flex items-center gap-2 px-3 py-1 rounded-lg bg-emerald-600 text-white text-sm shadow-sm"
 										>
-											{registrationInfo.actionLabel || 'Register'}
+											{registrationInfo.actionLabel || 'Register'}{' '}
 											<Globe size={14} />
 										</a>
 									)}
@@ -379,13 +393,13 @@ const EventDetailModal = ({ event: initialEvent, isOpen, onClose }) => {
 							</div>
 						)}
 
-						{/* partners: visually prominent grid of logos (no counts) */}
+						{/* partners: visually prominent tiles */}
 						{partners.length > 0 && (
 							<div className="mt-6">
 								<h3 className="text-lg font-semibold mb-3 text-slate-900 dark:text-white">
 									Partners
 								</h3>
-								<div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4 items-center">
+								<div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4">
 									{partners.map((p, i) => (
 										<a
 											key={i}
@@ -398,14 +412,14 @@ const EventDetailModal = ({ event: initialEvent, isOpen, onClose }) => {
 												<img
 													src={p.logo.url}
 													alt={p.name}
-													className="w-20 h-12 object-contain"
+													className="w-full h-12 object-contain max-w-[120px]"
 												/>
 											) : (
-												<div className="w-20 h-12 rounded bg-slate-200 dark:bg-slate-700 flex items-center justify-center text-xs text-slate-700 dark:text-slate-200 font-medium">
-													{p.name?.slice(0, 2) ?? '—'}
+												<div className="w-full h-12 rounded bg-slate-200 dark:bg-slate-700 flex items-center justify-center text-xs text-slate-700 dark:text-slate-200 font-medium">
+													{(p.name || '—').slice(0, 12)}
 												</div>
 											)}
-											<div className="text-sm text-slate-700 dark:text-slate-200">
+											<div className="text-sm text-slate-700 dark:text-slate-200 text-center">
 												{p.name}
 											</div>
 										</a>
