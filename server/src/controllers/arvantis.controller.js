@@ -283,55 +283,6 @@ const unlinkEventFromFest = asyncHandler(async (req, res) => {
 	return ApiResponse.success(res, fest.events, 'Event unlinked successfully');
 });
 
-// Add fest poster
-const addFestPoster = asyncHandler(async (req, res) => {
-	const { identifier } = req.params;
-	const fest = await findFestBySlugOrYear(identifier);
-
-	if (!req.files || req.files.length === 0)
-		throw new ApiError.BadRequest('At least one media file is required.');
-
-	const uploadPromises = req.files.map((f) =>
-		uploadFile(f, { folder: `arvantis/${fest.year}/gallery` })
-	);
-	const uploaded = await Promise.all(uploadPromises);
-
-	const items = uploaded.map((u) => ({
-		url: u.url,
-		publicId: u.publicId,
-		resource_type: u.resource_type,
-	}));
-
-	fest.gallery.push(...items);
-	await fest.save();
-	return ApiResponse.success(res, items, 'Gallery media added successfully', 201);
-});
-
-// Remove fest poster
-const removeFestPoster = asyncHandler(async (req, res) => {
-	const { identifier } = req.params;
-	const fest = await findFestBySlugOrYear(identifier);
-
-	if (!fest.poster || !fest.poster.publicId) {
-		throw new ApiError.BadRequest('No poster to remove for this fest.');
-	}
-
-	try {
-		await deleteFile({
-			public_id: fest.poster.publicId,
-			resource_type: fest.poster.resource_type || 'image',
-		});
-	} catch (err) {
-		/* eslint-disable no-console */
-		console.warn('Failed to delete poster from Cloudinary:', err.message || err);
-		/* eslint-enable no-console */
-	}
-
-	fest.poster = undefined;
-	await fest.save();
-	return ApiResponse.success(res, null, 'Fest poster removed successfully');
-});
-
 // Add gallery media (expects req.files)
 const addGalleryMedia = asyncHandler(async (req, res) => {
 	const { identifier } = req.params;
@@ -379,6 +330,357 @@ const removeGalleryMedia = asyncHandler(async (req, res) => {
 	return ApiResponse.success(res, null, 'Gallery media removed successfully');
 });
 
+// Add fest poster (legacy name kept - adds media to gallery)
+const addFestPoster = asyncHandler(async (req, res) => {
+	const { identifier } = req.params;
+	const fest = await findFestBySlugOrYear(identifier);
+
+	if (!req.files || req.files.length === 0)
+		throw new ApiError.BadRequest('At least one media file is required.');
+
+	const uploadPromises = req.files.map((f) =>
+		uploadFile(f, { folder: `arvantis/${fest.year}/gallery` })
+	);
+	const uploaded = await Promise.all(uploadPromises);
+
+	const items = uploaded.map((u) => ({
+		url: u.url,
+		publicId: u.publicId,
+		resource_type: u.resource_type,
+	}));
+
+	fest.gallery.push(...items);
+	await fest.save();
+	return ApiResponse.success(res, items, 'Gallery media added successfully', 201);
+});
+
+// Remove fest poster (explicit poster removal)
+const removeFestPoster = asyncHandler(async (req, res) => {
+	const { identifier } = req.params;
+	const fest = await findFestBySlugOrYear(identifier);
+
+	if (!fest.poster || !fest.poster.publicId) {
+		throw new ApiError.BadRequest('No poster to remove for this fest.');
+	}
+
+	try {
+		await deleteFile({
+			public_id: fest.poster.publicId,
+			resource_type: fest.poster.resource_type || 'image',
+		});
+	} catch (err) {
+		/* eslint-disable no-console */
+		console.warn('Failed to delete poster from Cloudinary:', err.message || err);
+		/* eslint-enable no-console */
+	}
+
+	fest.poster = undefined;
+	await fest.save();
+	return ApiResponse.success(res, null, 'Fest poster removed successfully');
+});
+
+// Replace or set updateFestPoster (single file, field "poster")
+const updateFestPoster = asyncHandler(async (req, res) => {
+	const { identifier } = req.params;
+	const fest = await findFestBySlugOrYear(identifier);
+
+	if (!req.file) throw new ApiError.BadRequest('poster file is required (field "poster").');
+
+	// upload new poster
+	const uploaded = await uploadFile(req.file, { folder: `arvantis/${fest.year}/poster` });
+
+	// delete old poster if present
+	if (fest.poster?.publicId) {
+		try {
+			await deleteFile({
+				public_id: fest.poster.publicId,
+				resource_type: fest.poster.resource_type || 'image',
+			});
+		} catch (err) {
+			/* eslint-disable no-console */
+			console.warn('Failed to delete previous poster:', err.message || err);
+			/* eslint-enable no-console */
+		}
+	}
+
+	// assign new poster
+	fest.poster = {
+		url: uploaded.url,
+		publicId: uploaded.publicId,
+		resource_type: uploaded.resource_type,
+		caption: req.body.caption || undefined,
+	};
+	await fest.save();
+	return ApiResponse.success(res, fest.poster, 'Poster updated successfully', 200);
+});
+
+// Update hero media (single file)
+const updateFestHero = asyncHandler(async (req, res) => {
+	const { identifier } = req.params;
+	const fest = await findFestBySlugOrYear(identifier);
+
+	if (!req.file) throw new ApiError.BadRequest('hero file is required (field "hero").');
+
+	const uploaded = await uploadFile(req.file, { folder: `arvantis/${fest.year}/hero` });
+
+	if (fest.heroMedia?.publicId) {
+		try {
+			await deleteFile({
+				public_id: fest.heroMedia.publicId,
+				resource_type: fest.heroMedia.resource_type || 'image',
+			});
+		} catch (err) {
+			/* eslint-disable no-console */
+			console.warn('Failed to delete previous hero media:', err.message || err);
+			/* eslint-enable no-console */
+		}
+	}
+
+	fest.heroMedia = {
+		url: uploaded.url,
+		publicId: uploaded.publicId,
+		resource_type: uploaded.resource_type,
+		caption: req.body.caption || undefined,
+	};
+	await fest.save();
+	return ApiResponse.success(res, fest.heroMedia, 'Hero media updated successfully', 200);
+});
+
+// Update a partner (by name param) - supports optional new logo upload
+const updatePartner = asyncHandler(async (req, res) => {
+	const { identifier, partnerName } = req.params;
+	const fest = await findFestBySlugOrYear(identifier);
+
+	const decoded = decodeURIComponent(partnerName);
+	const idx = fest.partners.findIndex((p) => p.name === decoded);
+	if (idx === -1) throw new ApiError.NotFound(`Partner '${decoded}' not found.`);
+
+	const partner = fest.partners[idx];
+
+	// If a new logo is uploaded, replace it
+	if (req.file) {
+		const uploaded = await uploadFile(req.file, { folder: `arvantis/${fest.year}/partners` });
+		// delete old logo if exists
+		if (partner.logo?.publicId) {
+			try {
+				await deleteFile({
+					public_id: partner.logo.publicId,
+					resource_type: partner.logo.resource_type || 'image',
+				});
+			} catch (err) {
+				/* eslint-disable no-console */
+				console.warn('Failed to delete previous partner logo:', err.message || err);
+				/* eslint-enable no-console */
+			}
+		}
+		partner.logo = {
+			url: uploaded.url,
+			publicId: uploaded.publicId,
+			resource_type: uploaded.resource_type,
+			caption: req.body.logoCaption || partner.logo?.caption,
+		};
+	}
+
+	// Update other fields
+	if (req.body.name) partner.name = String(req.body.name).trim();
+	if (req.body.website) partner.website = String(req.body.website).trim();
+	if (req.body.tier) partner.tier = req.body.tier;
+	if (req.body.description) partner.description = String(req.body.description).trim();
+
+	fest.markModified('partners');
+	await fest.save();
+	return ApiResponse.success(res, partner, 'Partner updated successfully', 200);
+});
+
+// Reorder partners - expects body.order = [name1, name2, ...] (best-effort)
+const reorderPartners = asyncHandler(async (req, res) => {
+	const { identifier } = req.params;
+	const { order } = req.body;
+	if (!Array.isArray(order))
+		throw new ApiError.BadRequest('Order must be an array of partner names.');
+
+	const fest = await findFestBySlugOrYear(identifier);
+	const map = new Map((fest.partners || []).map((p) => [p.name, p]));
+	const newArr = [];
+	order.forEach((n) => {
+		if (map.has(n)) {
+			newArr.push(map.get(n));
+			map.delete(n);
+		}
+	});
+	// append remaining
+	for (const p of map.values()) newArr.push(p);
+
+	fest.partners = newArr;
+	await fest.save();
+	return ApiResponse.success(res, fest.partners, 'Partners reordered successfully', 200);
+});
+
+// Reorder gallery - expects body.order = [publicId1, publicId2, ...]
+const reorderGallery = asyncHandler(async (req, res) => {
+	const { identifier } = req.params;
+	const { order } = req.body;
+	if (!Array.isArray(order))
+		throw new ApiError.BadRequest('Order must be an array of publicIds.');
+
+	const fest = await findFestBySlugOrYear(identifier);
+	const map = new Map((fest.gallery || []).map((g) => [g.publicId, g]));
+	const newArr = [];
+	order.forEach((id) => {
+		if (map.has(id)) {
+			newArr.push(map.get(id));
+			map.delete(id);
+		}
+	});
+	// append remaining
+	for (const g of map.values()) newArr.push(g);
+
+	fest.gallery = newArr;
+	await fest.save();
+	return ApiResponse.success(res, fest.gallery, 'Gallery reordered successfully', 200);
+});
+
+// Bulk delete media by publicIds (returns removed count)
+const bulkDeleteMedia = asyncHandler(async (req, res) => {
+	const { identifier } = req.params;
+	const { publicIds } = req.body;
+	if (!Array.isArray(publicIds) || publicIds.length === 0)
+		throw new ApiError.BadRequest('publicIds array is required.');
+
+	const fest = await findFestBySlugOrYear(identifier);
+	const toDelete = [];
+
+	// remove from gallery
+	fest.gallery = (fest.gallery || []).filter((g) => {
+		if (publicIds.includes(g.publicId)) {
+			toDelete.push({ public_id: g.publicId, resource_type: g.resource_type || 'image' });
+			return false;
+		}
+		return true;
+	});
+
+	// remove partner logos if included
+	fest.partners = (fest.partners || []).map((p) => {
+		if (p.logo?.publicId && publicIds.includes(p.logo.publicId)) {
+			toDelete.push({
+				public_id: p.logo.publicId,
+				resource_type: p.logo.resource_type || 'image',
+			});
+			return { ...(p.toObject ? p.toObject() : p), logo: undefined };
+		}
+		return p;
+	});
+
+	// remove poster/hero if included
+	if (fest.poster?.publicId && publicIds.includes(fest.poster.publicId)) {
+		toDelete.push({
+			public_id: fest.poster.publicId,
+			resource_type: fest.poster.resource_type || 'image',
+		});
+		fest.poster = undefined;
+	}
+	if (fest.heroMedia?.publicId && publicIds.includes(fest.heroMedia.publicId)) {
+		toDelete.push({
+			public_id: fest.heroMedia.publicId,
+			resource_type: fest.heroMedia.resource_type || 'image',
+		});
+		fest.heroMedia = undefined;
+	}
+
+	// perform deletion on cloudinary (best-effort)
+	if (toDelete.length > 0) {
+		try {
+			await deleteFiles(toDelete);
+		} catch (err) {
+			/* eslint-disable no-console */
+			console.warn('bulkDeleteMedia: deleteFiles failed', err.message || err);
+			/* eslint-enable no-console */
+		}
+	}
+
+	await fest.save();
+	return ApiResponse.success(
+		res,
+		{ removed: toDelete.length },
+		'Media removed successfully',
+		200
+	);
+});
+
+// Duplicate a fest into a new year (does not copy media to avoid duplicate storage)
+const duplicateFest = asyncHandler(async (req, res) => {
+	const { identifier } = req.params;
+	const { year } = req.body;
+	if (!year) throw new ApiError.BadRequest('Target year is required.');
+	const y = parseInt(year, 10);
+	if (Number.isNaN(y)) throw new ApiError.BadRequest('Invalid year value');
+
+	// check destination availability
+	const exists = await Arvantis.findOne({ year: y }).lean().exec();
+	if (exists) throw new ApiError.Conflict(`A fest for the year ${y} already exists.`);
+
+	const fest = await findFestBySlugOrYear(identifier, false);
+	const data = fest.toObject ? fest.toObject() : fest;
+	// create shallow copy - do not copy media, events; keep partners metadata (without logos)
+	const copy = {
+		...data,
+		_id: undefined,
+		year: y,
+		name: data.name ? `${data.name} ${y}` : `Arvantis ${y}`,
+		startDate: null,
+		endDate: null,
+		poster: undefined,
+		heroMedia: undefined,
+		gallery: [],
+		events: [],
+		partners: (data.partners || []).map((p) => ({
+			name: p.name,
+			website: p.website,
+			tier: p.tier,
+			description: p.description,
+			// no logo copied
+		})),
+	};
+
+	const created = await Arvantis.create(copy);
+	return ApiResponse.success(res, created, 'Fest duplicated (media/events not copied)', 201);
+});
+
+// Toggle or set status
+const setFestStatus = asyncHandler(async (req, res) => {
+	const { identifier } = req.params;
+	const { status } = req.body;
+	if (!status) throw new ApiError.BadRequest('Status is required.');
+	if (!['upcoming', 'ongoing', 'completed', 'cancelled', 'postponed'].includes(status))
+		throw new ApiError.BadRequest('Invalid status value.');
+
+	const fest = await findFestBySlugOrYear(identifier);
+	fest.status = status;
+	await fest.save();
+	return ApiResponse.success(res, fest, 'Fest status updated', 200);
+});
+
+// Update theme colors / social links
+const updatePresentation = asyncHandler(async (req, res) => {
+	const { identifier } = req.params;
+	const fest = await findFestBySlugOrYear(identifier);
+
+	const { themeColors, socialLinks } = req.body;
+	if (themeColors && typeof themeColors === 'object') {
+		fest.themeColors = { ...fest.themeColors, ...themeColors };
+	}
+	if (socialLinks && typeof socialLinks === 'object') {
+		fest.socialLinks = { ...fest.socialLinks, ...socialLinks };
+	}
+	await fest.save();
+	return ApiResponse.success(
+		res,
+		{ themeColors: fest.themeColors, socialLinks: fest.socialLinks },
+		'Presentation updated',
+		200
+	);
+});
+
 // Export fests as CSV
 const exportFestsCSV = asyncHandler(async (req, res) => {
 	const fests = await Arvantis.find().sort({ year: -1 }).lean().exec();
@@ -388,8 +690,14 @@ const exportFestsCSV = asyncHandler(async (req, res) => {
 		{ label: 'Year', value: 'year' },
 		{ label: 'Name', value: 'name' },
 		{ label: 'Status', value: 'status' },
-		{ label: 'Start Date', value: (row) => row.startDate?.toISOString() || '' },
-		{ label: 'End Date', value: (row) => row.endDate?.toISOString() || '' },
+		{
+			label: 'Start Date',
+			value: (row) => (row.startDate ? new Date(row.startDate).toISOString() : ''),
+		},
+		{
+			label: 'End Date',
+			value: (row) => (row.endDate ? new Date(row.endDate).toISOString() : ''),
+		},
 		{ label: 'Events Count', value: (row) => (row.events || []).length },
 		{ label: 'Partners Count', value: (row) => (row.partners || []).length },
 	];
@@ -511,8 +819,18 @@ export {
 	linkEventToFest,
 	unlinkEventFromFest,
 	updateFestPoster,
+	addFestPoster,
+	removeFestPoster,
 	addGalleryMedia,
 	removeGalleryMedia,
+	reorderGallery,
+	reorderPartners,
+	updatePartner,
+	bulkDeleteMedia,
+	duplicateFest,
+	setFestStatus,
+	updateFestHero,
+	updatePresentation,
 	exportFestsCSV,
 	getFestStatistics,
 	getFestAnalytics,
