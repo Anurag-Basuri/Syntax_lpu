@@ -58,8 +58,9 @@ const TeamGrid = ({ members = [], onCardClick }) => {
 		m?._id || m?.id || m?.memberID || `${m?.fullname || 'member'}-${idx}`;
 
 	return (
+		// NOTE: use a different root class to avoid colliding with .team-grid CSS
 		<motion.div
-			className="team-grid"
+			className="team-grid-root"
 			variants={containerVariants}
 			initial="hidden"
 			animate="visible"
@@ -68,6 +69,8 @@ const TeamGrid = ({ members = [], onCardClick }) => {
 			{leaders.length > 0 && (
 				<section aria-label="Leadership" className="mb-6">
 					<h3 className="text-lg font-semibold mb-3">Leadership</h3>
+
+					{/* leaders use their own grid so keep .team-grid only where cards should flow */}
 					<div className="grid gap-6 sm:gap-8 grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
 						<AnimatePresence>
 							{leaders.map((m, i) => (
@@ -90,6 +93,7 @@ const TeamGrid = ({ members = [], onCardClick }) => {
 
 			{/* Main grid */}
 			<section aria-label="Team members">
+				{/* actual grid class used by CSS to size columns */}
 				<div className="team-grid">
 					<AnimatePresence>
 						{rest.map((m, i) => (
