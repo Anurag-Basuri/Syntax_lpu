@@ -4,32 +4,20 @@ import TeamMemberCard from './TeamMemberCard.jsx';
 import { Users } from 'lucide-react';
 
 /**
- * Rebuilt TeamGrid
+ * TeamGrid - unified grid (no separate leadership section)
+ * - responsive grid columns driven by CSS (design.css)
  * - stable keys
- * - leaders displayed as featured section
- * - responsive grid using CSS from design.css / index.css
- * - accessible empty state
  */
 
 const containerVariants = {
 	hidden: {},
 	visible: {
-		transition: { staggerChildren: 0.04 },
+		transition: { staggerChildren: 0.03 },
 	},
 };
 
 const TeamGrid = ({ members = [], onCardClick }) => {
 	const safeMembers = Array.isArray(members) ? members : [];
-
-	const { leaders, rest } = useMemo(() => {
-		const l = [];
-		const r = [];
-		for (const m of safeMembers) {
-			if (m && m.isLeader) l.push(m);
-			else r.push(m);
-		}
-		return { leaders: l, rest: r };
-	}, [safeMembers]);
 
 	if (safeMembers.length === 0) {
 		return (
@@ -53,59 +41,29 @@ const TeamGrid = ({ members = [], onCardClick }) => {
 		);
 	}
 
-	// helper for stable key
 	const getKey = (m, idx) =>
 		m?._id || m?.id || m?.memberID || `${m?.fullname || 'member'}-${idx}`;
 
 	return (
-		// NOTE: use a different root class to avoid colliding with .team-grid CSS
 		<motion.div
 			className="team-grid-root"
 			variants={containerVariants}
 			initial="hidden"
 			animate="visible"
 		>
-			{/* Featured leaders row */}
-			{leaders.length > 0 && (
-				<section aria-label="Leadership" className="mb-6">
-					<h3 className="text-lg font-semibold mb-3">Leadership</h3>
-
-					{/* leaders use their own grid so keep .team-grid only where cards should flow */}
-					<div className="grid gap-6 sm:gap-8 grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
-						<AnimatePresence>
-							{leaders.map((m, i) => (
-								<motion.div
-									key={getKey(m, i)}
-									layout
-									initial={{ opacity: 0, y: 8 }}
-									animate={{ opacity: 1, y: 0 }}
-									exit={{ opacity: 0, y: 8 }}
-								>
-									<div className="h-64 sm:h-72 lg:h-80">
-										<TeamMemberCard member={m} onClick={onCardClick} />
-									</div>
-								</motion.div>
-							))}
-						</AnimatePresence>
-					</div>
-				</section>
-			)}
-
-			{/* Main grid */}
 			<section aria-label="Team members">
-				{/* actual grid class used by CSS to size columns */}
 				<div className="team-grid">
 					<AnimatePresence>
-						{rest.map((m, i) => (
+						{safeMembers.map((m, i) => (
 							<motion.div
 								key={getKey(m, i)}
 								layout
-								initial={{ opacity: 0, scale: 0.98 }}
-								animate={{ opacity: 1, scale: 1 }}
-								exit={{ opacity: 0, scale: 0.98 }}
-								transition={{ duration: 0.22 }}
+								initial={{ opacity: 0, y: 8 }}
+								animate={{ opacity: 1, y: 0 }}
+								exit={{ opacity: 0, y: 8 }}
+								transition={{ duration: 0.2 }}
 							>
-								<div className="h-64 sm:h-72 lg:h-80">
+								<div className="h-full min-h-[180px]">
 									<TeamMemberCard member={m} onClick={onCardClick} />
 								</div>
 							</motion.div>
