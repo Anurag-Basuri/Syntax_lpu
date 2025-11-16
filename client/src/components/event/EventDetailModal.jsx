@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { useQuery } from '@tanstack/react-query';
 import { X, Calendar, MapPin, Tag, Users, Globe, Copy, CreditCard, Sun, Moon } from 'lucide-react';
 import { getEventById } from '../../services/eventServices.js';
+import useTheme from '../../hooks/useTheme.js';
 
 /*
  EventDetailModal (refined)
@@ -72,28 +73,35 @@ const EventDetailModal = ({ event: initialEvent, isOpen, onClose }) => {
 	const rightPaneRef = useRef(null);
 	const modalRootRef = useRef(null);
 
-	// theme state persisted
+	// Prefer application theme (via hook); fall back to local persisted value if hook missing.
+	const appThemeCtx = useTheme?.();
+	// appThemeCtx may be: string, { theme, setTheme }, or [theme, setTheme]
+	const appTheme =
+		typeof appThemeCtx === 'string'
+			? appThemeCtx
+			: appThemeCtx?.theme ?? (Array.isArray(appThemeCtx) ? appThemeCtx[0] : undefined);
+	const appSetTheme =
+		appThemeCtx?.setTheme ?? (Array.isArray(appThemeCtx) ? appThemeCtx[1] : undefined);
+
 	const [theme, setTheme] = useState(() => {
 		try {
 			return (
+				appTheme ||
 				localStorage.getItem('site-theme') ||
 				(window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches
 					? 'dark'
 					: 'light')
 			);
 		} catch {
-			return 'light';
+			return appTheme || 'light';
 		}
 	});
 
+	// keep local theme in sync if the app theme changes externally
 	useEffect(() => {
-		// apply theme on mount/update
-		if (theme === 'dark') document.documentElement.classList.add('dark');
-		else document.documentElement.classList.remove('dark');
-		try {
-			localStorage.setItem('site-theme', theme);
-		} catch {}
-	}, [theme]);
+		if (appTheme && appTheme !== theme) setTheme(appTheme);
+		// eslint-disable-next-line react-hooks/exhaustive-deps
+	}, [appTheme]);
 
 	const { data: event } = useQuery({
 		queryKey: ['event-full', id],
@@ -141,6 +149,29 @@ const EventDetailModal = ({ event: initialEvent, isOpen, onClose }) => {
 
 	useEffect(() => {
 		if (!isOpen) setShowRaw(false);
+	}, [isOpen]);
+
+	// Forward wheel events to the right pane so mouse-wheel works reliably when pointer is over left / poster
+	useEffect(() => {
+		if (!isOpen) return;
+		const root = modalRootRef.current;
+		const right = rightPaneRef.current;
+		if (!root || !right) return;
+
+		const onWheel = (e) => {
+			// Only handle vertical scrolls
+			if (Math.abs(e.deltaY) < Math.abs(e.deltaX)) return;
+
+			const canScrollUp = right.scrollTop > 0;
+			const canScrollDown = right.scrollTop + right.clientHeight < right.scrollHeight;
+			if ((e.deltaY < 0 && canScrollUp) || (e.deltaY > 0 && canScrollDown)) {
+				right.scrollBy({ top: e.deltaY, behavior: 'auto' });
+				e.preventDefault();
+			}
+		};
+
+		root.addEventListener('wheel', onWheel, { passive: false });
+		return () => root.removeEventListener('wheel', onWheel);
 	}, [isOpen]);
 
 	if (!isOpen) return null;
@@ -311,9 +342,7 @@ const EventDetailModal = ({ event: initialEvent, isOpen, onClose }) => {
 							<div className="flex items-center gap-2">
 								{/* theme toggle */}
 								<button
-									onClick={() =>
-										setTheme((t) => (t === 'dark' ? 'light' : 'dark'))
-									}
+									onClick={toggleAppTheme}
 									title="Toggle theme"
 									className="p-2 rounded-md text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800"
 									aria-label="Toggle theme"
