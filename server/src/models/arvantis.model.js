@@ -82,12 +82,11 @@ const partnerSchema = new mongoose.Schema(
             trim: true,
             maxlength: 40,
         },
-        booth: {
-            type: String,
-            trim: true,
-            maxlength: 40,
+        description: {
+            type: String, 
+            trim: true, 
+            maxlength: 500 
         },
-        description: { type: String, trim: true, maxlength: 500 },
     },
     { _id: false }
 );

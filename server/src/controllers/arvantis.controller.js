@@ -283,36 +283,53 @@ const unlinkEventFromFest = asyncHandler(async (req, res) => {
 	return ApiResponse.success(res, fest.events, 'Event unlinked successfully');
 });
 
-// Update fest poster (expects multer middleware to provide req.file "poster")
-const updateFestPoster = asyncHandler(async (req, res) => {
+// Add fest poster
+const addFestPoster = asyncHandler(async (req, res) => {
 	const { identifier } = req.params;
 	const fest = await findFestBySlugOrYear(identifier);
 
-	if (!req.file) throw new ApiError.BadRequest('Poster file is required (field "poster").');
+	if (!req.files || req.files.length === 0)
+		throw new ApiError.BadRequest('At least one media file is required.');
 
-	// delete existing poster if present
-	if (fest.poster?.publicId) {
-		try {
-			await deleteFile({
-				public_id: fest.poster.publicId,
-				resource_type: fest.poster.resource_type || 'image',
-			});
-		} catch (err) {
-			/* eslint-disable no-console */
-			console.warn('Failed to delete previous poster from Cloudinary:', err.message || err);
-			/* eslint-enable no-console */
-		}
+	const uploadPromises = req.files.map((f) =>
+		uploadFile(f, { folder: `arvantis/${fest.year}/gallery` })
+	);
+	const uploaded = await Promise.all(uploadPromises);
+
+	const items = uploaded.map((u) => ({
+		url: u.url,
+		publicId: u.publicId,
+		resource_type: u.resource_type,
+	}));
+
+	fest.gallery.push(...items);
+	await fest.save();
+	return ApiResponse.success(res, items, 'Gallery media added successfully', 201);
+});
+
+// Remove fest poster
+const removeFestPoster = asyncHandler(async (req, res) => {
+	const { identifier } = req.params;
+	const fest = await findFestBySlugOrYear(identifier);
+
+	if (!fest.poster || !fest.poster.publicId) {
+		throw new ApiError.BadRequest('No poster to remove for this fest.');
 	}
 
-	const uploaded = await uploadFile(req.file, { folder: `arvantis/${fest.year}` });
-	fest.poster = {
-		url: uploaded.url,
-		publicId: uploaded.publicId,
-		resource_type: uploaded.resource_type,
-		caption: req.body.caption || undefined,
-	};
+	try {
+		await deleteFile({
+			public_id: fest.poster.publicId,
+			resource_type: fest.poster.resource_type || 'image',
+		});
+	} catch (err) {
+		/* eslint-disable no-console */
+		console.warn('Failed to delete poster from Cloudinary:', err.message || err);
+		/* eslint-enable no-console */
+	}
+
+	fest.poster = undefined;
 	await fest.save();
-	return ApiResponse.success(res, fest.poster, 'Fest poster updated successfully');
+	return ApiResponse.success(res, null, 'Fest poster removed successfully');
 });
 
 // Add gallery media (expects req.files)
