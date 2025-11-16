@@ -575,7 +575,31 @@ const reorderGallery = asyncHandler(async (req, res) => {
 	return ApiResponse.success(res, fest.gallery, 'Gallery reordered successfully', 200);
 });
 
-// Bulk delete media items (gallery, partner logos, poster, hero)
+// Reorder tracks
+const reorderTracks = asyncHandler(async (req, res) => {
+	const { identifier } = req.params;
+	const { order } = req.body;
+	if (!Array.isArray(order))
+		throw new ApiError.BadRequest('Order must be an array of track keys.');
+
+	const fest = await findFestBySlugOrYear(identifier);
+	const map = new Map((fest.tracks || []).map((t) => [t.key, t]));
+	const newArr = [];
+	order.forEach((k) => {
+		if (map.has(k)) {
+			newArr.push(map.get(k));
+			map.delete(k);
+		}
+	});
+	// append any remaining tracks that weren't included in order
+	for (const t of map.values()) newArr.push(t);
+
+	fest.tracks = newArr;
+	await fest.save();
+	return ApiResponse.success(res, fest.tracks, 'Tracks reordered successfully', 200);
+});
+
+// Bulk delete media items (gallery, partner logos, posters, hero)
 const bulkDeleteMedia = asyncHandler(async (req, res) => {
 	const { identifier } = req.params;
 	const { publicIds } = req.body;
@@ -585,32 +609,40 @@ const bulkDeleteMedia = asyncHandler(async (req, res) => {
 	const fest = await findFestBySlugOrYear(identifier);
 	const toDelete = [];
 
+	// gallery
 	fest.gallery = (fest.gallery || []).filter((g) => {
-		if (publicIds.includes(g.publicId)) {
+		if (g.publicId && publicIds.includes(g.publicId)) {
 			toDelete.push({ public_id: g.publicId, resource_type: g.resource_type || 'image' });
 			return false;
 		}
 		return true;
 	});
 
+	// partners (logos)
 	fest.partners = (fest.partners || []).map((p) => {
 		if (p.logo?.publicId && publicIds.includes(p.logo.publicId)) {
 			toDelete.push({
 				public_id: p.logo.publicId,
 				resource_type: p.logo.resource_type || 'image',
 			});
-			return { ...(p.toObject ? p.toObject() : p), logo: undefined };
+			// return partner without logo
+			const plain = p.toObject ? p.toObject() : { ...p };
+			plain.logo = undefined;
+			return plain;
 		}
 		return p;
 	});
 
-	if (fest.poster?.publicId && publicIds.includes(fest.poster.publicId)) {
-		toDelete.push({
-			public_id: fest.poster.publicId,
-			resource_type: fest.poster.resource_type || 'image',
-		});
-		fest.poster = undefined;
-	}
+	// posters (array)
+	fest.posters = (fest.posters || []).filter((p) => {
+		if (p.publicId && publicIds.includes(p.publicId)) {
+			toDelete.push({ public_id: p.publicId, resource_type: p.resource_type || 'image' });
+			return false;
+		}
+		return true;
+	});
+
+	// hero
 	if (fest.heroMedia?.publicId && publicIds.includes(fest.heroMedia.publicId)) {
 		toDelete.push({
 			public_id: fest.heroMedia.publicId,
@@ -619,6 +651,7 @@ const bulkDeleteMedia = asyncHandler(async (req, res) => {
 		fest.heroMedia = undefined;
 	}
 
+	// attempt cloudinary deletions (best-effort)
 	if (toDelete.length > 0) {
 		try {
 			await deleteFiles(toDelete);
@@ -988,6 +1021,7 @@ export {
 	updatePartner,
 	reorderPartners,
 	reorderGallery,
+	reorderTracks,
 	bulkDeleteMedia,
 	duplicateFest,
 	setFestStatus,
