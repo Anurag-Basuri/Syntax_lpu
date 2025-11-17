@@ -104,6 +104,200 @@ const groupPartnersByTier = (partners = [], titleSponsor = null) => {
 	return arr;
 };
 
+// --- New: Industry-grade FAQ list component ---
+// Provides: searchable, long-row layout, accessible expand/collapse, expand-all, copy-link
+const FAQList = ({ faqs = [], visible = false }) => {
+	const [query, setQuery] = useState('');
+	const [expandedMap, setExpandedMap] = useState(() => ({}));
+	const [expandAll, setExpandAll] = useState(false);
+
+	useEffect(() => {
+		// Sync expandAll to individual items
+		if (!visible) return;
+		if (expandAll) {
+			const map = {};
+			(faqs || []).forEach((f) => (map[String(f._id || f.question || Math.random())] = true));
+			setExpandedMap(map);
+		} else {
+			setExpandedMap({});
+		}
+		// eslint-disable-next-line react-hooks/exhaustive-deps
+	}, [expandAll, visible]);
+
+	const filtered = useMemo(() => {
+		if (!query) return faqs || [];
+		const q = query.trim().toLowerCase();
+		return (faqs || []).filter((f) => {
+			const qn = String(f.question || '').toLowerCase();
+			const an = String(f.answer || '').toLowerCase();
+			return qn.includes(q) || an.includes(q);
+		});
+	}, [faqs, query]);
+
+	const toggleOne = useCallback((id) => {
+		setExpandedMap((s) => ({ ...s, [id]: !s[id] }));
+	}, []);
+
+	const copyLink = useCallback((id) => {
+		try {
+			const url = `${window.location.origin}${window.location.pathname}#faq-${id}`;
+			navigator.clipboard?.writeText(url);
+			window.dispatchEvent(
+				new CustomEvent('toast', { detail: { message: 'FAQ link copied' } })
+			);
+		} catch {
+			/* ignore */
+		}
+	}, []);
+
+	if (!visible) return null;
+
+	return (
+		<div className="glass-card p-4" aria-live="polite" aria-atomic="true">
+			<div className="flex items-center justify-between mb-3 gap-3">
+				<div>
+					<div className="text-sm text-[var(--text-secondary)]">
+						Frequently Asked Questions
+					</div>
+					<div className="font-semibold">{(faqs || []).length} items</div>
+				</div>
+
+				<div className="flex items-center gap-2">
+					<input
+						type="search"
+						placeholder="Search FAQs (question or answer)…"
+						value={query}
+						onChange={(e) => setQuery(e.target.value)}
+						className="rounded-md border py-2 px-3 bg-[var(--input-bg)]"
+						aria-label="Search FAQs"
+					/>
+					<button
+						onClick={() => setExpandAll((s) => !s)}
+						className="btn-ghost small"
+						aria-pressed={expandAll}
+						title={expandAll ? 'Collapse all' : 'Expand all'}
+					>
+						{expandAll ? 'Collapse all' : 'Expand all'}
+					</button>
+				</div>
+			</div>
+
+			{filtered.length === 0 ? (
+				<div className="mt-3 muted">No FAQs match your search.</div>
+			) : (
+				<ul className="mt-3 space-y-4" role="list">
+					{filtered.map((f, i) => {
+						const id = String(f._id || `faq-${i}`);
+						const isOpen = !!expandedMap[id];
+						const q = f.question || `FAQ ${i + 1}`;
+						const a = f.answer || 'No answer provided.';
+						return (
+							<li
+								key={id}
+								className="detail-card p-4"
+								id={`faq-${id}`}
+								role="listitem"
+							>
+								<div className="grid grid-cols-1 md:grid-cols-12 gap-4 items-start">
+									{/* Left: Question (long-row visual) */}
+									<div className="md:col-span-4 flex items-start gap-3">
+										<div className="min-w-0">
+											<button
+												onClick={() => toggleOne(id)}
+												aria-expanded={isOpen}
+												aria-controls={`faq-panel-${id}`}
+												className="text-left w-full"
+												style={{ cursor: 'pointer' }}
+											>
+												<div
+													className="font-semibold text-base truncate"
+													style={{ color: 'var(--text-primary)' }}
+												>
+													{q}
+												</div>
+												<div className="text-xs muted mt-1">
+													{isOpen ? 'Hide answer' : 'Show answer'}
+												</div>
+											</button>
+										</div>
+
+										<div className="ml-auto flex items-center gap-2">
+											<button
+												onClick={() => copyLink(id)}
+												className="btn-ghost small"
+												title="Copy link to this FAQ"
+												aria-label={`Copy link for ${q}`}
+											>
+												<svg
+													width="14"
+													height="14"
+													viewBox="0 0 24 24"
+													fill="none"
+													aria-hidden
+												>
+													<path
+														d="M10 14L14 10"
+														stroke="currentColor"
+														strokeWidth="1.6"
+														strokeLinecap="round"
+														strokeLinejoin="round"
+													/>
+													<rect
+														x="3"
+														y="3"
+														width="14"
+														height="14"
+														rx="2"
+														stroke="currentColor"
+														strokeWidth="1.6"
+													/>
+													<rect
+														x="7"
+														y="7"
+														width="14"
+														height="14"
+														rx="2"
+														stroke="currentColor"
+														strokeWidth="1.6"
+													/>
+												</svg>
+											</button>
+										</div>
+									</div>
+
+									{/* Right: Answer (long, roomy area) */}
+									<div
+										id={`faq-panel-${id}`}
+										className="md:col-span-8 text-sm muted whitespace-pre-wrap"
+										role="region"
+										aria-labelledby={`faq-${id}`}
+										style={{
+											transition: 'max-height 320ms ease',
+											overflow: 'hidden',
+											maxHeight: isOpen ? '1200px' : '0px',
+										}}
+									>
+										<div style={{ paddingTop: isOpen ? 6 : 0 }}>
+											<div
+												style={{
+													color: 'var(--text-primary)',
+													lineHeight: 1.6,
+												}}
+											>
+												{a}
+											</div>
+										</div>
+									</div>
+								</div>
+							</li>
+						);
+					})}
+				</ul>
+			)}
+		</div>
+	);
+};
+
 const ArvantisPage = () => {
 	// primary state
 	const [identifier, setIdentifier] = useState(null);
