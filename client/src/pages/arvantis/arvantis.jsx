@@ -94,14 +94,268 @@ const groupPartnersByTier = (partners = [], titleSponsor = null) => {
 	return arr;
 };
 
-// Provides: searchable, long-row layout, accessible expand/collapse, expand-all, copy-link
+/* --- Prominent Partners section --- */
+const PartnersSection = ({
+	titleSponsor,
+	partnersByTier = [],
+	partners = [],
+	showAll,
+	onToggleShowAll,
+	onPartnerClick = () => {},
+	previewLimit = PARTNERS_PREVIEW,
+}) => {
+	const visiblePartners = showAll ? partners : partners.slice(0, previewLimit);
+
+	return (
+		<section aria-labelledby="arvantis-partners" className="mt-8">
+			<h3 id="arvantis-partners" className="section-title">
+				Partners & Sponsors
+			</h3>
+
+			{/* Title sponsor / powered-by prominent banner */}
+			{titleSponsor ? (
+				<div
+					className="glass-card p-5 mt-4 flex flex-col md:flex-row items-center gap-4"
+					role="region"
+					aria-label="Title sponsor"
+				>
+					<div className="flex items-center gap-4">
+						<div
+							className="w-20 h-20 rounded-lg overflow-hidden bg-white/5 flex items-center justify-center"
+							style={{ border: '1px solid rgba(255,255,255,0.04)' }}
+						>
+							{titleSponsor.logo?.url ? (
+								<img
+									src={titleSponsor.logo.url}
+									alt={titleSponsor.name}
+									className="w-full h-full object-contain"
+								/>
+							) : (
+								<div
+									className="text-sm font-semibold mono"
+									style={{ color: 'var(--text-primary)' }}
+								>
+									{titleSponsor.name}
+								</div>
+							)}
+						</div>
+						<div>
+							<div className="text-sm text-[var(--text-secondary)]">
+								Title sponsor
+							</div>
+							<div
+								className="text-xl font-extrabold"
+								style={{ color: 'var(--text-primary)' }}
+							>
+								{titleSponsor.name}
+							</div>
+							{titleSponsor.tier && (
+								<div className="text-xs muted mt-1">{titleSponsor.tier}</div>
+							)}
+						</div>
+					</div>
+
+					{/* description and details */}
+					<div className="flex-1 text-sm text-[var(--text-secondary)] md:pl-6">
+						{titleSponsor.description ? (
+							<p className="mb-2" style={{ color: 'var(--text-primary)' }}>
+								{titleSponsor.description}
+							</p>
+						) : (
+							<p className="mb-2 muted">No description provided.</p>
+						)}
+						<div className="flex items-center gap-3">
+							{titleSponsor.website && (
+								<a
+									href={titleSponsor.website}
+									target="_blank"
+									rel="noopener noreferrer"
+									onClick={(e) => e.stopPropagation()}
+									className="btn-ghost small"
+								>
+									<ExternalLink size={14} /> Visit website
+								</a>
+							)}
+							{titleSponsor.contact && (
+								<div className="text-xs muted">Contact: {titleSponsor.contact}</div>
+							)}
+						</div>
+					</div>
+
+					{/* CTA */}
+					<div className="mt-3 md:mt-0 md:flex-shrink-0">
+						<a
+							href={titleSponsor.website || '#'}
+							target={titleSponsor.website ? '_blank' : '_self'}
+							rel={titleSponsor.website ? 'noopener noreferrer' : undefined}
+							onClick={(e) => e.stopPropagation()}
+							className="btn-primary neon-btn"
+							style={{ whiteSpace: 'nowrap' }}
+						>
+							Learn about {titleSponsor.name}
+						</a>
+					</div>
+				</div>
+			) : (
+				<div className="muted mt-2">No title sponsor for this edition.</div>
+			)}
+
+			{/* All partners preview + tiered groups */}
+			<div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mt-6 items-start">
+				{/* Left: quick stats / summary */}
+				<div className="glass-card p-4">
+					<div className="text-sm text-[var(--text-secondary)]">Partners summary</div>
+					<div
+						className="font-semibold text-2xl mono"
+						style={{ color: 'var(--text-primary)' }}
+					>
+						{partners.length}
+					</div>
+					<div className="mt-3 text-sm muted">
+						Partners are shown grouped by tier. Click a logo to open their website.
+					</div>
+					<button
+						onClick={onToggleShowAll}
+						className="btn-ghost small mt-4"
+						aria-pressed={showAll}
+					>
+						{showAll ? 'Show less' : `Show all (${partners.length})`}
+					</button>
+				</div>
+
+				{/* Middle: featured grid (visiblePartners) */}
+				<div className="glass-card p-4 lg:col-span-1">
+					<div className="text-sm text-[var(--text-secondary)]">Featured partners</div>
+					<div className="mt-3 grid grid-cols-2 sm:grid-cols-3 gap-3">
+						{visiblePartners.length === 0 ? (
+							<div className="muted">No partners yet.</div>
+						) : (
+							visiblePartners.map((p, idx) => (
+								<button
+									key={p?.name || idx}
+									onClick={() => {
+										onPartnerClick(p);
+										if (p.website) window.open(p.website, '_blank', 'noopener');
+									}}
+									className="partner-cell group flex items-center justify-center p-3 rounded-xl transition-transform duration-300"
+									title={p.name}
+									style={{
+										background: 'var(--glass-bg)',
+										border: '1px solid var(--glass-border)',
+									}}
+								>
+									{p.logo?.url ? (
+										<img
+											src={p.logo.url}
+											alt={p.name}
+											className="partner-logo"
+											loading="lazy"
+										/>
+									) : (
+										<div
+											className="text-sm font-semibold"
+											style={{ color: 'var(--text-primary)' }}
+										>
+											{p.name}
+										</div>
+									)}
+								</button>
+							))
+						)}
+					</div>
+				</div>
+
+				{/* Right: tiered listing with descriptions */}
+				<div className="glass-card p-4">
+					<div className="text-sm text-[var(--text-secondary)]">Partner tiers</div>
+					<div className="mt-3 space-y-3">
+						{partnersByTier.length === 0 ? (
+							<div className="muted">No partners listed.</div>
+						) : (
+							partnersByTier.map(([tier, list]) => (
+								<div key={tier} className="detail-card p-3">
+									<div className="flex items-center justify-between">
+										<div
+											className="font-semibold"
+											style={{ color: 'var(--text-primary)' }}
+										>
+											{tier.replace(/(^\w)|-\w/g, (m) => m.toUpperCase())} (
+											{list.length})
+										</div>
+									</div>
+
+									<ul className="mt-3 grid grid-cols-1 gap-2">
+										{list.map((p, i) => (
+											<li
+												key={`${p.name}-${i}`}
+												className="flex items-start gap-3"
+											>
+												<div
+													className="w-12 h-10 rounded-md overflow-hidden bg-white/3 flex items-center justify-center"
+													style={{
+														border: '1px solid rgba(255,255,255,0.02)',
+													}}
+												>
+													{p.logo?.url ? (
+														<img
+															src={p.logo.url}
+															alt={p.name}
+															className="w-full h-full object-contain"
+														/>
+													) : (
+														<div className="text-xs mono">
+															{(p.name || '').slice(0, 4)}
+														</div>
+													)}
+												</div>
+												<div className="min-w-0">
+													<div
+														className="font-medium"
+														style={{ color: 'var(--text-primary)' }}
+													>
+														{p.name}
+													</div>
+													{p.description ? (
+														<div className="text-xs muted mt-1">
+															{p.description}
+														</div>
+													) : (
+														<div className="text-xs muted mt-1">
+															No description provided.
+														</div>
+													)}
+													{p.website && (
+														<a
+															href={p.website}
+															target="_blank"
+															rel="noopener noreferrer"
+															className="text-xs mt-1 inline-flex items-center gap-1 text-indigo-400"
+															onClick={(e) => e.stopPropagation()}
+														>
+															<ExternalLink size={12} /> Visit
+														</a>
+													)}
+												</div>
+											</li>
+										))}
+									</ul>
+								</div>
+							))
+						)}
+					</div>
+				</div>
+			</div>
+		</section>
+	);
+};
+
+/* --- Enhanced FAQList: industry-level UI with clearer layout & accessibility --- */
 const FAQList = ({ faqs = [], visible = false }) => {
 	const [query, setQuery] = useState('');
-	const [expandedMap, setExpandedMap] = useState(() => ({}));
+	const [expandedMap, setExpandedMap] = useState({});
 	const [expandAll, setExpandAll] = useState(false);
 
 	useEffect(() => {
-		// Sync expandAll to individual items
 		if (!visible) return;
 		if (expandAll) {
 			const map = {};
@@ -110,8 +364,7 @@ const FAQList = ({ faqs = [], visible = false }) => {
 		} else {
 			setExpandedMap({});
 		}
-		// eslint-disable-next-line react-hooks/exhaustive-deps
-	}, [expandAll, visible]);
+	}, [expandAll, visible, faqs]);
 
 	const filtered = useMemo(() => {
 		if (!query) return faqs || [];
@@ -142,19 +395,21 @@ const FAQList = ({ faqs = [], visible = false }) => {
 	if (!visible) return null;
 
 	return (
-		<div className="glass-card p-4" aria-live="polite" aria-atomic="true">
-			<div className="flex items-center justify-between mb-3 gap-3">
+		<section aria-labelledby="arvantis-faqs" className="mt-8">
+			<div className="flex items-center justify-between">
 				<div>
-					<div className="text-sm text-[var(--text-secondary)]">
-						Frequently Asked Questions
-					</div>
-					<div className="font-semibold">{(faqs || []).length} items</div>
+					<h3 id="arvantis-faqs" className="section-title">
+						Frequently asked questions
+					</h3>
+					<p className="muted">
+						Clear answers to common queries — search, expand and copy links.
+					</p>
 				</div>
 
 				<div className="flex items-center gap-2">
 					<input
 						type="search"
-						placeholder="Search FAQs (question or answer)…"
+						placeholder="Search FAQs…"
 						value={query}
 						onChange={(e) => setQuery(e.target.value)}
 						className="rounded-md border py-2 px-3 bg-[var(--input-bg)]"
@@ -164,17 +419,24 @@ const FAQList = ({ faqs = [], visible = false }) => {
 						onClick={() => setExpandAll((s) => !s)}
 						className="btn-ghost small"
 						aria-pressed={expandAll}
-						title={expandAll ? 'Collapse all' : 'Expand all'}
 					>
-						{expandAll ? 'Collapse all' : 'Expand all'}
+						{expandAll ? (
+							<>
+								<ChevronUp size={14} /> Collapse
+							</>
+						) : (
+							<>
+								<ChevronDown size={14} /> Expand
+							</>
+						)}
 					</button>
 				</div>
 			</div>
 
 			{filtered.length === 0 ? (
-				<div className="mt-3 muted">No FAQs match your search.</div>
+				<div className="mt-4 muted">No FAQs match your search.</div>
 			) : (
-				<ul className="mt-3 space-y-4" role="list">
+				<ul className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-4">
 					{filtered.map((f, i) => {
 						const id = String(f._id || `faq-${i}`);
 						const isOpen = !!expandedMap[id];
@@ -183,99 +445,87 @@ const FAQList = ({ faqs = [], visible = false }) => {
 						return (
 							<li
 								key={id}
-								className="detail-card p-4"
 								id={`faq-${id}`}
+								className="detail-card p-4"
 								role="listitem"
 							>
-								<div className="grid grid-cols-1 md:grid-cols-12 gap-4 items-start">
-									{/* Left: Question (long-row visual) */}
-									<div className="md:col-span-4 flex items-start gap-3">
-										<div className="min-w-0">
-											<button
-												onClick={() => toggleOne(id)}
-												aria-expanded={isOpen}
-												aria-controls={`faq-panel-${id}`}
-												className="text-left w-full"
-												style={{ cursor: 'pointer' }}
+								<div className="flex items-start gap-3">
+									<div className="min-w-0">
+										<button
+											onClick={() => toggleOne(id)}
+											aria-expanded={isOpen}
+											aria-controls={`faq-panel-${id}`}
+											className="text-left w-full"
+										>
+											<div
+												className="font-semibold text-base"
+												style={{ color: 'var(--text-primary)' }}
 											>
-												<div
-													className="font-semibold text-base truncate"
-													style={{ color: 'var(--text-primary)' }}
-												>
-													{q}
-												</div>
-												<div className="text-xs muted mt-1">
-													{isOpen ? 'Hide answer' : 'Show answer'}
-												</div>
-											</button>
-										</div>
-
-										<div className="ml-auto flex items-center gap-2">
-											<button
-												onClick={() => copyLink(id)}
-												className="btn-ghost small"
-												title="Copy link to this FAQ"
-												aria-label={`Copy link for ${q}`}
+												{q}
+											</div>
+											<div className="text-xs muted mt-1">
+												{isOpen ? 'Hide answer' : 'Show answer'}
+											</div>
+										</button>
+									</div>
+									<div className="ml-auto flex items-center gap-2">
+										<button
+											onClick={() => copyLink(id)}
+											className="btn-ghost small"
+											title="Copy link to this FAQ"
+											aria-label={`Copy link for ${q}`}
+										>
+											<svg
+												width="14"
+												height="14"
+												viewBox="0 0 24 24"
+												fill="none"
+												aria-hidden
 											>
-												<svg
+												<path
+													d="M10 14L14 10"
+													stroke="currentColor"
+													strokeWidth="1.6"
+													strokeLinecap="round"
+													strokeLinejoin="round"
+												/>
+												<rect
+													x="3"
+													y="3"
 													width="14"
 													height="14"
-													viewBox="0 0 24 24"
-													fill="none"
-													aria-hidden
-												>
-													<path
-														d="M10 14L14 10"
-														stroke="currentColor"
-														strokeWidth="1.6"
-														strokeLinecap="round"
-														strokeLinejoin="round"
-													/>
-													<rect
-														x="3"
-														y="3"
-														width="14"
-														height="14"
-														rx="2"
-														stroke="currentColor"
-														strokeWidth="1.6"
-													/>
-													<rect
+													rx="2"
+													stroke="currentColor"
+													strokeWidth="1.6"
+												/>
+												<rect
 													x="7"
-														y="7"
-														width="14"
-														height="14"
-														rx="2"
-														stroke="currentColor"
-														strokeWidth="1.6"
-													/>
-												</svg>
-											</button>
-										</div>
+													y="7"
+													width="14"
+													height="14"
+													rx="2"
+													stroke="currentColor"
+													strokeWidth="1.6"
+												/>
+											</svg>
+										</button>
 									</div>
+								</div>
 
-									{/* Right: Answer (long, roomy area) */}
-									<div
-										id={`faq-panel-${id}`}
-										className="md:col-span-8 text-sm muted whitespace-pre-wrap"
-										role="region"
-										aria-labelledby={`faq-${id}`}
-										style={{
-											transition: 'max-height 320ms ease',
-											overflow: 'hidden',
-											maxHeight: isOpen ? '1200px' : '0px',
-										}}
-									>
-										<div style={{ paddingTop: isOpen ? 6 : 0 }}>
-											<div
-												style={{
-													color: 'var(--text-primary)',
-													lineHeight: 1.6,
-												}}
-											>
-												{a}
-											</div>
-										</div>
+								<div
+									id={`faq-panel-${id}`}
+									className="mt-3 text-sm muted whitespace-pre-wrap"
+									role="region"
+									aria-labelledby={`faq-${id}`}
+									style={{
+										transition: 'max-height 240ms ease, opacity 180ms ease',
+										overflow: 'hidden',
+										maxHeight: isOpen ? '720px' : '0px',
+										opacity: isOpen ? 1 : 0,
+									}}
+								>
+									<div style={{ color: 'var(--text-primary)', lineHeight: 1.6 }}>
+										{a}
 									</div>
 								</div>
 							</li>
@@ -283,7 +533,7 @@ const FAQList = ({ faqs = [], visible = false }) => {
 					})}
 				</ul>
 			)}
-		</div>
+		</section>
 	);
 };
 
@@ -617,6 +867,21 @@ const ArvantisPage = () => {
 						{/* Hero */}
 						<PosterHero fest={fest} />
 
+						{/* NEW: Prominent Partners section (right after hero) */}
+						<PartnersSection
+							titleSponsor={titleSponsor}
+							partnersByTier={partnersByTier}
+							partners={partners}
+							showAll={showAllPartners}
+							onToggleShowAll={() => setShowAllPartners((s) => !s)}
+							onPartnerClick={(p) => {
+								/* optional analytics or modal */
+								window.dispatchEvent(
+									new CustomEvent('partnerClick', { detail: p })
+								);
+							}}
+						/>
+
 						{/* Top area - stats + CTAs */}
 						<div className="grid grid-cols-1 lg:grid-cols-4 gap-6 mt-6">
 							<div className="lg:col-span-3 grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -700,42 +965,40 @@ const ArvantisPage = () => {
 						</section>
 
 						{/* Tracks */}
-							<div className="glass-card p-4">
-								<div className="flex items-center justify-between">
-									<div>
-										<div className="text-sm text-[var(--text-secondary)]">
-											Tracks
-										</div>
-										<div className="font-semibold">
-											{(fest.tracks || []).length} tracks
-										</div>
+						<div className="glass-card p-4">
+							<div className="flex items-center justify-between">
+								<div>
+									<div className="text-sm text-[var(--text-secondary)]">
+										Tracks
 									</div>
-									<button
-										onClick={() => setShowTracks((s) => !s)}
-										className="btn-ghost small"
-									>
-										{showTracks ? 'Hide' : 'View'}
-									</button>
+									<div className="font-semibold">
+										{(fest.tracks || []).length} tracks
+									</div>
 								</div>
-								{showTracks && (fest.tracks || []).length > 0 ? (
-									<ul className="mt-3 space-y-2">
-										{(fest.tracks || []).map((t) => (
-											<li key={t.key} className="detail-card p-3">
-												<div className="font-semibold">{t.title}</div>
-												{t.description && (
-													<div className="text-sm mt-1 muted">
-														{t.description}
-													</div>
-												)}
-											</li>
-										))}
-									</ul>
-								) : (
-									showTracks && (
-										<div className="mt-3 muted">No tracks defined.</div>
-									)
-								)}
+								<button
+									onClick={() => setShowTracks((s) => !s)}
+									className="btn-ghost small"
+								>
+									{showTracks ? 'Hide' : 'View'}
+								</button>
 							</div>
+							{showTracks && (fest.tracks || []).length > 0 ? (
+								<ul className="mt-3 space-y-2">
+									{(fest.tracks || []).map((t) => (
+										<li key={t.key} className="detail-card p-3">
+											<div className="font-semibold">{t.title}</div>
+											{t.description && (
+												<div className="text-sm mt-1 muted">
+													{t.description}
+												</div>
+											)}
+										</li>
+									))}
+								</ul>
+							) : (
+								showTracks && <div className="mt-3 muted">No tracks defined.</div>
+							)}
+						</div>
 
 						{/* Gallery */}
 						{Array.isArray(fest.gallery) && fest.gallery.length > 0 && (
