@@ -1,16 +1,8 @@
-import React, { useMemo, useState, useCallback, useEffect } from 'react';
+import React, { useMemo, useState, useCallback, useEffect, useRef } from 'react';
 import { Sparkles, Calendar, Ticket, MapPin, Info, ChevronLeft, ChevronRight } from 'lucide-react';
 import { StatusPill } from './StatusPill';
 import { motion } from 'framer-motion';
 import ImageLightbox from './ImageLightbox.jsx';
-
-/*
-  Simplified PosterHero:
-  - Self-contained carousel (no external PosterCarousel dependency)
-  - Countdown implemented inline
-  - Simple FestDetails rendered inline when requested
-  - Uses existing ImageLightbox component for zoom
-*/
 
 const formatDate = (date) => {
 	if (!date) return 'TBA';
@@ -19,77 +11,136 @@ const formatDate = (date) => {
 	return d.toLocaleDateString('en-US', { month: 'long', day: 'numeric' });
 };
 
-const useCountdown = (target) => {
-	const [remaining, setRemaining] = useState(() => {
-		if (!target) return null;
-		const ms = new Date(target).getTime() - Date.now();
-		return ms > 0 ? ms : 0;
-	});
+const useHighPrecisionCountdown = (target) => {
+	const [now, setNow] = useState(Date.now());
+	const rafRef = useRef(null);
 
 	useEffect(() => {
 		if (!target) return;
-		const interval = setInterval(() => {
-			const ms = new Date(target).getTime() - Date.now();
-			setRemaining(ms > 0 ? ms : 0);
-		}, 1000);
-		return () => clearInterval(interval);
+		let mounted = true;
+		const tick = () => {
+			if (!mounted) return;
+			setNow(Date.now());
+			rafRef.current = requestAnimationFrame(tick);
+		};
+		rafRef.current = requestAnimationFrame(tick);
+		return () => {
+			mounted = false;
+			if (rafRef.current) cancelAnimationFrame(rafRef.current);
+		};
 	}, [target]);
 
-	if (remaining === null) return null;
-	const s = Math.floor(remaining / 1000);
-	const days = Math.floor(s / (24 * 3600));
-	const hours = Math.floor((s % (24 * 3600)) / 3600);
-	const mins = Math.floor((s % 3600) / 60);
-	const secs = Math.floor(s % 60);
-	return { days, hours, mins, secs };
+	const targetMs = useMemo(() => {
+		if (!target) return null;
+		const d = new Date(target);
+		return isNaN(d.getTime()) ? null : d.getTime();
+	}, [target]);
+
+	if (!targetMs) return null;
+
+	const diff = Math.max(0, targetMs - now);
+	const totalSeconds = Math.floor(diff / 1000);
+	const days = Math.floor(totalSeconds / 86400);
+	const hours = Math.floor((totalSeconds % 86400) / 3600);
+	const minutes = Math.floor((totalSeconds % 3600) / 60);
+	const seconds = totalSeconds % 60;
+
+	return { days, hours, minutes, seconds, isOngoing: diff === 0 };
 };
 
 const Countdown = ({ target }) => {
-	const cd = useCountdown(target);
+	const cd = useHighPrecisionCountdown(target);
 	if (!cd) return null;
-	if (cd.days === 0 && cd.hours === 0 && cd.mins === 0 && cd.secs === 0)
-		return <div className="mono">Starts soon</div>;
+	if (cd.isOngoing) {
+		return (
+			<div
+				role="status"
+				aria-live="polite"
+				className="mt-4 text-sm font-medium text-green-500"
+			>
+				Ongoing
+			</div>
+		);
+	}
+	const two = (n) => String(n).padStart(2, '0');
 	return (
-		<div className="arv-countdown" aria-hidden>
-			<div className="cd-item">
-				<div className="cd-value">{cd.days}</div>
-				<div className="cd-label">days</div>
-			</div>
-			<div className="cd-item">
-				<div className="cd-value">{String(cd.hours).padStart(2, '0')}</div>
-				<div className="cd-label">hrs</div>
-			</div>
-			<div className="cd-item">
-				<div className="cd-value">{String(cd.mins).padStart(2, '0')}</div>
-				<div className="cd-label">mins</div>
+		<div
+			className="mt-4 inline-flex items-center gap-3"
+			role="timer"
+			aria-live="polite"
+			aria-atomic="true"
+			aria-label={`Starts in ${cd.days} days ${cd.hours} hours ${cd.minutes} minutes ${cd.seconds} seconds`}
+		>
+			<div className="flex items-baseline gap-2">
+				<div className="px-3 py-2 rounded-lg glass-card text-center">
+					<div
+						className="text-lg font-extrabold mono"
+						style={{ color: 'var(--text-primary)' }}
+					>
+						{cd.days}
+					</div>
+					<div className="text-xs muted">Days</div>
+				</div>
+				<div className="px-3 py-2 rounded-lg glass-card text-center">
+					<div
+						className="text-lg font-extrabold mono"
+						style={{ color: 'var(--text-primary)' }}
+					>
+						{two(cd.hours)}
+					</div>
+					<div className="text-xs muted">Hours</div>
+				</div>
+				<div className="px-3 py-2 rounded-lg glass-card text-center">
+					<div
+						className="text-lg font-extrabold mono"
+						style={{ color: 'var(--text-primary)' }}
+					>
+						{two(cd.minutes)}
+					</div>
+					<div className="text-xs muted">Minutes</div>
+				</div>
+				<div className="px-3 py-2 rounded-lg glass-card text-center">
+					<div className="text-lg font-extrabold mono accent-neon">{two(cd.seconds)}</div>
+					<div className="text-xs muted">Seconds</div>
+				</div>
 			</div>
 		</div>
 	);
 };
 
 const PosterHero = ({ fest = {} }) => {
+	// prefer fest.hero virtual or heroMedia, then posters array, then poster fallback
 	const posters = useMemo(() => {
-		const raw = Array.isArray(fest?.posters) ? fest.posters : fest?.gallery || [];
-		// normalize simple string items
+		// backend uses posters[] and heroMedia; accept gallery fallback
+		const raw =
+			Array.isArray(fest?.posters) && fest.posters.length
+				? fest.posters
+				: Array.isArray(fest?.gallery)
+				? fest.gallery
+				: [];
 		return raw.map((p) => (typeof p === 'string' ? { url: p } : p)).filter(Boolean);
 	}, [fest]);
 
-	const heroPoster = posters.length
-		? posters[0]
-		: fest?.poster
-		? typeof fest.poster === 'string'
-			? { url: fest.poster }
-			: fest.poster
-		: null;
+	const hero = useMemo(() => {
+		// prefer explicit heroMedia, then posters[0], then fest.poster legacy, then gallery first
+		if (fest?.heroMedia)
+			return typeof fest.heroMedia === 'string' ? { url: fest.heroMedia } : fest.heroMedia;
+		if (Array.isArray(fest?.posters) && fest.posters.length) return fest.posters[0];
+		if (fest?.poster)
+			return typeof fest.poster === 'string' ? { url: fest.poster } : fest.poster;
+		if (Array.isArray(fest?.gallery) && fest.gallery.length) return fest.gallery[0];
+		return null;
+	}, [fest]);
+
+	const heroUrl = hero?.url || hero?.src || '';
 
 	const [index, setIndex] = useState(0);
 	const [lightboxOpen, setLightboxOpen] = useState(false);
-	const [showDetails, setShowDetails] = useState(false);
 
 	useEffect(() => {
 		// reset index when posters change
 		setIndex(0);
-	}, [posters.length, heroPoster?.url]);
+	}, [posters.length, heroUrl]);
 
 	const next = useCallback(() => {
 		if (!posters.length) return;
@@ -124,40 +175,45 @@ const PosterHero = ({ fest = {} }) => {
 			>
 				<div className="relative z-10 max-w-6xl w-full mx-auto px-4 py-8 md:py-12 lg:py-14">
 					<div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
+						{/* Carousel + caption */}
 						<div className="col-span-2">
-							{/* Carousel area */}
 							<div className="poster-carousel">
 								<div
 									className="poster-main"
 									role="region"
 									aria-label="Festival poster"
 								>
-									{posters.length ? (
+									{posters.length || heroUrl ? (
 										<>
-											<button
-												aria-label="Previous poster"
-												onClick={prev}
-												className="poster-nav-btn left"
-											>
-												<ChevronLeft size={18} />
-											</button>
-											<button
-												aria-label="Next poster"
-												onClick={next}
-												className="poster-nav-btn right"
-											>
-												<ChevronRight size={18} />
-											</button>
+											{posters.length > 1 && (
+												<>
+													<button
+														aria-label="Previous poster"
+														onClick={prev}
+														className="poster-nav-btn left"
+													>
+														<ChevronLeft size={18} />
+													</button>
+													<button
+														aria-label="Next poster"
+														onClick={next}
+														className="poster-nav-btn right"
+													>
+														<ChevronRight size={18} />
+													</button>
+												</>
+											)}
 											<img
 												src={
-													posters[index]?.url ||
-													posters[index]?.src ||
-													heroPoster?.url ||
-													''
+													posters.length
+														? posters[index]?.url || posters[index]?.src
+														: heroUrl
 												}
 												alt={fest?.name || 'Poster'}
 												className="poster-main-img"
-												onClick={() => openLightbox(index)}
+												onClick={() =>
+													openLightbox(posters.length ? index : 0)
+												}
 												loading="lazy"
 											/>
 										</>
@@ -171,6 +227,7 @@ const PosterHero = ({ fest = {} }) => {
 									)}
 								</div>
 
+								{/* Thumbnails only if multiple posters */}
 								{posters.length > 1 && (
 									<div className="poster-thumbs mt-3 flex gap-2 overflow-x-auto">
 										{posters.map((p, i) => (
@@ -194,11 +251,12 @@ const PosterHero = ({ fest = {} }) => {
 								)}
 							</div>
 
+							{/* caption + controls */}
 							<div className="mt-4 flex items-center justify-between gap-4">
 								<div className="flex items-center gap-3">
 									<div className="w-14 h-14 rounded-xl overflow-hidden ring-2 ring-white flex-shrink-0">
 										<img
-											src={fest?.logo?.url || heroPoster?.url || ''}
+											src={fest?.logo?.url || heroUrl || ''}
 											alt={`${fest?.name || 'Arvantis'} logo`}
 											className="w-full h-full object-cover"
 										/>
@@ -224,7 +282,8 @@ const PosterHero = ({ fest = {} }) => {
 									</div>
 								</div>
 
-								<div className="hidden md:flex items-center gap-3">
+								{/* Unified responsive controls (no duplicate hidden sections) */}
+								<div className="flex items-center gap-3">
 									{fest?.tickets?.url && (
 										<a
 											href={fest.tickets.url}
@@ -238,40 +297,12 @@ const PosterHero = ({ fest = {} }) => {
 									<a href="#events" className="btn-ghost">
 										Explore Events
 									</a>
-									<button
-										onClick={() => setShowDetails((s) => !s)}
-										className="btn-ghost"
-										aria-expanded={showDetails}
-										aria-controls="fest-full-details"
-									>
-										<Info size={14} />{' '}
-										{showDetails ? 'Hide Details' : 'View Full Details'}
-									</button>
 								</div>
-							</div>
-
-							<div className="mt-3 md:hidden flex gap-3">
-								{fest?.tickets?.url && (
-									<a
-										href={fest.tickets.url}
-										className="btn-primary neon-btn"
-										style={{ flex: 1 }}
-									>
-										<Ticket size={14} /> Buy
-									</a>
-								)}
-								<button
-									onClick={() => setShowDetails((s) => !s)}
-									className="btn-ghost"
-									aria-expanded={showDetails}
-									aria-controls="fest-full-details"
-								>
-									<Info size={14} /> {showDetails ? 'Hide' : 'Details'}
-								</button>
 							</div>
 						</div>
 
-						<aside className="details-panel glass-card p-5">
+						{/* Compact details / countdown / tickets */}
+						<aside className="details-panel glass-card p-5" aria-hidden={false}>
 							<div className="flex items-start justify-between gap-3">
 								<div>
 									<div
@@ -300,6 +331,7 @@ const PosterHero = ({ fest = {} }) => {
 								</div>
 							</div>
 
+							{/* Countdown */}
 							{fest?.startDate && (
 								<div className="mt-4">
 									<div
@@ -314,6 +346,7 @@ const PosterHero = ({ fest = {} }) => {
 								</div>
 							)}
 
+							{/* Tickets */}
 							{typeof fest?.tickets?.capacity !== 'undefined' && (
 								<div className="mt-4">
 									<div
@@ -353,75 +386,16 @@ const PosterHero = ({ fest = {} }) => {
 								</div>
 							)}
 
-							{Array.isArray(fest?.sponsors) && fest.sponsors.length > 0 && (
-								<div className="mt-5">
-									<div
-										className="text-xs font-semibold"
-										style={{ color: 'var(--text-secondary)' }}
-									>
-										Top Sponsors
-									</div>
-									<div className="mt-2 flex gap-2 items-center overflow-auto">
-										{fest.sponsors.slice(0, 6).map((s, i) => (
-											<img
-												key={i}
-												src={s.logo || s.logoUrl || s.url}
-												alt={s.name || 'Sponsor'}
-												className="sponsor-mini"
-											/>
-										))}
-									</div>
-								</div>
-							)}
+							
 						</aside>
 					</div>
 				</div>
 			</motion.section>
 
-			{/* details panel / expanded */}
-			<div
-				id="fest-full-details"
-				aria-hidden={!showDetails}
-				style={{ display: showDetails ? 'block' : 'none' }}
-			>
-				<div className="max-w-7xl mx-auto px-4 sm:px-8 lg:px-12 py-6 fest-details-section">
-					<div className="fest-details grid gap-6">
-						<div className="detail-card">
-							<h3 className="card-title">About {fest?.name}</h3>
-							<div className="card-body">
-								{fest?.description || 'No description available.'}
-							</div>
-						</div>
-
-						<div className="detail-card">
-							<h4 className="card-title">Location</h4>
-							<div className="card-body">{fest?.location || 'TBA'}</div>
-						</div>
-
-						{Array.isArray(fest?.partners) && fest.partners.length > 0 && (
-							<div className="detail-card">
-								<h4 className="card-title">Partners</h4>
-								<div className="sponsors-grid">
-									{fest.partners.map((p, i) => (
-										<div key={i} className="sponsor-card">
-											{p.logo?.url ? (
-												<img src={p.logo.url} alt={p.name} />
-											) : (
-												<div className="sponsor-name">{p.name}</div>
-											)}
-										</div>
-									))}
-								</div>
-							</div>
-						)}
-					</div>
-				</div>
-			</div>
-
 			{/* Lightbox */}
 			{lightboxOpen && (
 				<ImageLightbox
-					image={posters[index] || heroPoster}
+					image={posters[index] || hero || { url: heroUrl }}
 					onClose={closeLightbox}
 					onPrev={posters.length > 1 ? prev : undefined}
 					onNext={posters.length > 1 ? next : undefined}
