@@ -437,10 +437,11 @@ const FAQList = ({ faqs = [], visible = false }) => {
 							<div
 								key={id}
 								id={`faq-${id}`}
-								className="glass-card p-5 transition-all duration-300"
+								className="glass-card p-5 transition-all duration-300 border border-[var(--glass-border)] shadow-md"
 								style={{
 									boxShadow: 'var(--shadow-md)',
-									border: '1px solid var(--glass-border)',
+									borderRadius: '1.25rem',
+									background: 'var(--glass-bg)',
 								}}
 							>
 								<button
@@ -474,9 +475,6 @@ const FAQList = ({ faqs = [], visible = false }) => {
 											>
 												<Copy size={14} /> Copy link
 											</button>
-											{/* <button className="btn-ghost small" title="Open in new tab">
-												<ExternalLink size={14} /> Open
-											</button> */}
 										</div>
 									</div>
 								)}
