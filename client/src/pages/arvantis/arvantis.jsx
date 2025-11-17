@@ -6,7 +6,7 @@ import {
 	getAllFests,
 } from '../../services/arvantisServices.js';
 import EventDetailModal from '../../components/event/EventDetailModal.jsx';
-import { Calendar, Image as ImageIcon, Layers3, Users, Filter, ChevronDown } from 'lucide-react';
+import { Calendar, Image as ImageIcon, Layers3, Users, Filter } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import PosterHero from '../../components/Arvantis/PosterHero.jsx';
 import EditionsStrip from '../../components/Arvantis/EditionsStrip.jsx';
@@ -24,10 +24,8 @@ const ITEMS_IN_PAST_SECTION = 8;
 const safeArray = (v) => (Array.isArray(v) ? v : v ? [v] : []);
 
 const normalizeLanding = (raw) => {
-	// server may return { fest, partners, events, hero, computed } or raw fest directly
 	if (!raw) return null;
 	if (raw.fest) {
-		// merge subkeys into single "fest" shaped object for components
 		const f = { ...raw.fest };
 		f.hero = raw.hero ?? f.hero ?? (f.poster ? f.poster : null);
 		f.events = raw.events ?? f.events ?? [];
@@ -40,14 +38,12 @@ const normalizeLanding = (raw) => {
 
 const findTitleSponsor = (partners = []) => {
 	if (!partners || partners.length === 0) return null;
-	// prefer explicit tier names, then keywords in name/description
 	const byTier = partners.find(
 		(p) => p.tier && /title|title-sponsor|presenting|powered by|lead/i.test(p.tier)
 	);
 	if (byTier) return byTier;
 	const byFlag = partners.find((p) => p.isTitleSponsor || p.role === 'title' || p.titleSponsor);
 	if (byFlag) return byFlag;
-	// fallback look-up by name/description heuristics
 	return (
 		partners.find((p) =>
 			/title sponsor|powered by|presented by/i.test(`${p.name} ${p.description || ''}`)
@@ -121,7 +117,7 @@ const ArvantisPage = () => {
 	// Details for selected identifier
 	const detailsQuery = useQuery({
 		queryKey: ['arvantis', 'details', identifier],
-		queryFn: () => getFestDetails(identifier),
+		queryFn: () => (identifier ? getFestDetails(identifier) : Promise.resolve(null)),
 		enabled: !!identifier,
 		staleTime: 60_000,
 		retry: 1,
@@ -129,14 +125,11 @@ const ArvantisPage = () => {
 
 	// Resolve which fest to display: detailsQuery -> landing fallback (landing first if requested)
 	const fest = useMemo(() => {
-		// If user wants landing first and landing matches identifier -> use landingFest
 		if (showLandingFirst && landingFest) {
 			const landingId = landingFest.slug || String(landingFest.year || '');
 			if (!identifier || landingId === identifier) return landingFest;
 		}
-		// prefer explicit detailsQuery result
 		if (detailsQuery.data) return detailsQuery.data;
-		// fallback to landingFest
 		return landingFest ?? null;
 	}, [detailsQuery.data, landingFest, identifier, showLandingFirst]);
 
@@ -242,7 +235,7 @@ const ArvantisPage = () => {
 	// When user selects an edition from strip or cards: set identifier and scroll to top
 	const handleSelectEdition = useCallback((id) => {
 		if (!id) return;
-		setShowLandingFirst(false); // user chose explicit edition
+		setShowLandingFirst(false);
 		setIdentifier(id);
 		window.scrollTo({ top: 0, behavior: 'smooth' });
 	}, []);
@@ -266,29 +259,29 @@ const ArvantisPage = () => {
 	/* -------------------------
      Render
      ------------------------- */
+	const landingIdentifier = landingFest
+		? landingFest.slug || String(landingFest.year || '')
+		: null;
+
 	return (
 		<div className="min-h-screen arvantis-page" style={{ color: 'var(--text-primary)' }}>
-			<div className="max-w-7xl mx-auto px-4 sm:px-8 lg:px-12 py-10 sm:py-16">
-				{/* Header / Title + Powered by */}
-				<header className="mb-6 flex flex-col lg:flex-row lg:items-center lg:justify-between gap-6">
+			<div className="max-w-7xl mx-auto px-4 sm:px-8 lg:px-12 py-8 sm:py-12">
+				{/* Header */}
+				<header className="mb-4 flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
 					<div>
 						<h1
 							className="text-4xl md:text-5xl lg:text-6xl font-extrabold leading-tight"
 							style={{ fontFamily: 'Space Grotesk, system-ui' }}
 						>
-							Arvantis
-							<span className="ml-3 accent-neon">
-								{fest?.year ? ` ${fest.year}` : ''}
-							</span>
+							Arvantis <span className="ml-2 accent-neon">{fest?.year ?? ''}</span>
 						</h1>
 						<p className="mt-2 text-base md:text-lg text-[var(--text-secondary)] max-w-2xl">
 							{fest?.tagline ||
-								fest?.subtitle ||
 								'A celebration of tech, creativity and collaboration — by Syntax Club.'}
 						</p>
 
-						{/* Powered by title sponsor line */}
-						{titleSponsor ? (
+						{/* Powered by title sponsor */}
+						{titleSponsor && (
 							<div className="mt-3 flex items-center gap-3">
 								<div className="text-sm text-[var(--text-secondary)]">
 									Powered by
@@ -310,14 +303,14 @@ const ArvantisPage = () => {
 									)}
 								</a>
 							</div>
-						) : null}
+						)}
 					</div>
 
-					<div className="flex gap-3 items-center">
+					<div className="flex items-center gap-3">
 						<button
 							onClick={() => {
 								setShowLandingFirst(true);
-								setIdentifier(landingFest?.slug || String(landingFest?.year || ''));
+								if (landingIdentifier) setIdentifier(landingIdentifier);
 								window.scrollTo({ top: 0, behavior: 'smooth' });
 							}}
 							className="btn-primary neon-btn"
@@ -326,19 +319,31 @@ const ArvantisPage = () => {
 							View Landing
 						</button>
 
-						<div className="relative inline-flex items-center gap-2 p-2 rounded-md bg-[var(--button-secondary-bg)] border border-[var(--button-secondary-border)]">
-							<button
-								title="Filters"
-								onClick={() => setShowPastEditions((s) => !s)}
-								className="ml-2 p-2 rounded-md bg-transparent"
-							>
-								<Filter size={16} />
-							</button>
-						</div>
+						<button
+							onClick={() => setShowPastEditions((s) => !s)}
+							className="btn-ghost"
+							title={
+								showPastEditions ? 'Collapse past editions' : 'Show past editions'
+							}
+						>
+							{showPastEditions ? 'Hide Past' : 'Past Editions'}
+						</button>
 					</div>
 				</header>
 
-				{/* Error / Loading / No data */}
+				{/* Edition selector moved to top for quick switching */}
+				{editions && editions.length > 0 && (
+					<div className="mb-6">
+						<EditionsStrip
+							editions={editions}
+							currentIdentifier={identifier}
+							onSelect={handleSelectEdition}
+							landingIdentifier={landingIdentifier}
+						/>
+					</div>
+				)}
+
+				{/* Main content */}
 				{isErrorOverall ? (
 					<ErrorBlock
 						message={errorMsg}
@@ -351,7 +356,7 @@ const ArvantisPage = () => {
 				) : isLoadingOverall && !fest ? (
 					<LoadingBlock />
 				) : !fest ? (
-					<div className="py-24 text-center">
+					<div className="py-20 text-center">
 						<h3 className="text-3xl font-bold mb-3">No Fest Data Available</h3>
 						<p className="text-lg text-[var(--text-secondary)]">
 							Please check back later for updates on Arvantis.
@@ -359,75 +364,58 @@ const ArvantisPage = () => {
 					</div>
 				) : (
 					<motion.div
-						initial={{ opacity: 0, y: 12 }}
+						initial={{ opacity: 0, y: 8 }}
 						animate={{ opacity: 1, y: 0 }}
-						transition={{ duration: 0.5 }}
+						transition={{ duration: 0.4 }}
 						className="space-y-8"
 					>
-						{/* Hero / Poster */}
+						{/* Hero */}
 						<PosterHero fest={fest} />
 
-						{/* Editions strip + quick access to previous ones */}
-						<div className="flex flex-col lg:flex-row gap-6 items-start">
-							<div className="flex-1">
-								<EditionsStrip
-									editions={editions}
-									currentIdentifier={identifier}
-									onSelect={handleSelectEdition}
-									landingIdentifier={
-										landingFest
-											? landingFest.slug || String(landingFest.year || '')
-											: null
-									}
-								/>
+						{/* Top quick stats + CTAs */}
+						<div className="grid grid-cols-1 lg:grid-cols-4 gap-6 items-start">
+							<div className="lg:col-span-3 grid grid-cols-1 md:grid-cols-3 gap-4">
+								{stats.map((s, i) => (
+									<StatCard
+										key={s.label}
+										icon={s.icon}
+										label={s.label}
+										value={s.value}
+										index={i}
+									/>
+								))}
 							</div>
 
-							<div className="w-full lg:w-64">
+							<div className="lg:col-span-1">
 								<div className="glass-card p-4">
-									<div className="flex items-center justify-between">
-										<div>
-											<div className="text-xs text-[var(--text-secondary)]">
-												Quick stats
-											</div>
-											<div className="font-semibold">
-												{fest?.name || `Arvantis ${fest?.year || ''}`}
-											</div>
-										</div>
-										<div className="text-sm mono text-[var(--text-secondary)]">
-											{fest?.computed?.computedStatus || fest?.status}
-										</div>
+									<div className="text-sm text-[var(--text-secondary)]">
+										Quick actions
 									</div>
-
-									<div className="mt-3 grid grid-cols-2 gap-2">
-										{stats.map((s, i) => (
-											<div
-												key={i}
-												className="p-2 rounded-md bg-[var(--glass-bg)] border border-[var(--glass-border)] text-center"
+									<div className="mt-3 flex flex-col gap-3">
+										<a href="#events" className="btn-ghost">
+											Explore events
+										</a>
+										{fest?.registrationUrl || fest?.tickets?.url ? (
+											<a
+												href={fest.registrationUrl || fest.tickets.url}
+												target="_blank"
+												rel="noreferrer"
+												className="btn-primary neon-btn"
 											>
-												<div className="text-xs text-[var(--text-secondary)]">
-													{s.label}
-												</div>
-												<div
-													className="font-mono font-bold"
-													style={{ color: 'var(--text-primary)' }}
-												>
-													{s.value}
-												</div>
-											</div>
-										))}
+												Register / Tickets
+											</a>
+										) : (
+											<a href="#register" className="btn-primary neon-btn">
+												Register
+											</a>
+										)}
 									</div>
 
-									<div className="mt-3 flex gap-2">
-										<a href="#events" className="btn-ghost" style={{ flex: 1 }}>
-											View events
-										</a>
-										<a
-											href="#register"
-											className="btn-primary neon-btn"
-											style={{ flex: 1 }}
-										>
-											Register
-										</a>
+									<div className="mt-4 text-sm text-[var(--text-secondary)]">
+										Status:{' '}
+										<strong className="mono">
+											{fest?.computed?.computedStatus || fest?.status}
+										</strong>
 									</div>
 								</div>
 							</div>
@@ -477,7 +465,7 @@ const ArvantisPage = () => {
 							<EventsGrid events={filteredEvents} onEventClick={handleEventClick} />
 						</section>
 
-						{/* Partners - emphasize title sponsor and tiers */}
+						{/* Partners */}
 						<section
 							className="rounded-3xl p-6"
 							style={{
@@ -509,8 +497,8 @@ const ArvantisPage = () => {
 								>
 									<div
 										style={{
-											width: 120,
-											height: 56,
+											width: 140,
+											height: 64,
 											display: 'flex',
 											alignItems: 'center',
 											justifyContent: 'center',
@@ -520,7 +508,7 @@ const ArvantisPage = () => {
 											<img
 												src={titleSponsor.logo.url}
 												alt={titleSponsor.name}
-												style={{ maxHeight: 56, objectFit: 'contain' }}
+												style={{ maxHeight: 64, objectFit: 'contain' }}
 											/>
 										) : (
 											<div className="font-semibold">{titleSponsor.name}</div>
@@ -557,31 +545,28 @@ const ArvantisPage = () => {
 								</div>
 							)}
 
-							{/* other partners grouped by tier */}
-							<div className="grid gap-6">
-								{Object.keys(otherPartnersByTier).length === 0 ? (
-									<div className="text-sm text-[var(--text-secondary)]">
-										No partners listed yet.
-									</div>
-								) : (
-									Object.entries(otherPartnersByTier).map(([tier, list]) => (
-										<div key={tier}>
-											<div className="flex items-center justify-between mb-3">
-												<div
-													className="text-sm font-semibold"
-													style={{ color: 'var(--text-secondary)' }}
-												>
-													{tier.toUpperCase()}
-												</div>
-												<div className="text-xs text-[var(--text-secondary)]">
-													{list.length} partners
-												</div>
+							{Object.keys(otherPartnersByTier).length === 0 ? (
+								<div className="text-sm text-[var(--text-secondary)]">
+									No partners listed yet.
+								</div>
+							) : (
+								Object.entries(otherPartnersByTier).map(([tier, list]) => (
+									<div key={tier} className="mb-6">
+										<div className="flex items-center justify-between mb-3">
+											<div
+												className="text-sm font-semibold"
+												style={{ color: 'var(--text-secondary)' }}
+											>
+												{tier.toUpperCase()}
 											</div>
-											<PartnersGrid partners={list} />
+											<div className="text-xs text-[var(--text-secondary)]">
+												{list.length} partners
+											</div>
 										</div>
-									))
-								)}
-							</div>
+										<PartnersGrid partners={list} />
+									</div>
+								))
+							)}
 						</section>
 
 						{/* Gallery */}
@@ -599,7 +584,7 @@ const ArvantisPage = () => {
 							/>
 						</section>
 
-						{/* Past editions preview */}
+						{/* Past editions */}
 						<section
 							className="rounded-3xl p-6"
 							style={{
@@ -628,9 +613,7 @@ const ArvantisPage = () => {
 										onClick={() => {
 											window.scrollTo({ top: 0, behavior: 'smooth' });
 											setShowLandingFirst(true);
-											setIdentifier(
-												landingFest?.slug || String(landingFest?.year || '')
-											);
+											if (landingIdentifier) setIdentifier(landingIdentifier);
 										}}
 										className="btn-ghost"
 									>
@@ -702,11 +685,7 @@ const ArvantisPage = () => {
 									editions={editions}
 									currentIdentifier={identifier}
 									onSelect={handleSelectEdition}
-									landingIdentifier={
-										landingFest
-											? landingFest.slug || String(landingFest.year || '')
-											: null
-									}
+									landingIdentifier={landingIdentifier}
 								/>
 							)}
 						</section>
