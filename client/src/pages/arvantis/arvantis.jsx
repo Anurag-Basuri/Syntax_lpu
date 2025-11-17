@@ -17,6 +17,7 @@ import EventsGrid from '../../components/Arvantis/EventsGrid.jsx';
 import PartnersGrid from '../../components/Arvantis/PartnersGrid.jsx';
 import GalleryGrid from '../../components/Arvantis/GalleryGrid.jsx';
 import ImageLightbox from '../../components/Arvantis/ImageLightbox.jsx';
+import EventDetailModal from '../../components/event/EventDetailModal.jsx';
 import LoadingBlock from '../../components/Arvantis/LoadingBlock.jsx';
 import ErrorBlock from '../../components/Arvantis/ErrorBlock.jsx';
 import EditionsStrip from '../../components/Arvantis/EditionsStrip.jsx';
@@ -28,15 +29,16 @@ import {
 import '../../arvantis.css';
 
 /*
-  Reorganized, industry-grade Arvantis page:
-  - Two-column layout: main content (description, events, gallery, faqs) + right sidebar (stats, partners, sponsor)
-  - Description and Location always visible under hero
-  - Respect fest.themeColors by setting CSS vars on root container (non-invasive)
-  - Clear sections with headings and consistent spacing
-  - Minimal, defensive data handling and accessible markup
+  Refactor notes:
+  - Clean, semantic layout: Hero -> Prominent Partners (full-width) -> content grid (main + sidebar)
+  - Always show description & location under hero
+  - Partners are prominent and have anchor (#partners)
+  - Event detail modal implemented and opened via EventsGrid click
+  - Robust defensive data handling and proper keys
+  - Theme variables applied non-destructively
 */
 
-// --- Utility ---
+/* ---------- Utilities ---------- */
 const safeArray = (v) => (Array.isArray(v) ? v : v ? [v] : []);
 const normalizeLanding = (raw) => {
 	if (!raw) return null;
@@ -65,12 +67,11 @@ const findTitleSponsor = (partners = []) => {
 	);
 };
 
-/* --- Partners showcase: prominent full-width section --- */
+/* ---------- Partners showcase (prominent) ---------- */
 const PartnersShowcase = ({ partners = [], titleSponsor = null }) => {
 	if (!partners || partners.length === 0) return null;
-
 	return (
-		<section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mt-8">
+		<section id="partners" className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mt-8">
 			<div className="glass-card p-6">
 				<div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-6">
 					<div className="min-w-0">
@@ -81,7 +82,7 @@ const PartnersShowcase = ({ partners = [], titleSponsor = null }) => {
 							Our Partners
 						</h2>
 						<p className="mt-2 muted">
-							We work with organizations across tiers — from title sponsors to
+							We collaborate with organizations across tiers — from title sponsors to
 							community partners.
 							{titleSponsor ? ` Proudly presented by ${titleSponsor.name}.` : ''}
 						</p>
@@ -94,6 +95,7 @@ const PartnersShowcase = ({ partners = [], titleSponsor = null }) => {
 								target={titleSponsor.website ? '_blank' : '_self'}
 								rel={titleSponsor.website ? 'noopener noreferrer' : undefined}
 								className="btn-ghost small"
+								onClick={(e) => e.stopPropagation()}
 							>
 								{titleSponsor.logo?.url ? (
 									<img
@@ -106,14 +108,18 @@ const PartnersShowcase = ({ partners = [], titleSponsor = null }) => {
 								)}
 							</a>
 						)}
-						<a href="#partners" className="btn-primary small">
+						<a
+							href="#partners"
+							className="btn-primary small"
+							onClick={(e) => e.preventDefault()}
+						>
 							View all partners
 						</a>
 					</div>
 				</div>
 
+				{/* bigger grid for prominence, responsive */}
 				<div className="mt-6">
-					{/* larger grid to make partners prominent */}
 					<PartnersGrid
 						partners={partners.slice(0, 24)}
 						className="!grid-cols-3 sm:!grid-cols-4 md:!grid-cols-6"
@@ -124,9 +130,8 @@ const PartnersShowcase = ({ partners = [], titleSponsor = null }) => {
 	);
 };
 
-// --- FAQ Section (search removed, kept accessible) ---
+/* ---------- FAQ (no search) ---------- */
 const FAQList = ({ faqs = [] }) => {
-	// search removed as requested
 	const [expanded, setExpanded] = useState({});
 
 	useEffect(() => setExpanded({}), [faqs]);
@@ -140,15 +145,13 @@ const FAQList = ({ faqs = [] }) => {
 			aria-labelledby="arvantis-faqs"
 			className="mt-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8"
 		>
-			<div className="flex items-center justify-between mb-4">
-				<h3 id="arvantis-faqs" className="section-title flex items-center gap-2">
-					<HelpCircle size={20} className="text-[var(--accent-1)]" /> FAQs
-				</h3>
-			</div>
+			<h3 id="arvantis-faqs" className="section-title flex items-center gap-2">
+				<HelpCircle size={20} className="text-[var(--accent-1)]" /> FAQs
+			</h3>
 
-			<div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+			<div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
 				{faqs.map((f, i) => {
-					const id = f._id || i;
+					const id = f._id || `faq-${i}`;
 					const open = !!expanded[id];
 					return (
 						<article
@@ -186,7 +189,7 @@ const FAQList = ({ faqs = [] }) => {
 											type="button"
 											className="btn-ghost small"
 											onClick={() => {
-												const url = `${window.location.origin}${window.location.pathname}#faq-${id}`;
+												const url = `${window.location.origin}${window.location.pathname}#${id}`;
 												navigator.clipboard?.writeText?.(url);
 												window.dispatchEvent(
 													new CustomEvent('toast', {
@@ -208,11 +211,14 @@ const FAQList = ({ faqs = [] }) => {
 	);
 };
 
-// --- Main Page ---
+/* ---------- Main page ---------- */
 const ArvantisPage = () => {
+	// page state
 	const [identifier, setIdentifier] = useState(null);
 	const [selectedImage, setSelectedImage] = useState(null);
+	const [selectedEvent, setSelectedEvent] = useState(null);
 
+	// data fetchers
 	const landingQuery = useQuery({
 		queryKey: ['arvantis', 'landing'],
 		queryFn: getArvantisLandingData,
@@ -269,6 +275,7 @@ const ArvantisPage = () => {
 	const partners = useMemo(() => safeArray(fest?.partners), [fest]);
 	const titleSponsor = useMemo(() => findTitleSponsor(partners), [partners]);
 
+	// stats
 	const stats = useMemo(() => {
 		const safe = fest || {};
 		return [
@@ -279,6 +286,7 @@ const ArvantisPage = () => {
 		];
 	}, [fest]);
 
+	// loading / error
 	const isLoading = landingQuery.isLoading || editionsQuery.isLoading || detailsQuery.isLoading;
 	const isError = landingQuery.isError || editionsQuery.isError || detailsQuery.isError;
 	const errorMsg =
@@ -294,13 +302,15 @@ const ArvantisPage = () => {
 	}, []);
 
 	const handleImageClick = useCallback((img) => setSelectedImage(img), []);
+	const handleEventClick = useCallback((ev) => setSelectedEvent(ev), []);
+	const closeEventModal = useCallback(() => setSelectedEvent(null), []);
 
-	// apply fest theme colors to this container via CSS variables (non-destructive)
+	// theming: apply fest theme colors non-destructively
 	const themeVars = useMemo(() => {
-		return {
-			['--accent-1']: fest?.themeColors?.primary || undefined,
-			['--accent-2']: fest?.themeColors?.accent || undefined,
-		};
+		const vars = {};
+		if (fest?.themeColors?.primary) vars['--accent-1'] = fest.themeColors.primary;
+		if (fest?.themeColors?.accent) vars['--accent-2'] = fest.themeColors.accent;
+		return vars;
 	}, [fest]);
 
 	if (isLoading) return <LoadingBlock label="Loading Arvantis..." />;
@@ -308,7 +318,7 @@ const ArvantisPage = () => {
 
 	return (
 		<div className="arvantis-page" style={themeVars}>
-			{/* Top editions */}
+			{/* Editions navigation */}
 			<EditionsStrip
 				editions={editions}
 				currentIdentifier={identifier}
@@ -319,18 +329,19 @@ const ArvantisPage = () => {
 			{/* Hero */}
 			<PosterHero fest={fest} />
 
-			{/* Prominent partners showcase (full width) */}
+			{/* Prominent partners (full-width) */}
 			<PartnersShowcase partners={partners} titleSponsor={titleSponsor} />
 
-			{/* Organized layout: main + right sidebar */}
+			{/* Main content container */}
 			<div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mt-8 grid grid-cols-1 lg:grid-cols-3 gap-8">
 				{/* Main column */}
-				<main className="lg:col-span-2 space-y-8">
-					{/* Always-visible summary: name, tagline, location, description */}
-					<section className="glass-card p-6">
+				<main className="lg:col-span-2 space-y-8" id="maincontent" tabIndex={-1}>
+					{/* Summary card: title, tagline, description, location */}
+					<section className="glass-card p-6" aria-labelledby="fest-summary">
 						<div className="flex flex-col md:flex-row md:items-start md:gap-6">
 							<div className="flex-1 min-w-0">
 								<h1
+									id="fest-summary"
 									className="text-2xl font-extrabold"
 									style={{ color: 'var(--text-primary)' }}
 								>
@@ -351,11 +362,11 @@ const ArvantisPage = () => {
 								</div>
 
 								<div
-									className="mt-4 flex items-center gap-4 text-sm"
+									className="mt-4 flex flex-wrap items-center gap-4 text-sm"
 									style={{ color: 'var(--text-secondary)' }}
 								>
 									<div className="inline-flex items-center gap-2">
-										<Calendar size={16} />{' '}
+										<Calendar size={16} />
 										<span>
 											{fest?.startDate
 												? new Date(fest.startDate).toLocaleDateString()
@@ -363,13 +374,18 @@ const ArvantisPage = () => {
 										</span>
 									</div>
 									<div className="inline-flex items-center gap-2">
-										<ExternalLink size={16} />{' '}
+										<ExternalLink size={16} />
 										<span>{fest?.location || 'Location TBA'}</span>
 									</div>
+									{fest?.contactEmail && (
+										<div className="inline-flex items-center gap-2 mono">
+											📧 {fest.contactEmail}
+										</div>
+									)}
 								</div>
 							</div>
 
-							{/* quick actions visible on larger screens */}
+							{/* quick actions */}
 							<div className="mt-4 md:mt-0 md:flex-shrink-0 flex flex-col gap-3">
 								{fest?.tickets?.url && (
 									<a
@@ -388,24 +404,19 @@ const ArvantisPage = () => {
 						</div>
 					</section>
 
-					{/* Events list */}
-					<EventsGrid
-						events={events}
-						onEventClick={() => {
-							/* event modal handled elsewhere */
-						}}
-					/>
+					{/* Events */}
+					<EventsGrid events={events} onEventClick={handleEventClick} />
 
 					{/* Gallery */}
 					<GalleryGrid gallery={fest?.gallery || []} onImageClick={handleImageClick} />
 
-					{/* FAQ */}
+					{/* FAQs */}
 					<FAQList faqs={fest?.faqs || []} />
 				</main>
 
-				{/* Right sidebar */}
-				<aside className="space-y-6">
-					{/* Stats */}
+				{/* Sidebar */}
+				<aside className="space-y-6" aria-label="Sidebar">
+					{/* Overview / stats */}
 					<div className="glass-card p-4">
 						<div className="text-sm text-[var(--text-secondary)]">Overview</div>
 						<div className="mt-3 grid grid-cols-2 gap-3">
@@ -483,9 +494,16 @@ const ArvantisPage = () => {
 				</aside>
 			</div>
 
-			{/* Lightbox */}
+			{/* Modals */}
 			{selectedImage && (
 				<ImageLightbox image={selectedImage} onClose={() => setSelectedImage(null)} />
+			)}
+			{selectedEvent && (
+				<EventDetailModal
+					event={selectedEvent}
+					isOpen={!!selectedEvent}
+					onClose={closeEventModal}
+				/>
 			)}
 		</div>
 	);
