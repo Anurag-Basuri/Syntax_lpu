@@ -32,11 +32,12 @@
 
 	/* Neutral / background family (light defaults) */
 	/* Slightly richer base gradient and a stronger bluish overlay for visible depth */
-	--bg-base: linear-gradient(180deg,#f7fbff 0%, #eef6ff 56%);
+	--bg-base: linear-gradient(180deg, #f7fbff 0%, #eef6ff 56%);
 	--bg-soft: #ffffff;
 	--bg-softer: rgba(255, 255, 255, 0.96);
 	--bg-muted: #eaf6ff;
-	--bg-overlay: radial-gradient(30rem 20rem at 8% 12%, rgba(11,116,255,0.045), transparent), radial-gradient(18rem 12rem at 92% 78%, rgba(37,99,235,0.03), transparent);
+	--bg-overlay: radial-gradient(30rem 20rem at 8% 12%, rgba(11, 116, 255, 0.045), transparent),
+		radial-gradient(18rem 12rem at 92% 78%, rgba(37, 99, 235, 0.03), transparent);
 
 	/* Nav / glass surfaces (light defaults) */
 	/* stronger glass border and hover to make edges readable on bright backgrounds */
@@ -44,7 +45,7 @@
 	--nav-border: rgba(6, 42, 86, 0.08);
 	--glass-bg: rgba(255, 255, 255, 0.96);
 	--glass-border: rgba(6, 42, 86, 0.08);
-	--glass-hover: rgba(6, 42, 86, 0.10);
+	--glass-hover: rgba(6, 42, 86, 0.1);
 
 	/* Text — increased contrast */
 	--text-primary: #02243a; /* stronger cool/blue heading color */
@@ -54,13 +55,13 @@
 	/* Buttons & inputs */
 	--button-primary-bg: linear-gradient(135deg, var(--accent-1), var(--accent-2));
 	--button-primary-hover: linear-gradient(135deg, #0971e6, #1e40af);
-	--button-primary-shadow: 0 10px 36px rgba(11,116,255,0.12);
+	--button-primary-shadow: 0 10px 36px rgba(11, 116, 255, 0.12);
 	--button-secondary-bg: rgba(255, 255, 255, 0.94);
 	--button-secondary-border: rgba(6, 42, 86, 0.08);
 
 	--input-bg: rgba(255, 255, 255, 0.98);
-	--input-border: rgba(6, 42, 86, 0.10);
-	--input-border-focus: rgba(11,116,255,0.36);
+	--input-border: rgba(6, 42, 86, 0.1);
+	--input-border-focus: rgba(11, 116, 255, 0.36);
 
 	/* Cards */
 	--card-bg: rgba(255, 255, 255, 0.98);
@@ -68,8 +69,8 @@
 	--card-hover-bg: rgba(247, 250, 255, 0.98);
 
 	/* Focus & shadows */
-	--focus-ring: 0 0 0 4px rgba(11,116,255,0.12);
-	--nav-shadow-elevated: 0 12px 42px rgba(6, 42, 86, 0.10);
+	--focus-ring: 0 0 0 4px rgba(11, 116, 255, 0.12);
+	--nav-shadow-elevated: 0 12px 42px rgba(6, 42, 86, 0.1);
 
 	/* accessory helpers (safe defaults) */
 	--input-text: var(--text-primary);
@@ -81,8 +82,8 @@
 	/* shadow tokens (slightly stronger for bright mode) */
 	--shadow-sm: 0 6px 18px rgba(6, 42, 86, 0.06);
 	--shadow-md: 0 12px 36px rgba(6, 42, 86, 0.08);
-	--shadow-lg: 0 24px 80px rgba(6, 42, 86, 0.10);
-	--glow-blue: 0 10px 56px rgba(11,116,255,0.14);
+	--shadow-lg: 0 24px 80px rgba(6, 42, 86, 0.1);
+	--glow-blue: 0 10px 56px rgba(11, 116, 255, 0.14);
 }
 
 /* Dark theme overrides — unchanged */
@@ -92,11 +93,12 @@
 	--accent-2: #06b6d4;
 	--accent-glow: rgba(34, 211, 238, 0.22);
 
-	--bg-base: linear-gradient(180deg,#04121a 0%, #061726 70%);
+	--bg-base: linear-gradient(180deg, #04121a 0%, #061726 70%);
 	--bg-soft: #071826;
 	--bg-softer: rgba(6, 10, 14, 0.64);
 	--bg-muted: #071a22;
-	--bg-overlay: radial-gradient(36rem 22rem at 6% 14%, rgba(34,211,238,0.03), transparent), radial-gradient(22rem 14rem at 90% 82%, rgba(6,182,212,0.02), transparent);
+	--bg-overlay: radial-gradient(36rem 22rem at 6% 14%, rgba(34, 211, 238, 0.03), transparent),
+		radial-gradient(22rem 14rem at 90% 82%, rgba(6, 182, 212, 0.02), transparent);
 
 	--nav-bg: rgba(4, 6, 10, 0.62);
 	--nav-border: rgba(255, 255, 255, 0.04);
@@ -133,23 +135,99 @@
 	--glow-blue: 0 10px 30px rgba(34, 211, 238, 0.06);
 }
 
-/* Light theme explicit overrides (toggle by setting data-theme="light") */
-:root[data-theme='light'] {
-	/* ensure glass and interactive states are more visible in bright contexts */
-	--glass-bg: rgba(255, 255, 255, 0.98);
-	--glass-border: rgba(6, 42, 86, 0.10);
-	--input-bg: rgba(255, 255, 255, 0.99);
-	--input-border: rgba(6, 42, 86, 0.10);
-	--input-text: #02243a;
-	--input-placeholder: #6b8fa6;
-	--card-bg: rgba(255, 255, 255, 0.99);
-	--card-border: rgba(6, 42, 86, 0.06);
-	--bg-softer: rgba(255, 255, 255, 0.96);
+/* Light theme explicit overrides — improved color tokens for better contrast */
+:root[data-theme='light'],
+[data-theme='light'] {
+	/* Page / surfaces */
+	--bg: transparent; /* keep page transparent as requested */
+	--card-bg: rgba(255, 255, 255, 0.92); /* primary card surface */
+	--glass-bg: rgba(255, 255, 255, 0.7); /* glass panels (translucent white) */
+	--glass-border: rgba(2, 6, 23, 0.06); /* subtle border that shows on light bg */
 
-	/* stronger bluish glow + hover for light contexts */
-	--glow-blue: 0 12px 64px rgba(11,116,255,0.16);
-	--glass-hover: rgba(6, 42, 86, 0.10);
-	--nav-shadow-elevated: 0 18px 56px rgba(6, 42, 86, 0.12);
+	/* Text */
+	--text-primary: #0f1724; /* dark, high-contrast primary text */
+	--text-secondary: #475569; /* medium secondary */
+	--text-muted: rgba(15, 23, 36, 0.55);
+
+	/* Accents */
+	--accent-1: #0ea5a4; /* teal/cyan (works on light & dark) */
+	--accent-2: #7c3aed; /* violet */
+	--accent-glow: 0 12px 40px rgba(14, 165, 164, 0.08), 0 6px 24px rgba(124, 58, 237, 0.05);
+
+	/* Shadows / elevation tuned for light mode */
+	--shadow-md: 0 8px 30px rgba(15, 23, 42, 0.06);
+
+	/* Buttons */
+	--button-primary-bg: linear-gradient(90deg, var(--accent-1), var(--accent-2));
+	--button-secondary-bg: rgba(2, 6, 23, 0.04);
+	--button-secondary-border: rgba(2, 6, 23, 0.06);
+
+	/* Misc */
+	--focus-ring: rgba(14, 165, 164, 0.18);
+}
+
+/* Ensure Arvantis page uses tokenized colors and stays transparent */
+.arvantis-page {
+	background: var(--bg, transparent) !important;
+	color: var(--text-primary);
+}
+
+/* Make glass-card readable in light mode and consistent across themes.
+   Index.css controls global .glass-card; adjust here to use tokens above. */
+.glass-card {
+	background: var(--glass-bg);
+	border: 1px solid var(--glass-border);
+	color: var(--text-primary);
+	border-radius: 0.75rem;
+	padding: 1rem;
+	-webkit-backdrop-filter: blur(8px) saturate(120%);
+	backdrop-filter: blur(8px) saturate(120%);
+	box-shadow: var(--shadow-md);
+}
+
+/* Controls / Buttons — ensure primary is legible on bright backgrounds */
+.btn-primary {
+	background: var(--button-primary-bg);
+	color: #fff;
+	box-shadow: var(--accent-glow);
+	border: none;
+}
+.btn-primary:focus,
+.btn-primary:active {
+	outline: 3px solid var(--focus-ring);
+	outline-offset: 2px;
+}
+
+.btn-ghost {
+	background: var(--button-secondary-bg);
+	color: var(--text-primary);
+	border: 1px solid var(--button-secondary-border);
+}
+
+/* Ensure muted / secondary text uses defined tokens */
+.muted,
+.text-muted {
+	color: var(--text-muted) !important;
+}
+
+/* Partner cells and tiles: use glass surface so logos are visible */
+.partner-cell,
+.partner-logo,
+.poster-main-img,
+.gallery-tile img {
+	background: transparent;
+	color: var(--text-primary);
+}
+
+/* Make headings/titles stand out on light backgrounds */
+.section-title {
+	color: var(--text-primary);
+}
+
+/* Small utility: focus visible for keyboard users */
+:focus-visible {
+	outline: 3px solid var(--focus-ring);
+	outline-offset: 2px;
 }
 
 /* Respect system preference if no explicit data-theme set.
@@ -190,11 +268,7 @@ html {
    subtle depth in both light and dark modes. Background is fixed to give
    a pleasant parallax-like feel on scroll. */
 body {
-	font-family:
-		'Inter',
-		system-ui,
-		-apple-system,
-		sans-serif;
+	font-family: 'Inter', system-ui, -apple-system, sans-serif;
 	color: var(--text-secondary);
 	background-image: var(--bg-overlay), var(--bg-base);
 	background-repeat: no-repeat, repeat;
@@ -203,9 +277,7 @@ body {
 	background-position: center center, center top;
 	background-color: var(--bg-base);
 	line-height: 1.65;
-	transition:
-		background-color 0.25s var(--transition-fast),
-		color 0.25s var(--transition-fast);
+	transition: background-color 0.25s var(--transition-fast), color 0.25s var(--transition-fast);
 }
 
 h1,
@@ -214,11 +286,7 @@ h3,
 h4,
 h5,
 h6 {
-	font-family:
-		'Space Grotesk',
-		system-ui,
-		-apple-system,
-		sans-serif;
+	font-family: 'Space Grotesk', system-ui, -apple-system, sans-serif;
 	color: var(--text-primary);
 	font-weight: 700;
 	letter-spacing: -0.025em;
@@ -250,9 +318,7 @@ select {
 	color: var(--input-text);
 	background: var(--input-bg);
 	border: 1px solid var(--input-border);
-	transition:
-		border-color var(--transition-fast),
-		box-shadow var(--transition-fast),
+	transition: border-color var(--transition-fast), box-shadow var(--transition-fast),
 		background-color var(--transition-fast);
 }
 
@@ -303,9 +369,7 @@ textarea::placeholder {
 	border: 1px solid var(--glass-border);
 	background-color: color-mix(in srgb, var(--glass-bg) 70%, transparent);
 	color: var(--input-text);
-	transition:
-		border-color var(--t-fast),
-		box-shadow var(--t-fast);
+	transition: border-color var(--t-fast), box-shadow var(--t-fast);
 }
 
 .auth-input:focus {
@@ -330,9 +394,7 @@ textarea::placeholder {
 	font-weight: 600;
 	font-size: 1rem;
 	box-shadow: var(--shadow-sm);
-	transition:
-		transform 0.25s var(--transition-fast),
-		box-shadow 0.25s var(--transition-fast);
+	transition: transform 0.25s var(--transition-fast), box-shadow 0.25s var(--transition-fast);
 }
 
 .auth-button:hover:not(:disabled) {
