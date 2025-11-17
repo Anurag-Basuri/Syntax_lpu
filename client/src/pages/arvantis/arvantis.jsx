@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import {
 	HelpCircle,
@@ -27,8 +27,7 @@ import {
 } from '../../services/arvantisServices.js';
 import '../../arvantis.css';
 
-const PARTNERS_PREVIEW = 8;
-
+// --- Utility ---
 const safeArray = (v) => (Array.isArray(v) ? v : v ? [v] : []);
 const normalizeLanding = (raw) => {
 	if (!raw) return null;
@@ -42,7 +41,6 @@ const normalizeLanding = (raw) => {
 	}
 	return raw;
 };
-
 const findTitleSponsor = (partners = []) => {
 	if (!partners || partners.length === 0) return null;
 	const byTier = partners.find(
@@ -57,7 +55,6 @@ const findTitleSponsor = (partners = []) => {
 		) || null
 	);
 };
-
 const groupPartnersByTier = (partners = [], titleSponsor = null) => {
 	const map = new Map();
 	(partners || []).forEach((p) => {
@@ -85,248 +82,7 @@ const groupPartnersByTier = (partners = [], titleSponsor = null) => {
 	return arr;
 };
 
-/* --- Prominent Partners section --- */
-const PartnersSection = ({
-	titleSponsor,
-	partnersByTier = [],
-	partners = [],
-	showAll,
-	onToggleShowAll,
-	onPartnerClick = () => {},
-	previewLimit = PARTNERS_PREVIEW,
-}) => {
-	const visiblePartners = showAll ? partners : partners.slice(0, previewLimit);
-
-	return (
-		<section aria-labelledby="arvantis-partners" className="mt-8">
-			<h3 id="arvantis-partners" className="section-title">
-				Partners & Sponsors
-			</h3>
-			{titleSponsor ? (
-				<div
-					className="glass-card p-5 mt-4 flex flex-col md:flex-row items-center gap-4"
-					role="region"
-					aria-label="Title sponsor"
-				>
-					<div className="flex items-center gap-4">
-						<div
-							className="w-20 h-20 rounded-lg overflow-hidden bg-white/5 flex items-center justify-center"
-							style={{ border: '1px solid rgba(255,255,255,0.04)' }}
-						>
-							{titleSponsor.logo?.url ? (
-								<img
-									src={titleSponsor.logo.url}
-									alt={titleSponsor.name}
-									className="w-full h-full object-contain"
-								/>
-							) : (
-								<div
-									className="text-sm font-semibold mono"
-									style={{ color: 'var(--text-primary)' }}
-								>
-									{titleSponsor.name}
-								</div>
-							)}
-						</div>
-						<div>
-							<div className="text-sm text-[var(--text-secondary)]">
-								Title sponsor
-							</div>
-							<div
-								className="text-xl font-extrabold"
-								style={{ color: 'var(--text-primary)' }}
-							>
-								{titleSponsor.name}
-							</div>
-							{titleSponsor.tier && (
-								<div className="text-xs muted mt-1">{titleSponsor.tier}</div>
-							)}
-						</div>
-					</div>
-					<div className="flex-1 text-sm text-[var(--text-secondary)] md:pl-6">
-						{titleSponsor.description ? (
-							<p className="mb-2" style={{ color: 'var(--text-primary)' }}>
-								{titleSponsor.description}
-							</p>
-						) : (
-							<p className="mb-2 muted">No description provided.</p>
-						)}
-						<div className="flex items-center gap-3">
-							{titleSponsor.website && (
-								<a
-									href={titleSponsor.website}
-									target="_blank"
-									rel="noopener noreferrer"
-									onClick={(e) => e.stopPropagation()}
-									className="btn-ghost small"
-								>
-									<ExternalLink size={14} /> Visit website
-								</a>
-							)}
-							{titleSponsor.contact && (
-								<div className="text-xs muted">Contact: {titleSponsor.contact}</div>
-							)}
-						</div>
-					</div>
-					<div className="mt-3 md:mt-0 md:flex-shrink-0">
-						<a
-							href={titleSponsor.website || '#'}
-							target={titleSponsor.website ? '_blank' : '_self'}
-							rel={titleSponsor.website ? 'noopener noreferrer' : undefined}
-							onClick={(e) => e.stopPropagation()}
-							className="btn-primary neon-btn"
-							style={{ whiteSpace: 'nowrap' }}
-						>
-							Learn about {titleSponsor.name}
-						</a>
-					</div>
-				</div>
-			) : (
-				<div className="muted mt-2">No title sponsor for this edition.</div>
-			)}
-			<div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mt-6 items-start">
-				<div className="glass-card p-4">
-					<div className="text-sm text-[var(--text-secondary)]">Partners summary</div>
-					<div
-						className="font-semibold text-2xl mono"
-						style={{ color: 'var(--text-primary)' }}
-					>
-						{partners.length}
-					</div>
-					<div className="mt-3 text-sm muted">
-						Partners are shown grouped by tier. Click a logo to open their website.
-					</div>
-					<button
-						onClick={onToggleShowAll}
-						className="btn-ghost small mt-4"
-						aria-pressed={showAll}
-					>
-						{showAll ? 'Show less' : `Show all (${partners.length})`}
-					</button>
-				</div>
-				<div className="glass-card p-4 lg:col-span-1">
-					<div className="text-sm text-[var(--text-secondary)]">Featured partners</div>
-					<div className="mt-3 grid grid-cols-2 sm:grid-cols-3 gap-3">
-						{visiblePartners.length === 0 ? (
-							<div className="muted">No partners yet.</div>
-						) : (
-							visiblePartners.map((p, idx) => (
-								<button
-									key={p?.name || idx}
-									onClick={() => {
-										onPartnerClick(p);
-										if (p.website) window.open(p.website, '_blank', 'noopener');
-									}}
-									className="partner-cell group flex items-center justify-center p-3 rounded-xl transition-transform duration-300"
-									title={p.name}
-									style={{
-										background: 'var(--glass-bg)',
-										border: '1px solid var(--glass-border)',
-									}}
-								>
-									{p.logo?.url ? (
-										<img
-											src={p.logo.url}
-											alt={p.name}
-											className="partner-logo"
-											loading="lazy"
-										/>
-									) : (
-										<div
-											className="text-sm font-semibold"
-											style={{ color: 'var(--text-primary)' }}
-										>
-											{p.name}
-										</div>
-									)}
-								</button>
-							))
-						)}
-					</div>
-				</div>
-				<div className="glass-card p-4">
-					<div className="text-sm text-[var(--text-secondary)]">Partner tiers</div>
-					<div className="mt-3 space-y-3">
-						{partnersByTier.length === 0 ? (
-							<div className="muted">No partners listed.</div>
-						) : (
-							partnersByTier.map(([tier, list]) => (
-								<div key={tier} className="detail-card p-3">
-									<div className="flex items-center justify-between">
-										<div
-											className="font-semibold"
-											style={{ color: 'var(--text-primary)' }}
-										>
-											{tier.replace(/(^\w)|-\w/g, (m) => m.toUpperCase())} (
-											{list.length})
-										</div>
-									</div>
-									<ul className="mt-3 grid grid-cols-1 gap-2">
-										{list.map((p, i) => (
-											<li
-												key={`${p.name}-${i}`}
-												className="flex items-start gap-3"
-											>
-												<div
-													className="w-12 h-10 rounded-md overflow-hidden bg-white/3 flex items-center justify-center"
-													style={{
-														border: '1px solid rgba(255,255,255,0.02)',
-													}}
-												>
-													{p.logo?.url ? (
-														<img
-															src={p.logo.url}
-															alt={p.name}
-															className="w-full h-full object-contain"
-														/>
-													) : (
-														<div className="text-xs mono">
-															{(p.name || '').slice(0, 4)}
-														</div>
-													)}
-												</div>
-												<div className="min-w-0">
-													<div
-														className="font-medium"
-														style={{ color: 'var(--text-primary)' }}
-													>
-														{p.name}
-													</div>
-													{p.description ? (
-														<div className="text-xs muted mt-1">
-															{p.description}
-														</div>
-													) : (
-														<div className="text-xs muted mt-1">
-															No description provided.
-														</div>
-													)}
-													{p.website && (
-														<a
-															href={p.website}
-															target="_blank"
-															rel="noopener noreferrer"
-															className="text-xs mt-1 inline-flex items-center gap-1 text-indigo-400"
-															onClick={(e) => e.stopPropagation()}
-														>
-															<ExternalLink size={12} /> Visit
-														</a>
-													)}
-												</div>
-											</li>
-										))}
-									</ul>
-								</div>
-							))
-						)}
-					</div>
-				</div>
-			</div>
-		</section>
-	);
-};
-
-/* --- Enhanced FAQList: industry-level UI with clearer layout & accessibility --- */
+// --- FAQ Section ---
 const FAQList = ({ faqs = [] }) => {
 	const [query, setQuery] = useState('');
 	const [expandedMap, setExpandedMap] = useState({});
@@ -460,6 +216,7 @@ const FAQList = ({ faqs = [] }) => {
 	);
 };
 
+// --- Main Page ---
 const ArvantisPage = () => {
 	const [identifier, setIdentifier] = useState(null);
 	const [selectedEvent, setSelectedEvent] = useState(null);
@@ -594,14 +351,78 @@ const ArvantisPage = () => {
 				))}
 			</div>
 
-			{/* Partners Section - improved */}
-			<PartnersSection
-				titleSponsor={titleSponsor}
-				partnersByTier={partnersByTier}
-				partners={partners}
-				showAll={showAllPartners}
-				onToggleShowAll={() => setShowAllPartners((s) => !s)}
-			/>
+			{/* Partners Section */}
+			<section aria-labelledby="arvantis-partners" className="mt-8">
+				<h3 id="arvantis-partners" className="section-title mb-6">
+					Partners & Sponsors
+				</h3>
+				{titleSponsor && (
+					<div className="glass-card p-5 mb-6 flex flex-col md:flex-row items-center gap-4">
+						<div className="flex items-center gap-4">
+							<div
+								className="w-20 h-20 rounded-lg overflow-hidden bg-white/5 flex items-center justify-center"
+								style={{ border: '1px solid rgba(255,255,255,0.04)' }}
+							>
+								{titleSponsor.logo?.url ? (
+									<img
+										src={titleSponsor.logo.url}
+										alt={titleSponsor.name}
+										className="w-full h-full object-contain"
+									/>
+								) : (
+									<div
+										className="text-sm font-semibold mono"
+										style={{ color: 'var(--text-primary)' }}
+									>
+										{titleSponsor.name}
+									</div>
+								)}
+							</div>
+							<div>
+								<div className="text-sm text-[var(--text-secondary)]">
+									Title sponsor
+								</div>
+								<div
+									className="text-xl font-extrabold"
+									style={{ color: 'var(--text-primary)' }}
+								>
+									{titleSponsor.name}
+								</div>
+								{titleSponsor.tier && (
+									<div className="text-xs muted mt-1">{titleSponsor.tier}</div>
+								)}
+							</div>
+						</div>
+						<div className="flex-1 text-sm text-[var(--text-secondary)] md:pl-6">
+							{titleSponsor.description ? (
+								<p className="mb-2" style={{ color: 'var(--text-primary)' }}>
+									{titleSponsor.description}
+								</p>
+							) : (
+								<p className="mb-2 muted">No description provided.</p>
+							)}
+							<div className="flex items-center gap-3">
+								{titleSponsor.website && (
+									<a
+										href={titleSponsor.website}
+										target="_blank"
+										rel="noopener noreferrer"
+										className="btn-ghost small"
+									>
+										<ExternalLink size={14} /> Visit website
+									</a>
+								)}
+								{titleSponsor.contact && (
+									<div className="text-xs muted">
+										Contact: {titleSponsor.contact}
+									</div>
+								)}
+							</div>
+						</div>
+					</div>
+				)}
+				<PartnersGrid partners={partners} />
+			</section>
 
 			{/* Events */}
 			<EventsGrid events={filteredEvents} onEventClick={handleEventClick} />
@@ -609,7 +430,7 @@ const ArvantisPage = () => {
 			{/* Gallery */}
 			<GalleryGrid gallery={fest?.gallery || []} onImageClick={handleImageClick} />
 
-			{/* FAQ Section - always visible, improved */}
+			{/* FAQ Section */}
 			<FAQList faqs={fest?.faqs || []} />
 
 			{/* Image Lightbox */}
