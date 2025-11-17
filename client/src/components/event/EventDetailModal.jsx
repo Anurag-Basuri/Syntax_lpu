@@ -77,7 +77,8 @@ const EventDetailModal = ({ event: initialEvent, isOpen, onClose }) => {
 	const previouslyFocusedRef = useRef(null);
 
 	// follow application theme (modal uses global theme; no toggle here)
-	const themeCtx = useTheme(); // not used locally, but ensures modal follows app theme
+	const themeCtx = useTheme(); // returns { mode, theme, setMode, toggleMode } per app
+	const theme = themeCtx?.theme ?? (Array.isArray(themeCtx) ? themeCtx[0] : 'light');
 
 	const { data: event } = useQuery({
 		queryKey: ['event-full', id],
@@ -246,19 +247,25 @@ const EventDetailModal = ({ event: initialEvent, isOpen, onClose }) => {
 				initial={{ opacity: 0 }}
 				animate={{ opacity: 1 }}
 				exit={{ opacity: 0 }}
-				className="fixed inset-0 z-[9999] flex items-center justify-center"
+				// sit above everything (including navbar) and align near top so poster is visible immediately
+				className="fixed inset-0 z-[99999] flex items-start justify-center"
+				style={{
+					// small top padding so modal isn't flush with the OS/browser UI
+					paddingTop: '1.25rem',
+					paddingBottom: '1.25rem',
+				}}
 			>
-				{/* blurred backdrop above navbar */}
+				{/* blurred backdrop above everything */}
 				<motion.div
 					initial={{ opacity: 0 }}
 					animate={{ opacity: 1 }}
 					exit={{ opacity: 0 }}
-					className="absolute inset-0 bg-black/40 backdrop-blur-xl"
+					// stronger blur + slightly darker overlay for premium feel
+					className="absolute inset-0 bg-black/50 backdrop-blur-3xl"
 					onClick={onClose}
-					aria-hidden="true"
 				/>
 
-				{/* modal container */}
+				{/* modal */}
 				<motion.div
 					ref={modalRootRef}
 					initial={{ y: 8, scale: 0.995, opacity: 0 }}
@@ -268,16 +275,16 @@ const EventDetailModal = ({ event: initialEvent, isOpen, onClose }) => {
 					role="dialog"
 					aria-modal="true"
 					aria-label={`Event details: ${title}`}
-					className="relative z-10 w-full max-w-3xl rounded-2xl shadow-2xl overflow-hidden flex flex-col bg-white dark:bg-slate-900 ring-1 ring-black/5"
+					className="relative z-10 w-full max-w-5xl rounded-2xl shadow-2xl overflow-hidden flex flex-col bg-white dark:bg-slate-900 ring-1 ring-black/5"
 					style={{ maxHeight: modalMaxHeight }}
 					tabIndex={-1}
 				>
-					{/* Poster */}
-					<div className="relative w-full h-64 md:h-80 flex-shrink-0 bg-slate-100 dark:bg-slate-800">
+					{/* Poster (visual only) — rounded top and overflow-hidden for a polished header */}
+					<div className="relative w-full h-64 md:h-80 flex-shrink-0 bg-slate-100 dark:bg-slate-800 rounded-t-2xl overflow-hidden">
 						{poster ? (
 							<img
 								src={poster}
-								alt={title}
+								alt={`${title} poster`}
 								className="w-full h-full object-cover"
 								loading="lazy"
 								decoding="async"
@@ -287,27 +294,18 @@ const EventDetailModal = ({ event: initialEvent, isOpen, onClose }) => {
 								<div className="text-6xl text-white/90">🎭</div>
 							</div>
 						)}
-
-						{/* overlay: title/meta + close */}
-						<div className="absolute inset-0 flex flex-col justify-end p-4 bg-gradient-to-t from-black/50 to-transparent">
-							<div className="flex items-start justify-between gap-4">
-								<div className="min-w-0">
-									<h3 className="text-xl md:text-2xl font-semibold text-white truncate">
-										{title}
-									</h3>
-									<div className="text-sm text-white/90 mt-1">
-										{dateLabel} · {venue}
-									</div>
-								</div>
-
-								<button
-									onClick={onClose}
-									className="ml-3 p-2 rounded-full bg-white/10 hover:bg-white/20 text-white"
-									aria-label="Close"
-								>
-									<X size={20} />
-								</button>
-							</div>
+						{/* top-right close (minimal) */}
+						<div className="absolute top-3 right-3">
+							<button
+								onClick={onClose}
+								className="p-2 rounded-full bg-white/90 dark:bg-slate-900/70 hover:scale-105 transition-transform shadow ring-1 ring-black/10"
+								aria-label="Close"
+							>
+								<X
+									size={18}
+									className={theme === 'dark' ? 'text-white' : 'text-slate-900'}
+								/>
+							</button>
 						</div>
 					</div>
 
@@ -322,37 +320,87 @@ const EventDetailModal = ({ event: initialEvent, isOpen, onClose }) => {
 							overscrollBehavior: 'contain',
 						}}
 					>
-						{/* meta row */}
-						<div className="flex flex-col md:flex-row gap-4 items-start md:items-center">
-							<div className="flex-1 min-w-0">
-								<div className="flex flex-wrap gap-2 mb-2">
-									{tags.slice(0, 8).map((t) => (
-										<span
-											key={t}
-											className="flex items-center gap-2 text-xs px-2 py-1 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-slate-700"
-										>
-											<Tag className="w-3 h-3" /> {t}
-										</span>
-									))}
+						{/* Header (title moved here for clean typographic treatment) */}
+						<header className="space-y-3">
+							<h2 className="text-2xl md:text-3xl font-extrabold leading-tight text-slate-900 dark:text-white">
+								{title}
+							</h2>
+							<div className="flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-6">
+								<div className="flex items-center gap-3 text-sm text-slate-600 dark:text-slate-300">
+									<Calendar className="w-4 h-4 text-indigo-500" />
+									<span>{dateLabel}</span>
+									<span className="mx-1">·</span>
+									<MapPin className="w-4 h-4 text-indigo-500" />
+									<span>{venue}</span>
 								</div>
-								<div className="text-sm text-slate-600 dark:text-slate-300">
-									<DetailRow icon={Calendar} label="When">
-										{dateLabel}
-									</DetailRow>
-									<div className="mt-3">
-										<DetailRow icon={MapPin} label="Where">
-											{venue}
-											{payload.room ? ` • ${payload.room}` : ''}
-										</DetailRow>
+								<div className="ml-auto flex items-center gap-3">
+									<PricePill price={price} />
+								</div>
+							</div>
+							<div className="flex flex-wrap gap-2">
+								{tags.slice(0, 8).map((t) => (
+									<span
+										key={t}
+										className="text-xs px-2 py-1 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-slate-700"
+									>
+										{t}
+									</span>
+								))}
+							</div>
+						</header>
+
+						{/* Partners — prominent showcase */}
+						{partners.length > 0 && (
+							<section className="rounded-xl p-5 bg-gradient-to-r from-indigo-50 to-white dark:from-slate-900 dark:to-slate-800 ring-1 ring-black/5">
+								<div className="flex items-center justify-between mb-4">
+									<div>
+										<div className="text-sm text-indigo-600 font-semibold">
+											Partners
+										</div>
+										<h3 className="text-xl font-bold text-slate-900 dark:text-white">
+											Supported by
+										</h3>
+										<div className="text-sm text-slate-500 dark:text-slate-300 mt-1">
+											We thank our partners for their support.
+										</div>
+									</div>
+									<div className="text-xs text-slate-400">
+										Trusted collaborators
 									</div>
 								</div>
-							</div>
 
-							<div className="flex-shrink-0">
-								<PricePill price={price} />
-							</div>
-						</div>
+								<div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4 items-center">
+									{partners.map((p, i) => (
+										<a
+											key={i}
+											href={p.website || '#'}
+											target="_blank"
+											rel="noreferrer"
+											onClick={(e) => e.stopPropagation()}
+											className={`flex items-center justify-center gap-3 p-3 rounded-lg transition-shadow transform hover:scale-102 ${
+												theme === 'dark'
+													? 'bg-slate-800/60 border border-slate-700'
+													: 'bg-white border border-slate-100'
+											}`}
+										>
+											{p.logo?.url ? (
+												<img
+													src={p.logo.url}
+													alt={p.name}
+													className="max-h-14 object-contain"
+												/>
+											) : (
+												<div className="h-12 w-full rounded bg-slate-100 dark:bg-slate-700 flex items-center justify-center text-xs text-slate-700 dark:text-slate-200 font-medium">
+													{(p.name || '—').slice(0, 18)}
+												</div>
+											)}
+										</a>
+									))}
+								</div>
+							</section>
+						)}
 
+						{/* remaining content: registration, about, speakers, resources, raw JSON (unchanged) */}
 						{/* registration card */}
 						<div className="rounded-xl p-4 bg-slate-50 dark:bg-slate-800 border border-slate-100 dark:border-slate-700">
 							<div className="flex items-center justify-between gap-4">
