@@ -27,16 +27,6 @@ import ErrorBlock from '../../components/Arvantis/ErrorBlock.jsx';
 import LoadingBlock from '../../components/Arvantis/LoadingBlock.jsx';
 import '../../arvantis.css';
 
-/**
- * Major rewrite: industry-grade Arvantis page
- * - Edition switcher moved to top
- * - "Arvantis {year} — powered by {TitleSponsor}" heading
- * - Improved partners presentation with tier grouping and expandable lists
- * - Full event, tracks, faqs, contacts presentation where available
- * - Sticky ticket CTA, robust loading + error handling
- * - Accessibility & keyboard friendly interactions
- */
-
 const ITEMS_IN_PAST_SECTION = 8;
 const PARTNERS_PREVIEW = 8;
 
@@ -104,7 +94,6 @@ const groupPartnersByTier = (partners = [], titleSponsor = null) => {
 	return arr;
 };
 
-// --- New: Industry-grade FAQ list component ---
 // Provides: searchable, long-row layout, accessible expand/collapse, expand-all, copy-link
 const FAQList = ({ faqs = [], visible = false }) => {
 	const [query, setQuery] = useState('');
@@ -252,7 +241,7 @@ const FAQList = ({ faqs = [], visible = false }) => {
 														strokeWidth="1.6"
 													/>
 													<rect
-														x="7"
+													x="7"
 														y="7"
 														width="14"
 														height="14"
@@ -710,9 +699,7 @@ const ArvantisPage = () => {
 							<EventsGrid events={filteredEvents} onEventClick={handleEventClick} />
 						</section>
 
-						{/* Tracks & FAQs */}
-						<div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mt-8">
-							{/* Tracks */}
+						{/* Tracks */}
 							<div className="glass-card p-4">
 								<div className="flex items-center justify-between">
 									<div>
@@ -749,173 +736,6 @@ const ArvantisPage = () => {
 									)
 								)}
 							</div>
-
-							{/* FAQs */}
-							<div className="glass-card p-4">
-								<div className="flex items-center justify-between">
-									<div>
-										<div className="text-sm text-[var(--text-secondary)]">
-											FAQ
-										</div>
-										<div className="font-semibold">
-											{(fest.faqs || []).length} items
-										</div>
-									</div>
-									<button
-										onClick={() => setShowFaqs((s) => !s)}
-										className="btn-ghost small"
-									>
-										{showFaqs ? 'Hide' : 'View'}
-									</button>
-								</div>
-
-								{/* Improved FAQ presentation: long rows with Question (left) and Answer (right).
-									Uses responsive grid: stacked on small screens, long rows on md+. */}
-								{showFaqs && (fest.faqs || []).length > 0 ? (
-									<div
-										className="mt-3 space-y-4"
-										aria-live="polite"
-										aria-label="Frequently asked questions"
-									>
-										{(fest.faqs || []).map((f, i) => (
-											<div key={f._id || i} className="detail-card p-4">
-												<dl className="grid grid-cols-1 md:grid-cols-12 gap-4 items-start">
-													<dt
-														className="md:col-span-4 font-semibold text-base"
-														style={{ color: 'var(--text-primary)' }}
-													>
-														{f.question}
-													</dt>
-													<dd className="md:col-span-8 text-sm muted whitespace-pre-wrap">
-														{f.answer || 'No answer provided.'}
-													</dd>
-												</dl>
-											</div>
-										))}
-									</div>
-								) : (
-									showFaqs && <div className="mt-3 muted">No FAQs yet.</div>
-								)}
-							</div>
-
-							{/* Partners snapshot */}
-							<div className="glass-card p-4">
-								<div className="flex items-center justify-between">
-									<div>
-										<div className="text-sm text-[var(--text-secondary)]">
-											Partners
-										</div>
-										<div className="font-semibold">
-											{partners.length} partners
-										</div>
-									</div>
-									<button
-										onClick={() => setShowAllPartners((s) => !s)}
-										className="btn-ghost small"
-									>
-										{showAllPartners ? 'Collapse' : 'Expand'}
-									</button>
-								</div>
-
-								{titleSponsor && (
-									<div
-										className="mt-4 p-3 rounded-md border flex items-center gap-3"
-										style={{
-											background:
-												'linear-gradient(90deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01))',
-										}}
-									>
-										<div
-											style={{
-												width: 120,
-												height: 56,
-												display: 'flex',
-												alignItems: 'center',
-												justifyContent: 'center',
-											}}
-										>
-											{titleSponsor.logo?.url ? (
-												<img
-													src={titleSponsor.logo.url}
-													alt={titleSponsor.name}
-													style={{ maxHeight: 56, objectFit: 'contain' }}
-												/>
-											) : (
-												<strong>{titleSponsor.name}</strong>
-											)}
-										</div>
-										<div className="flex-1">
-											<div className="text-xs text-[var(--text-secondary)]">
-												Title Sponsor
-											</div>
-											<div className="font-semibold">{titleSponsor.name}</div>
-											{titleSponsor.description && (
-												<div className="text-sm muted">
-													{titleSponsor.description}
-												</div>
-											)}
-										</div>
-										{titleSponsor.website && (
-											<a
-												href={titleSponsor.website}
-												target="_blank"
-												rel="noreferrer"
-												className="btn-ghost small"
-											>
-												<ExternalLink size={14} />
-											</a>
-										)}
-									</div>
-								)}
-
-								{/* grouped tiers (preview or full) */}
-								<div className="mt-4 space-y-4">
-									{partnersByTier.map(([tier, list]) => {
-										const showAll = expandedTiers[tier] || showAllPartners;
-										return (
-											<div key={tier}>
-												<div className="flex items-center justify-between mb-2">
-													<div className="text-sm font-semibold">
-														{tier.toUpperCase()}
-													</div>
-													<div className="text-xs muted">
-														{list.length}
-													</div>
-												</div>
-												<div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
-													{(showAll
-														? list
-														: list.slice(0, PARTNERS_PREVIEW)
-													).map((p, i) =>
-														renderPartnerItem(p, `${tier}-${i}`)
-													)}
-												</div>
-												{list.length > PARTNERS_PREVIEW && (
-													<div className="mt-2 text-right">
-														<button
-															onClick={() => toggleTier(tier)}
-															className="btn-ghost small"
-														>
-															{showAll ? (
-																<>
-																	<ChevronUp size={14} /> Show
-																	less
-																</>
-															) : (
-																<>
-																	<ChevronDown size={14} /> Show
-																	all
-																</>
-															)}
-														</button>
-													</div>
-												)}
-											</div>
-										);
-									})}
-								</div>
-							</div>
-						</div>
 
 						{/* Gallery */}
 						{Array.isArray(fest.gallery) && fest.gallery.length > 0 && (
