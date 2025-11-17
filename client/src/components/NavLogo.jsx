@@ -6,14 +6,15 @@ const NavLogo = ({ onClick }) => {
 	const { mode } = useTheme();
 	const isLight = mode === 'light';
 
-	const logoHeight = 'clamp(44px, 4vw, 52px)';
+	// responsive height for the logo
+	const logoHeight = 'clamp(36px, 3.6vw, 52px)';
 
 	return (
 		<button
 			onClick={onClick}
 			aria-label="Go to home"
-			className="relative group inline-flex items-center px-3 py-2 select-none transition-transform duration-300 hover:scale-105"
-			style={{ borderRadius: 12 }}
+			className="relative group inline-flex items-center px-2 py-1 select-none transition-transform duration-300 hover:scale-105"
+			style={{ WebkitTapHighlightColor: 'transparent' }}
 		>
 			<div className="relative inline-flex items-center justify-center">
 				{/* Ambient halo */}
