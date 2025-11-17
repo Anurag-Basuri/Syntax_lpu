@@ -27,6 +27,15 @@ import {
 } from '../../services/arvantisServices.js';
 import '../../arvantis.css';
 
+/*
+  Reorganized, industry-grade Arvantis page:
+  - Two-column layout: main content (description, events, gallery, faqs) + right sidebar (stats, partners, sponsor)
+  - Description and Location always visible under hero
+  - Respect fest.themeColors by setting CSS vars on root container (non-invasive)
+  - Clear sections with headings and consistent spacing
+  - Minimal, defensive data handling and accessible markup
+*/
+
 // --- Utility ---
 const safeArray = (v) => (Array.isArray(v) ? v : v ? [v] : []);
 const normalizeLanding = (raw) => {
@@ -55,80 +64,37 @@ const findTitleSponsor = (partners = []) => {
 		) || null
 	);
 };
-const groupPartnersByTier = (partners = [], titleSponsor = null) => {
-	const map = new Map();
-	(partners || []).forEach((p) => {
-		if (!p) return;
-		if (titleSponsor && p.name === titleSponsor.name) return;
-		const tier = (p.tier || 'partner').toLowerCase();
-		if (!map.has(tier)) map.set(tier, []);
-		map.get(tier).push(p);
-	});
-	const order = [
-		'title',
-		'presenting',
-		'platinum',
-		'gold',
-		'silver',
-		'sponsor',
-		'partner',
-		'collaborator',
-	];
-	const arr = Array.from(map.entries()).sort((a, b) => {
-		const ai = order.indexOf(a[0]);
-		const bi = order.indexOf(b[0]);
-		return (ai === -1 ? 99 : ai) - (bi === -1 ? 99 : bi);
-	});
-	return arr;
-};
 
 // --- FAQ Section ---
 const FAQList = ({ faqs = [] }) => {
 	const [query, setQuery] = useState('');
-	const [expandedMap, setExpandedMap] = useState({});
-	const [expandAll, setExpandAll] = useState(false);
+	const [expanded, setExpanded] = useState({});
 
 	useEffect(() => {
-		if (expandAll) {
-			const all = {};
-			faqs.forEach((f, i) => {
-				all[f._id || i] = true;
-			});
-			setExpandedMap(all);
-		} else {
-			setExpandedMap({});
-		}
-	}, [expandAll, faqs]);
+		// collapse when faqs change
+		setExpanded({});
+	}, [faqs]);
 
 	const filtered = useMemo(() => {
 		if (!query) return faqs;
 		const q = query.toLowerCase();
 		return faqs.filter(
-			(f) => f.question?.toLowerCase().includes(q) || f.answer?.toLowerCase().includes(q)
+			(f) =>
+				(f.question || '').toLowerCase().includes(q) ||
+				(f.answer || '').toLowerCase().includes(q)
 		);
 	}, [faqs, query]);
 
-	const toggleOne = useCallback((id) => setExpandedMap((s) => ({ ...s, [id]: !s[id] })), []);
-	const copyLink = useCallback((id) => {
-		const url = `${window.location.origin}${window.location.pathname}#faq-${id}`;
-		navigator.clipboard.writeText(url);
-		window.dispatchEvent(new CustomEvent('toast', { detail: { message: 'FAQ link copied!' } }));
-	}, []);
+	const toggle = useCallback((id) => setExpanded((s) => ({ ...s, [id]: !s[id] })), []);
 
 	if (!faqs || faqs.length === 0) return null;
 
 	return (
-		<section aria-labelledby="arvantis-faqs" className="mt-12">
-			<div className="flex items-center justify-between mb-6">
-				<div>
-					<h3 id="arvantis-faqs" className="section-title flex items-center gap-2">
-						<HelpCircle size={22} className="text-[var(--accent-1)]" />
-						Frequently Asked Questions
-					</h3>
-					<p className="muted mt-1">
-						Find answers to common queries. Search, expand, and copy links.
-					</p>
-				</div>
+		<section aria-labelledby="arvantis-faqs" className="mt-10">
+			<div className="flex items-center justify-between mb-4">
+				<h3 id="arvantis-faqs" className="section-title flex items-center gap-2">
+					<HelpCircle size={20} className="text-[var(--accent-1)]" /> FAQs
+				</h3>
 				<div className="flex items-center gap-2">
 					<input
 						type="search"
@@ -138,80 +104,66 @@ const FAQList = ({ faqs = [] }) => {
 						className="rounded-md border py-2 px-3 bg-[var(--input-bg)]"
 						aria-label="Search FAQs"
 					/>
-					<button
-						onClick={() => setExpandAll((s) => !s)}
-						className="btn-ghost small"
-						aria-pressed={expandAll}
-					>
-						{expandAll ? (
-							<>
-								<ChevronUp size={14} /> Collapse all
-							</>
-						) : (
-							<>
-								<ChevronDown size={14} /> Expand all
-							</>
-						)}
-					</button>
 				</div>
 			</div>
-			{filtered.length === 0 ? (
-				<div className="mt-8 muted text-center">No FAQs match your search.</div>
-			) : (
-				<div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-					{filtered.map((f, i) => {
-						const id = f._id || i;
-						const expanded = expandedMap[id];
-						return (
-							<div
-								key={id}
-								id={`faq-${id}`}
-								className="glass-card p-5 transition-all duration-300 border border-[var(--glass-border)] shadow-md"
-								style={{
-									boxShadow: 'var(--shadow-md)',
-									borderRadius: '1.25rem',
-									background: 'var(--glass-bg)',
-								}}
-							>
+
+			<div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+				{filtered.map((f, i) => {
+					const id = f._id || i;
+					const open = !!expanded[id];
+					return (
+						<article
+							key={id}
+							className="glass-card p-4 transition-all"
+							aria-expanded={open}
+						>
+							<header>
 								<button
-									className="w-full flex items-center justify-between gap-3"
-									onClick={() => toggleOne(id)}
-									aria-expanded={expanded}
-									style={{
-										background: 'transparent',
-										border: 'none',
-										padding: 0,
-									}}
+									type="button"
+									onClick={() => toggle(id)}
+									className="w-full flex items-center justify-between text-left"
+									aria-controls={`faq-body-${id}`}
+									aria-expanded={open}
 								>
-									<div className="flex items-center gap-2 text-lg font-semibold text-[var(--text-primary)]">
-										<HelpCircle size={18} className="text-[var(--accent-1)]" />
+									<div className="font-semibold text-[var(--text-primary)]">
 										{f.question}
 									</div>
-									{expanded ? (
-										<ChevronUp size={18} className="text-[var(--accent-1)]" />
+									{open ? (
+										<ChevronUp className="text-[var(--accent-1)]" />
 									) : (
-										<ChevronDown size={18} className="text-[var(--accent-1)]" />
+										<ChevronDown className="text-[var(--accent-1)]" />
 									)}
 								</button>
-								{expanded && (
-									<div className="mt-4 text-[var(--text-secondary)] text-base">
-										{f.answer}
-										<div className="mt-3 flex gap-2">
-											<button
-												onClick={() => copyLink(id)}
-												className="btn-ghost small"
-												title="Copy FAQ link"
-											>
-												<Copy size={14} /> Copy link
-											</button>
-										</div>
+							</header>
+							{open && (
+								<div
+									id={`faq-body-${id}`}
+									className="mt-3 text-[var(--text-secondary)]"
+								>
+									{f.answer}
+									<div className="mt-3">
+										<button
+											type="button"
+											className="btn-ghost small"
+											onClick={() => {
+												const url = `${window.location.origin}${window.location.pathname}#faq-${id}`;
+												navigator.clipboard?.writeText?.(url);
+												window.dispatchEvent(
+													new CustomEvent('toast', {
+														detail: { message: 'FAQ link copied' },
+													})
+												);
+											}}
+										>
+											<Copy size={14} /> Copy link
+										</button>
 									</div>
-								)}
-							</div>
-						);
-					})}
-				</div>
-			)}
+								</div>
+							)}
+						</article>
+					);
+				})}
+			</div>
 		</section>
 	);
 };
@@ -219,9 +171,7 @@ const FAQList = ({ faqs = [] }) => {
 // --- Main Page ---
 const ArvantisPage = () => {
 	const [identifier, setIdentifier] = useState(null);
-	const [selectedEvent, setSelectedEvent] = useState(null);
 	const [selectedImage, setSelectedImage] = useState(null);
-	const [showAllPartners, setShowAllPartners] = useState(false);
 
 	const landingQuery = useQuery({
 		queryKey: ['arvantis', 'landing'],
@@ -242,7 +192,6 @@ const ArvantisPage = () => {
 		if (Array.isArray(raw)) return raw;
 		if (Array.isArray(raw.docs)) return raw.docs;
 		if (Array.isArray(raw.data)) return raw.data;
-		if (raw?.docs && Array.isArray(raw.docs)) return raw.docs;
 		return [];
 	}, [editionsQuery.data]);
 
@@ -272,28 +221,13 @@ const ArvantisPage = () => {
 		retry: 1,
 	});
 
-	const fest = useMemo(() => {
-		if (detailsQuery.data) return detailsQuery.data;
-		return landingFest ?? null;
-	}, [detailsQuery.data, landingFest]);
-
+	const fest = useMemo(
+		() => detailsQuery.data ?? landingFest ?? null,
+		[detailsQuery.data, landingFest]
+	);
 	const events = useMemo(() => safeArray(fest?.events), [fest]);
 	const partners = useMemo(() => safeArray(fest?.partners), [fest]);
 	const titleSponsor = useMemo(() => findTitleSponsor(partners), [partners]);
-	const partnersByTier = useMemo(
-		() => groupPartnersByTier(partners, titleSponsor),
-		[partners, titleSponsor]
-	);
-
-	const filteredEvents = useMemo(() => {
-		let out = [...events];
-		out.sort((a, b) => {
-			const ad = new Date(a.eventDate || a.date || 0).getTime();
-			const bd = new Date(b.eventDate || b.date || 0).getTime();
-			return bd - ad;
-		});
-		return out;
-	}, [events]);
 
 	const stats = useMemo(() => {
 		const safe = fest || {};
@@ -319,15 +253,22 @@ const ArvantisPage = () => {
 		window.scrollTo({ top: 0, behavior: 'smooth' });
 	}, []);
 
-	const handleEventClick = useCallback((ev) => setSelectedEvent(ev), []);
 	const handleImageClick = useCallback((img) => setSelectedImage(img), []);
+
+	// apply fest theme colors to this container via CSS variables (non-destructive)
+	const themeVars = useMemo(() => {
+		return {
+			['--accent-1']: fest?.themeColors?.primary || undefined,
+			['--accent-2']: fest?.themeColors?.accent || undefined,
+		};
+	}, [fest]);
 
 	if (isLoading) return <LoadingBlock label="Loading Arvantis..." />;
 	if (isError) return <ErrorBlock message={errorMsg} onRetry={() => window.location.reload()} />;
 
 	return (
-		<div className="arvantis-page">
-			{/* Editions strip (top) */}
+		<div className="arvantis-page" style={themeVars}>
+			{/* Top editions */}
 			<EditionsStrip
 				editions={editions}
 				currentIdentifier={identifier}
@@ -335,105 +276,171 @@ const ArvantisPage = () => {
 				landingIdentifier={landingFest?.slug || String(landingFest?.year || '')}
 			/>
 
-			{/* Hero / Poster */}
+			{/* Hero */}
 			<PosterHero fest={fest} />
 
-			{/* Stats */}
-			<div className="grid grid-cols-2 sm:grid-cols-4 gap-6 mt-10 mb-8">
-				{stats.map((s, i) => (
-					<StatCard
-						key={s.label}
-						icon={s.icon}
-						label={s.label}
-						value={s.value}
-						index={i}
-					/>
-				))}
-			</div>
+			{/* Organized layout: main + right sidebar */}
+			<div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mt-8 grid grid-cols-1 lg:grid-cols-3 gap-8">
+				{/* Main column */}
+				<main className="lg:col-span-2 space-y-8">
+					{/* Always-visible summary: name, tagline, location, description */}
+					<section className="glass-card p-6">
+						<div className="flex flex-col md:flex-row md:items-start md:gap-6">
+							<div className="flex-1 min-w-0">
+								<h1
+									className="text-2xl font-extrabold"
+									style={{ color: 'var(--text-primary)' }}
+								>
+									{fest?.name || 'Arvantis'} {fest?.year ? `· ${fest.year}` : ''}
+								</h1>
+								<div
+									className="mt-2 text-sm mono"
+									style={{ color: 'var(--text-secondary)' }}
+								>
+									{fest?.tagline || 'Tech • Hack • Build'}
+								</div>
 
-			{/* Partners Section */}
-			<section aria-labelledby="arvantis-partners" className="mt-8">
-				<h3 id="arvantis-partners" className="section-title mb-6">
-					Partners & Sponsors
-				</h3>
-				{titleSponsor && (
-					<div className="glass-card p-5 mb-6 flex flex-col md:flex-row items-center gap-4">
-						<div className="flex items-center gap-4">
-							<div
-								className="w-20 h-20 rounded-lg overflow-hidden bg-white/5 flex items-center justify-center"
-								style={{ border: '1px solid rgba(255,255,255,0.04)' }}
-							>
-								{titleSponsor.logo?.url ? (
-									<img
-										src={titleSponsor.logo.url}
-										alt={titleSponsor.name}
-										className="w-full h-full object-contain"
-									/>
-								) : (
+								<div
+									className="mt-4 text-base leading-relaxed"
+									style={{ color: 'var(--text-secondary)' }}
+								>
+									{fest?.description || 'No description available.'}
+								</div>
+
+								<div
+									className="mt-4 flex items-center gap-4 text-sm"
+									style={{ color: 'var(--text-secondary)' }}
+								>
+									<div className="inline-flex items-center gap-2">
+										<Calendar size={16} />{' '}
+										<span>
+											{fest?.startDate
+												? new Date(fest.startDate).toLocaleDateString()
+												: 'TBD'}
+										</span>
+									</div>
+									<div className="inline-flex items-center gap-2">
+										<ExternalLink size={16} />{' '}
+										<span>{fest?.location || 'Location TBA'}</span>
+									</div>
+								</div>
+							</div>
+
+							{/* quick actions visible on larger screens */}
+							<div className="mt-4 md:mt-0 md:flex-shrink-0 flex flex-col gap-3">
+								{fest?.tickets?.url && (
+									<a
+										href={fest.tickets.url}
+										target="_blank"
+										rel="noreferrer"
+										className="btn-primary neon-btn"
+									>
+										Buy Tickets
+									</a>
+								)}
+								<a href="#events" className="btn-ghost">
+									Browse Events
+								</a>
+							</div>
+						</div>
+					</section>
+
+					{/* Events list */}
+					<EventsGrid
+						events={events}
+						onEventClick={() => {
+							/* event modal handled elsewhere */
+						}}
+					/>
+
+					{/* Gallery */}
+					<GalleryGrid gallery={fest?.gallery || []} onImageClick={handleImageClick} />
+
+					{/* FAQ */}
+					<FAQList faqs={fest?.faqs || []} />
+				</main>
+
+				{/* Right sidebar */}
+				<aside className="space-y-6">
+					{/* Stats */}
+					<div className="glass-card p-4">
+						<div className="text-sm text-[var(--text-secondary)]">Overview</div>
+						<div className="mt-3 grid grid-cols-2 gap-3">
+							{stats.map((s) => (
+								<StatCard
+									key={s.label}
+									icon={s.icon}
+									label={s.label}
+									value={s.value}
+								/>
+							))}
+						</div>
+					</div>
+
+					{/* Title sponsor */}
+					{titleSponsor && (
+						<div className="glass-card p-4">
+							<div className="text-sm text-[var(--text-secondary)]">
+								Title Sponsor
+							</div>
+							<div className="mt-3 flex items-center gap-3">
+								<div
+									className="w-14 h-14 rounded-md overflow-hidden bg-white/5 flex items-center justify-center"
+									style={{ border: '1px solid var(--glass-border)' }}
+								>
+									{titleSponsor.logo?.url ? (
+										<img
+											src={titleSponsor.logo.url}
+											alt={titleSponsor.name}
+											className="w-full h-full object-contain"
+										/>
+									) : (
+										<div className="mono">{titleSponsor.name}</div>
+									)}
+								</div>
+								<div className="min-w-0">
 									<div
-										className="text-sm font-semibold mono"
+										className="font-medium"
 										style={{ color: 'var(--text-primary)' }}
 									>
 										{titleSponsor.name}
 									</div>
-								)}
-							</div>
-							<div>
-								<div className="text-sm text-[var(--text-secondary)]">
-									Title sponsor
+									{titleSponsor.website && (
+										<a
+											href={titleSponsor.website}
+											target="_blank"
+											rel="noreferrer"
+											className="text-sm muted inline-flex items-center gap-1"
+										>
+											<ExternalLink size={12} /> Visit
+										</a>
+									)}
 								</div>
-								<div
-									className="text-xl font-extrabold"
-									style={{ color: 'var(--text-primary)' }}
-								>
-									{titleSponsor.name}
-								</div>
-								{titleSponsor.tier && (
-									<div className="text-xs muted mt-1">{titleSponsor.tier}</div>
-								)}
 							</div>
 						</div>
-						<div className="flex-1 text-sm text-[var(--text-secondary)] md:pl-6">
-							{titleSponsor.description ? (
-								<p className="mb-2" style={{ color: 'var(--text-primary)' }}>
-									{titleSponsor.description}
-								</p>
-							) : (
-								<p className="mb-2 muted">No description provided.</p>
-							)}
-							<div className="flex items-center gap-3">
-								{titleSponsor.website && (
-									<a
-										href={titleSponsor.website}
-										target="_blank"
-										rel="noopener noreferrer"
-										className="btn-ghost small"
-									>
-										<ExternalLink size={14} /> Visit website
-									</a>
-								)}
-								{titleSponsor.contact && (
-									<div className="text-xs muted">
-										Contact: {titleSponsor.contact}
-									</div>
-								)}
-							</div>
+					)}
+
+					{/* Partners preview */}
+					<div className="glass-card p-4">
+						<div className="flex items-center justify-between">
+							<div className="text-sm text-[var(--text-secondary)]">Partners</div>
+							<div className="text-xs muted">{partners.length}</div>
 						</div>
+						<div className="mt-3">
+							<PartnersGrid partners={partners.slice(0, 8)} />
+						</div>
+						{partners.length > 8 && (
+							<div className="mt-3 text-center">
+								<a href="#partners" className="btn-ghost small">
+									View all partners
+								</a>
+							</div>
+						)}
 					</div>
-				)}
-				<PartnersGrid partners={partners} />
-			</section>
+				</aside>
+			</div>
 
-			{/* Events */}
-			<EventsGrid events={filteredEvents} onEventClick={handleEventClick} />
-
-			{/* Gallery */}
-			<GalleryGrid gallery={fest?.gallery || []} onImageClick={handleImageClick} />
-
-			{/* FAQ Section */}
-			<FAQList faqs={fest?.faqs || []} />
-
-			{/* Image Lightbox */}
+			{/* Lightbox */}
 			{selectedImage && (
 				<ImageLightbox image={selectedImage} onClose={() => setSelectedImage(null)} />
 			)}
