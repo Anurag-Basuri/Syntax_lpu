@@ -22,9 +22,10 @@ import { useTheme } from '../hooks/useTheme.js';
  * - Public, responsive contact page with:
  *   - Robust validation & server error mapping
  *   - Honeypot anti-spam
- *   - Submission cooldown + retry on failure
+ *   - Submission cooldown + retry/backoff on failure
  *   - Autosave to localStorage with debounce
  *   - Accessibility: aria-live, roles, keyboard-friendly controls
+ *   - Keyboard shortcut: Ctrl/Cmd+Enter to submit
  *   - Responsive layout: stacked on small screens, 2-column on larger
  *
  * Notes:
@@ -35,10 +36,11 @@ import { useTheme } from '../hooks/useTheme.js';
 /* ----------------------
    Config
    ---------------------- */
-const DRAFT_KEY = 'contact_form_draft_v1';
+const DRAFT_KEY = 'contact_form_draft_v2';
 const AUTOSAVE_DEBOUNCE = 700; // ms
-const SUBMIT_COOLDOWN = 20; // seconds
+const SUBMIT_COOLDOWN = 20; // seconds after successful send
 const MESSAGE_MAX = 2000;
+const MAX_RETRY_ATTEMPTS = 3;
 
 /* ----------------------
    Helpers
@@ -64,22 +66,22 @@ const defaultForm = {
 };
 
 const validators = {
-	name: (v) => (v.trim() ? null : 'Please enter your full name.'),
+	name: (v) => (v && v.trim() ? null : 'Please enter your full name.'),
 	email: (v) =>
-		!v.trim()
+		!v || !v.trim()
 			? 'Please enter your email.'
 			: /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v)
 			? null
 			: 'Enter a valid email address.',
 	phone: (v) =>
-		!v.trim()
+		!v || !v.trim()
 			? 'Please enter your phone number.'
 			: normalizePhone(v)
 			? null
 			: 'Enter a valid 10-digit mobile number.',
-	subject: (v) => (v.trim() ? null : 'Please add a short subject.'),
+	subject: (v) => (v && v.trim() ? null : 'Please add a short subject.'),
 	message: (v) =>
-		!v.trim()
+		!v || !v.trim()
 			? 'Please enter a message.'
 			: v.trim().length < 10
 			? 'Message must be at least 10 characters.'
@@ -97,6 +99,24 @@ const validateAll = (form) => {
 		if (e) errs[k] = e;
 	});
 	return Object.keys(errs).length ? errs : null;
+};
+
+const mapServerErrors = (payload) => {
+	const fieldMap = {};
+	if (!payload) return fieldMap;
+	// Support a few common shapes
+	if (Array.isArray(payload.errors)) {
+		payload.errors.forEach((it) => {
+			if (it.field) fieldMap[it.field] = it.message || it.msg || String(it);
+		});
+	} else if (payload.errors && typeof payload.errors === 'object') {
+		Object.entries(payload.errors).forEach(([k, v]) => {
+			fieldMap[k] = typeof v === 'string' ? v : v?.message ?? JSON.stringify(v);
+		});
+	} else if (payload.field && payload.message) {
+		fieldMap[payload.field] = payload.message;
+	}
+	return fieldMap;
 };
 
 /* ----------------------
@@ -120,8 +140,11 @@ const ContactPage = () => {
 	const [nonFieldError, setNonFieldError] = useState('');
 	const [isSubmitting, setIsSubmitting] = useState(false);
 	const [success, setSuccess] = useState(false);
+	const [ticketRef, setTicketRef] = useState(null);
 	const [cooldown, setCooldown] = useState(0);
 	const [lastFailedPayload, setLastFailedPayload] = useState(null);
+	const [retryAttempts, setRetryAttempts] = useState(0);
+
 	const autosaveTimer = useRef(null);
 	const cooldownTimer = useRef(null);
 	const firstInputRef = useRef(null);
@@ -170,25 +193,19 @@ const ContactPage = () => {
 		}, 1000);
 	};
 
-	// Map common server error shapes to field errors
-	const mapServerErrors = (payload) => {
-		const fieldMap = {};
-		if (!payload) return fieldMap;
-		// Axios error response may be in payload.message or payload.errors
-		if (Array.isArray(payload.errors)) {
-			payload.errors.forEach((it) => {
-				// support { field, message } shapes
-				if (it.field) fieldMap[it.field] = it.message || it.msg || String(it);
-			});
-		} else if (payload.errors && typeof payload.errors === 'object') {
-			Object.entries(payload.errors).forEach(([k, v]) => {
-				fieldMap[k] = typeof v === 'string' ? v : v?.message ?? JSON.stringify(v);
-			});
-		} else if (payload.field && payload.message) {
-			fieldMap[payload.field] = payload.message;
-		}
-		return fieldMap;
-	};
+	// keyboard shortcut: Ctrl/Cmd + Enter to submit
+	useEffect(() => {
+		const handler = (e) => {
+			if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
+				e.preventDefault();
+				if (!isSubmitting && cooldown === 0) {
+					handleSubmit();
+				}
+			}
+		};
+		window.addEventListener('keydown', handler);
+		return () => window.removeEventListener('keydown', handler);
+	}, [isSubmitting, cooldown, form, errors]);
 
 	/* ----------------------
 	   Event handlers
@@ -197,9 +214,7 @@ const ContactPage = () => {
 	const onChange = (e) => {
 		const { name, value } = e.target;
 		setForm((s) => ({ ...s, [name]: value }));
-		// clear server-level error when user types
 		setNonFieldError('');
-		// revalidate this field if touched
 		if (touched[name]) {
 			const err = validateField(name, value);
 			setErrors((prev) => {
@@ -232,10 +247,20 @@ const ContactPage = () => {
 		firstInputRef.current?.focus();
 	};
 
-	const submit = async (e) => {
+	// send - wrapped so retry/backoff can reuse
+	const doSend = async (payload) => {
+		const resp = await sendContactMessage(payload);
+		// try to normalize a returned reference id if present
+		const ref = resp?.ticketId || resp?.id || resp?.ref || resp?.data?.ticketId || null;
+		return { resp, ref };
+	};
+
+	// central submit handler
+	const handleSubmit = async (e) => {
 		e?.preventDefault?.();
 		setNonFieldError('');
 		setLastFailedPayload(null);
+		setRetryAttempts(0);
 
 		// honeypot check
 		if (form.website) {
@@ -265,18 +290,17 @@ const ContactPage = () => {
 
 		setIsSubmitting(true);
 		try {
-			await sendContactMessage(payload);
-			// success
+			const { resp, ref } = await doSend(payload);
 			setSuccess(true);
+			setTicketRef(ref);
 			toast.success('Message sent — thank you!');
-			// clear persisted draft
 			localStorage.removeItem(DRAFT_KEY);
 			setForm({ ...defaultForm });
 			startCooldown(SUBMIT_COOLDOWN);
 			// announce to screen readers
-			if (statusLiveRef.current) statusLiveRef.current.focus();
-			// reset visual success after a while
-			setTimeout(() => setSuccess(false), 8000);
+			statusLiveRef.current?.focus?.();
+			// auto-clear success after some time
+			setTimeout(() => setSuccess(false), 9000);
 		} catch (err) {
 			// robust error handling: map potential shapes
 			const resp = err?.response?.data ?? null;
@@ -299,23 +323,37 @@ const ContactPage = () => {
 		}
 	};
 
+	// retry with exponential backoff up to MAX_RETRY_ATTEMPTS
 	const retryLast = async () => {
 		if (!lastFailedPayload) return;
+		if (isSubmitting) return;
+		const nextAttempt = retryAttempts + 1;
+		setRetryAttempts(nextAttempt);
+		const backoffMs = Math.min(16000, 500 * Math.pow(2, nextAttempt - 1));
 		setIsSubmitting(true);
 		setNonFieldError('');
 		try {
-			await sendContactMessage(lastFailedPayload);
+			await new Promise((r) => setTimeout(r, backoffMs));
+			const { resp, ref } = await doSend(lastFailedPayload);
 			setSuccess(true);
+			setTicketRef(ref);
 			toast.success('Message sent — thank you!');
 			localStorage.removeItem(DRAFT_KEY);
 			setForm({ ...defaultForm });
 			startCooldown(SUBMIT_COOLDOWN);
-			if (statusLiveRef.current) statusLiveRef.current.focus();
-			setTimeout(() => setSuccess(false), 8000);
+			statusLiveRef.current?.focus?.();
+			setTimeout(() => setSuccess(false), 9000);
+			// clear lastFailedPayload
+			setLastFailedPayload(null);
+			setRetryAttempts(0);
 		} catch (err) {
 			const serverMessage = err?.response?.data?.message || err?.message || 'Retry failed';
 			setNonFieldError(serverMessage);
 			toast.error(serverMessage);
+			// if we've exhausted attempts, keep lastFailedPayload for manual copy
+			if (nextAttempt >= MAX_RETRY_ATTEMPTS) {
+				toast.error('Max retry attempts reached. You can copy the message and email us directly.');
+			}
 		} finally {
 			setIsSubmitting(false);
 		}
@@ -329,6 +367,16 @@ const ContactPage = () => {
 			toast.success('Message copied to clipboard. You can email it to us.');
 		} catch {
 			toast('Unable to copy. Please manually copy the message.');
+		}
+	};
+
+	const copyTicketRef = async () => {
+		if (!ticketRef) return;
+		try {
+			await navigator.clipboard.writeText(ticketRef);
+			toast.success('Reference copied to clipboard.');
+		} catch {
+			toast('Unable to copy reference.');
 		}
 	};
 
@@ -414,6 +462,15 @@ const ContactPage = () => {
 											<CheckCircle2 className="text-emerald-600 w-5 h-5" />
 											<div className="text-sm font-medium text-emerald-700">Thanks — your message was sent successfully. We'll reply within 48–72 hours.</div>
 										</div>
+										{ticketRef && (
+											<div className="mt-3 flex items-center gap-3">
+												<div className="text-sm text-[var(--text-muted)]">Reference:</div>
+												<div className="font-mono text-sm">{ticketRef}</div>
+												<button onClick={copyTicketRef} className="inline-flex items-center gap-2 px-2 py-1 rounded-md bg-[var(--glass-bg)] border border-[var(--glass-border)] text-sm">
+													<Copy className="w-4 h-4" /> Copy
+												</button>
+											</div>
+										)}
 									</motion.div>
 								)}
 							</AnimatePresence>
@@ -426,7 +483,7 @@ const ContactPage = () => {
 									</div>
 									{lastFailedPayload && (
 										<div className="mt-3 flex gap-2">
-											<button onClick={retryLast} disabled={isSubmitting} className="inline-flex items-center gap-2 px-3 py-2 rounded-md bg-[var(--button-primary-bg)] text-white">
+											<button onClick={retryLast} disabled={isSubmitting || retryAttempts >= MAX_RETRY_ATTEMPTS} className="inline-flex items-center gap-2 px-3 py-2 rounded-md bg-[var(--button-primary-bg)] text-white">
 												{isSubmitting ? <Loader2 className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />} Retry
 											</button>
 											<button onClick={copyFailure} className="inline-flex items-center gap-2 px-3 py-2 rounded-md bg-[var(--glass-bg)] border border-[var(--glass-border)] text-sm">
@@ -437,7 +494,7 @@ const ContactPage = () => {
 								</div>
 							)}
 
-							<form onSubmit={submit} className="space-y-4" noValidate>
+							<form onSubmit={handleSubmit} className="space-y-4" noValidate>
 								{/* Honeypot (hidden) */}
 								<div style={{ display: 'none' }} aria-hidden>
 									<label>Website</label>
@@ -566,6 +623,11 @@ const ContactPage = () => {
 									</div>
 								</div>
 							</form>
+
+							{/* accessibility / hint */}
+							<div className="mt-3 text-xs text-[var(--text-muted)]">
+								Tip: press <kbd className="px-2 py-0.5 bg-white/5 rounded">Ctrl</kbd> + <kbd className="px-2 py-0.5 bg-white/5 rounded">Enter</kbd> (or Cmd+Enter on Mac) to submit quickly.
+							</div>
 						</div>
 					</div>
 				</section>
