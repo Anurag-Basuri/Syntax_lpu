@@ -1,17 +1,18 @@
 import React, { useEffect, useState, useMemo, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useQuery } from '@tanstack/react-query';
-import { X, Calendar, MapPin, Tag, Users, Globe, Copy, CreditCard } from 'lucide-react';
+import { X, Calendar, MapPin, Tag, Globe, Copy, CreditCard } from 'lucide-react';
 import { getEventById } from '../../services/eventServices.js';
 import { useTheme } from '../../hooks/useTheme.js';
 
 /*
-  EventDetailModal — premium UI
-  - Poster on top, content below (single vertical scroll)
-  - Focus trap & restore previous focus
-  - Strong backdrop blur above navbar
-  - Smooth native scrolling + styled scrollbar
-  - No ticket/spot counts displayed (per request)
+  EventDetailModal — refreshed premium UI
+  - Always above navbar (very high z-index)
+  - Strong backdrop blur
+  - Poster header, large clean title below
+  - Prominent partners showcase (single section)
+  - Responsive, accessible, industry-level spacing & visuals
+  - Keeps app theme via useTheme()
 */
 
 const fetchEvent = async (id, signal) => {
@@ -77,7 +78,7 @@ const EventDetailModal = ({ event: initialEvent, isOpen, onClose }) => {
 	const previouslyFocusedRef = useRef(null);
 
 	// follow application theme (modal uses global theme; no toggle here)
-	const themeCtx = useTheme(); // returns { mode, theme, setMode, toggleMode } per app
+	const themeCtx = useTheme();
 	const theme = themeCtx?.theme ?? (Array.isArray(themeCtx) ? themeCtx[0] : 'light');
 
 	const { data: event } = useQuery({
@@ -239,7 +240,8 @@ const EventDetailModal = ({ event: initialEvent, isOpen, onClose }) => {
 		}
 	};
 
-	const modalMaxHeight = '90vh';
+	const modalMaxHeight = '92vh';
+	const topInset = 20; // px gap from top
 
 	return (
 		<AnimatePresence>
@@ -247,21 +249,21 @@ const EventDetailModal = ({ event: initialEvent, isOpen, onClose }) => {
 				initial={{ opacity: 0 }}
 				animate={{ opacity: 1 }}
 				exit={{ opacity: 0 }}
-				// sit above everything (including navbar) and align near top so poster is visible immediately
-				className="fixed inset-0 z-[99999] flex items-start justify-center"
+				// very high z-index to ensure modal sits above navbar/toolbars
+				className="fixed inset-0 flex items-start justify-center"
 				style={{
-					// small top padding so modal isn't flush with the OS/browser UI
-					paddingTop: '1.25rem',
+					zIndex: 2147483647,
+					paddingTop: `${topInset}px`,
 					paddingBottom: '1.25rem',
 				}}
+				aria-hidden={false}
 			>
-				{/* blurred backdrop above everything */}
+				{/* stronger blurred backdrop above everything */}
 				<motion.div
 					initial={{ opacity: 0 }}
 					animate={{ opacity: 1 }}
 					exit={{ opacity: 0 }}
-					// stronger blur + slightly darker overlay for premium feel
-					className="absolute inset-0 bg-black/50 backdrop-blur-3xl"
+					className="absolute inset-0 bg-black/55 backdrop-blur-3xl"
 					onClick={onClose}
 				/>
 
@@ -275,12 +277,12 @@ const EventDetailModal = ({ event: initialEvent, isOpen, onClose }) => {
 					role="dialog"
 					aria-modal="true"
 					aria-label={`Event details: ${title}`}
-					className="relative z-10 w-full max-w-5xl rounded-2xl shadow-2xl overflow-hidden flex flex-col bg-white dark:bg-slate-900 ring-1 ring-black/5"
+					className="relative w-full max-w-6xl rounded-2xl shadow-2xl overflow-hidden flex flex-col bg-white dark:bg-slate-900 ring-1 ring-black/6"
 					style={{ maxHeight: modalMaxHeight }}
 					tabIndex={-1}
 				>
-					{/* Poster (visual only) — rounded top and overflow-hidden for a polished header */}
-					<div className="relative w-full h-64 md:h-80 flex-shrink-0 bg-slate-100 dark:bg-slate-800 rounded-t-2xl overflow-hidden">
+					{/* Poster header */}
+					<div className="relative w-full h-64 md:h-96 flex-shrink-0 bg-slate-100 dark:bg-slate-800">
 						{poster ? (
 							<img
 								src={poster}
@@ -294,81 +296,99 @@ const EventDetailModal = ({ event: initialEvent, isOpen, onClose }) => {
 								<div className="text-6xl text-white/90">🎭</div>
 							</div>
 						)}
-						{/* top-right close (minimal) */}
-						<div className="absolute top-3 right-3">
-							<button
-								onClick={onClose}
-								className="p-2 rounded-full bg-white/90 dark:bg-slate-900/70 hover:scale-105 transition-transform shadow ring-1 ring-black/10"
-								aria-label="Close"
-							>
-								<X
-									size={18}
-									className={theme === 'dark' ? 'text-white' : 'text-slate-900'}
-								/>
-							</button>
-						</div>
+
+						{/* soft gradient to improve legibility of the poster top */}
+						<div className="absolute inset-0 bg-gradient-to-t from-transparent to-black/20 pointer-events-none" />
+
+						{/* close */}
+						<button
+							onClick={onClose}
+							className="absolute top-4 right-4 z-20 p-2 rounded-full bg-white/90 dark:bg-slate-900/70 hover:scale-105 transition-transform shadow ring-1 ring-black/10"
+							aria-label="Close"
+						>
+							<X
+								size={18}
+								className={theme === 'dark' ? 'text-white' : 'text-slate-900'}
+							/>
+						</button>
 					</div>
 
-					{/* scrollable content */}
+					{/* content: single vertical scroll area */}
 					<div
 						ref={rightPaneRef}
 						tabIndex={0}
-						className="flex-1 overflow-y-auto p-6 space-y-6 scroll-smooth"
+						className="flex-1 overflow-y-auto p-6 md:p-8 space-y-6 scroll-smooth"
 						style={{
 							WebkitOverflowScrolling: 'touch',
 							touchAction: 'pan-y',
 							overscrollBehavior: 'contain',
 						}}
 					>
-						{/* Header (title moved here for clean typographic treatment) */}
-						<header className="space-y-3">
-							<h2 className="text-2xl md:text-3xl font-extrabold leading-tight text-slate-900 dark:text-white">
-								{title}
-							</h2>
-							<div className="flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-6">
-								<div className="flex items-center gap-3 text-sm text-slate-600 dark:text-slate-300">
-									<Calendar className="w-4 h-4 text-indigo-500" />
-									<span>{dateLabel}</span>
-									<span className="mx-1">·</span>
-									<MapPin className="w-4 h-4 text-indigo-500" />
-									<span>{venue}</span>
+						{/* Title and meta */}
+						<div className="md:flex md:items-start md:gap-6">
+							<div className="min-w-0 flex-1">
+								<h1 className="text-2xl md:text-4xl font-extrabold leading-tight text-slate-900 dark:text-white">
+									{title}
+								</h1>
+								<div className="mt-3 flex flex-wrap items-center gap-4 text-sm text-slate-600 dark:text-slate-300">
+									<div className="flex items-center gap-2">
+										<Calendar className="w-4 h-4 text-indigo-500" />
+										<span>{dateLabel}</span>
+									</div>
+									<div className="flex items-center gap-2">
+										<MapPin className="w-4 h-4 text-indigo-500" />
+										<span>{venue}</span>
+									</div>
+									<div className="hidden md:inline-flex items-center gap-2 ml-2">
+										<span className="text-xs text-slate-400">•</span>
+										<span className="text-sm text-slate-500 dark:text-slate-400">
+											Organized by {organizer}
+										</span>
+									</div>
 								</div>
-								<div className="ml-auto flex items-center gap-3">
+
+								{/* tags */}
+								<div className="mt-4 flex flex-wrap gap-2">
+									{tags.slice(0, 8).map((t) => (
+										<span
+											key={t}
+											className="text-xs px-2 py-1 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-slate-700"
+										>
+											{t}
+										</span>
+									))}
+								</div>
+							</div>
+
+							{/* price / quick meta */}
+							<div className="mt-4 md:mt-0 md:flex-shrink-0">
+								<div className="flex items-center gap-4">
 									<PricePill price={price} />
 								</div>
 							</div>
-							<div className="flex flex-wrap gap-2">
-								{tags.slice(0, 8).map((t) => (
-									<span
-										key={t}
-										className="text-xs px-2 py-1 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-slate-700"
-									>
-										{t}
-									</span>
-								))}
-							</div>
-						</header>
+						</div>
 
-						{/* Partners — prominent showcase */}
+						{/* Partners showcase (prominent) */}
 						{partners.length > 0 && (
-							<section className="rounded-xl p-5 bg-gradient-to-r from-indigo-50 to-white dark:from-slate-900 dark:to-slate-800 ring-1 ring-black/5">
-								<div className="flex items-center justify-between mb-4">
+							<section className="rounded-2xl p-5 md:p-6 bg-gradient-to-r from-indigo-50 to-white dark:from-slate-900 dark:to-slate-800 ring-1 ring-black/5">
+								<div className="flex items-start justify-between gap-4 mb-4">
 									<div>
 										<div className="text-sm text-indigo-600 font-semibold">
 											Partners
 										</div>
-										<h3 className="text-xl font-bold text-slate-900 dark:text-white">
-											Supported by
-										</h3>
-										<div className="text-sm text-slate-500 dark:text-slate-300 mt-1">
-											We thank our partners for their support.
-										</div>
+										<h2 className="text-lg md:text-xl font-bold text-slate-900 dark:text-white">
+											Sponsored & supported by
+										</h2>
+										<p className="mt-1 text-sm text-slate-500 dark:text-slate-300 max-w-lg">
+											Our partners make this possible — show them some love.
+										</p>
 									</div>
-									<div className="text-xs text-slate-400">
-										Trusted collaborators
+									<div className="hidden md:flex items-center text-xs text-slate-400">
+										Partner tiers & logos
 									</div>
 								</div>
 
+								{/* responsive logo grid — larger logos, hover lift */}
 								<div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4 items-center">
 									{partners.map((p, i) => (
 										<a
@@ -377,21 +397,22 @@ const EventDetailModal = ({ event: initialEvent, isOpen, onClose }) => {
 											target="_blank"
 											rel="noreferrer"
 											onClick={(e) => e.stopPropagation()}
-											className={`flex items-center justify-center gap-3 p-3 rounded-lg transition-shadow transform hover:scale-102 ${
+											className={`flex items-center justify-center p-4 rounded-lg transition-transform transform hover:-translate-y-1 hover:shadow-xl ${
 												theme === 'dark'
 													? 'bg-slate-800/60 border border-slate-700'
 													: 'bg-white border border-slate-100'
 											}`}
+											title={p.name}
 										>
 											{p.logo?.url ? (
 												<img
 													src={p.logo.url}
 													alt={p.name}
-													className="max-h-14 object-contain"
+													className="max-h-16 md:max-h-20 object-contain"
 												/>
 											) : (
-												<div className="h-12 w-full rounded bg-slate-100 dark:bg-slate-700 flex items-center justify-center text-xs text-slate-700 dark:text-slate-200 font-medium">
-													{(p.name || '—').slice(0, 18)}
+												<div className="h-12 w-full rounded bg-slate-100 dark:bg-slate-700 flex items-center justify-center text-sm text-slate-700 dark:text-slate-200 font-medium">
+													{(p.name || '—').slice(0, 22)}
 												</div>
 											)}
 										</a>
@@ -400,24 +421,16 @@ const EventDetailModal = ({ event: initialEvent, isOpen, onClose }) => {
 							</section>
 						)}
 
-						{/* remaining content: registration, about, speakers, resources, raw JSON (unchanged) */}
-						{/* registration card */}
+						{/* Registration summary (no ticket counts shown) */}
 						<div className="rounded-xl p-4 bg-slate-50 dark:bg-slate-800 border border-slate-100 dark:border-slate-700">
-							<div className="flex items-center justify-between gap-4">
-								<div>
-									<div className="text-xs text-slate-500 dark:text-slate-300">
-										Registration
-									</div>
-									<div className="font-medium text-slate-900 dark:text-white mt-1">
-										{registrationInfo?.actionLabel ||
-											registrationInfo?.actionUrl ||
-											'No registration'}
-									</div>
-									{registrationInfo?.message && (
-										<div className="text-xs text-slate-500 dark:text-slate-300 mt-1">
-											{registrationInfo.message}
-										</div>
-									)}
+							<div className="text-xs text-slate-500 dark:text-slate-300">
+								Registration
+							</div>
+							<div className="mt-2 flex items-center gap-3">
+								<div className="font-medium text-slate-900 dark:text-white">
+									{registrationInfo?.actionLabel ||
+										registrationInfo?.actionUrl ||
+										'No registration'}
 								</div>
 
 								{registrationInfo?.isOpen && registrationInfo?.actionUrl && (
@@ -426,31 +439,36 @@ const EventDetailModal = ({ event: initialEvent, isOpen, onClose }) => {
 										target="_blank"
 										rel="noreferrer"
 										onClick={(e) => e.stopPropagation()}
-										className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-emerald-600 text-white text-sm shadow-sm"
+										className="ml-auto inline-flex items-center gap-2 px-3 py-1 rounded-lg bg-emerald-600 text-white text-sm shadow-sm"
 									>
 										{registrationInfo.actionLabel || 'Register'}{' '}
 										<Globe size={14} />
 									</a>
 								)}
 							</div>
+							{registrationInfo?.message && (
+								<div className="mt-2 text-xs text-slate-500 dark:text-slate-300">
+									{registrationInfo.message}
+								</div>
+							)}
 						</div>
 
-						{/* about */}
+						{/* About */}
 						<section>
-							<h4 className="text-lg font-semibold text-slate-900 dark:text-white mb-2">
+							<h3 className="text-lg font-semibold text-slate-900 dark:text-white mb-2">
 								About
-							</h4>
+							</h3>
 							<p className="text-sm text-slate-600 dark:text-slate-300 leading-relaxed whitespace-pre-wrap">
 								{desc}
 							</p>
 						</section>
 
-						{/* speakers */}
+						{/* Speakers */}
 						{speakers.length > 0 && (
 							<section>
-								<h4 className="text-lg font-semibold text-slate-900 dark:text-white mb-3">
+								<h3 className="text-lg font-semibold text-slate-900 dark:text-white mb-3">
 									Speakers
-								</h4>
+								</h3>
 								<div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
 									{speakers.map((s, i) => (
 										<div
@@ -487,43 +505,7 @@ const EventDetailModal = ({ event: initialEvent, isOpen, onClose }) => {
 							</section>
 						)}
 
-						{/* partners */}
-						{partners.length > 0 && (
-							<section>
-								<h4 className="text-lg font-semibold text-slate-900 dark:text-white mb-3">
-									Partners
-								</h4>
-								<div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
-									{partners.map((p, i) => (
-										<a
-											key={i}
-											href={p.website || '#'}
-											target="_blank"
-											rel="noreferrer"
-											onClick={(e) => e.stopPropagation()}
-											className="flex flex-col items-center gap-2 p-3 rounded-lg bg-white/50 dark:bg-slate-800 border border-slate-100 dark:border-slate-700 hover:shadow-lg transition-shadow"
-										>
-											{p.logo?.url ? (
-												<img
-													src={p.logo.url}
-													alt={p.name}
-													className="w-full h-12 object-contain max-w-[140px]"
-												/>
-											) : (
-												<div className="w-full h-12 rounded bg-slate-200 dark:bg-slate-700 flex items-center justify-center text-xs text-slate-700 dark:text-slate-200 font-medium">
-													{(p.name || '—').slice(0, 12)}
-												</div>
-											)}
-											<div className="text-sm text-slate-700 dark:text-slate-200 text-center">
-												{p.name}
-											</div>
-										</a>
-									))}
-								</div>
-							</section>
-						)}
-
-						{/* co-organizers & resources */}
+						{/* Resources / co-organizers */}
 						{(coOrganizers.length > 0 || resources.length > 0) && (
 							<section className="grid grid-cols-1 md:grid-cols-2 gap-4">
 								{coOrganizers.length > 0 && (
@@ -564,7 +546,7 @@ const EventDetailModal = ({ event: initialEvent, isOpen, onClose }) => {
 							</section>
 						)}
 
-						{/* raw JSON */}
+						{/* raw JSON (optional) */}
 						{showRaw && (
 							<section>
 								<h4 className="text-lg font-semibold text-slate-900 dark:text-white mb-2">
