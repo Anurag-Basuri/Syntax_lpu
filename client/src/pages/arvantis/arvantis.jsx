@@ -10,7 +10,36 @@ import {
 	Calendar,
 	Users,
 	Image,
+	Twitter,
+	Instagram,
+	Facebook,
+	Linkedin,
+	Phone,
 } from 'lucide-react';
+
+// SocialIcon helper component
+const SocialIcon = ({ keyName, url }) => {
+	if (!url) return null;
+	const icons = {
+		website: <ExternalLink size={16} />,
+		twitter: <Twitter size={16} />,
+		instagram: <Instagram size={16} />,
+		facebook: <Facebook size={16} />,
+		linkedin: <Linkedin size={16} />,
+	};
+	return (
+		<a
+			href={url}
+			target="_blank"
+			rel="noopener noreferrer"
+			className="btn-ghost small"
+			aria-label={keyName}
+			style={{ padding: 0, minWidth: 0 }}
+		>
+			{icons[keyName] || <ExternalLink size={16} />}
+		</a>
+	);
+};
 import PosterHero from '../../components/Arvantis/PosterHero.jsx';
 import StatCard from '../../components/Arvantis/StatCard.jsx';
 import EventsGrid from '../../components/Arvantis/EventsGrid.jsx';
@@ -467,13 +496,21 @@ const ArvantisPage = () => {
 	const partners = useMemo(() => safeArray(fest?.partners), [fest]);
 	const titleSponsor = useMemo(() => findTitleSponsor(partners), [partners]);
 
-	// stats
+	// stats extended: use computed if available
 	const stats = useMemo(() => {
 		const safe = fest || {};
 		return [
 			{ icon: Layers3, label: 'Edition', value: safe.year ?? '—' },
-			{ icon: Users, label: 'Partners', value: safe.partners?.length ?? 0 },
-			{ icon: Calendar, label: 'Events', value: safe.events?.length ?? 0 },
+			{
+				icon: Users,
+				label: 'Partners',
+				value: safe.totalPartners ?? safe.partners?.length ?? 0,
+			},
+			{
+				icon: Calendar,
+				label: 'Events',
+				value: safe.upcomingEventsCount ?? safe.events?.length ?? 0,
+			},
 			{ icon: Image, label: 'Gallery', value: safe.gallery?.length ?? 0 },
 		];
 	}, [fest]);
@@ -497,14 +534,26 @@ const ArvantisPage = () => {
 	const handleEventClick = useCallback((ev) => setSelectedEvent(ev), []);
 	const closeEventModal = useCallback(() => setSelectedEvent(null), []);
 
-	// set page title & meta for SEO + inject JSON-LD structured data for fest (lightweight)
+	// expose raw copy of fest for debugging / admin share
+	const copyFestJSON = useCallback(async () => {
+		if (!fest) return;
+		try {
+			await navigator.clipboard.writeText(JSON.stringify(fest, null, 2));
+			window.dispatchEvent(
+				new CustomEvent('toast', { detail: { message: 'Fest JSON copied' } })
+			);
+		} catch {
+			/* ignore */
+		}
+	}, [fest]);
+
+	// set page title & meta for SEO
 	useEffect(() => {
 		const title = fest?.name
 			? `${fest.name}${fest?.year ? ` · ${fest.year}` : ''} — Arvantis`
 			: 'Arvantis';
 		document.title = title;
 
-		// meta description update (non-destructive)
 		let descTag = document.querySelector('meta[name="description"]');
 		if (!descTag) {
 			descTag = document.createElement('meta');
@@ -515,7 +564,6 @@ const ArvantisPage = () => {
 			? String(fest.description).slice(0, 160)
 			: 'Arvantis — annual tech fest by Syntax Club.';
 
-		// inject lightweight JSON-LD for better rich results (best-effort, non-blocking)
 		const ldId = 'arvantis-jsonld';
 		let existing = document.getElementById(ldId);
 		if (existing) existing.remove();
@@ -548,11 +596,21 @@ const ArvantisPage = () => {
 		const vars = {};
 		if (fest?.themeColors?.primary) vars['--accent-1'] = fest.themeColors.primary;
 		if (fest?.themeColors?.accent) vars['--accent-2'] = fest.themeColors.accent;
+		if (fest?.themeColors?.bg) vars['--bg-base'] = fest.themeColors.bg;
 		return vars;
 	}, [fest]);
 
 	if (isLoading) return <LoadingBlock label="Loading Arvantis..." />;
 	if (isError) return <ErrorBlock message={errorMsg} onRetry={() => window.location.reload()} />;
+
+	// computed helpers for UI
+	const computedStatus = fest?.computedStatus || fest?.computed?.computedStatus || fest?.status;
+	const visibility = fest?.visibility ?? 'public';
+	const upcomingCount =
+		typeof fest?.upcomingEventsCount === 'number'
+			? fest.upcomingEventsCount
+			: events.filter((e) => e?.eventDate && new Date(e.eventDate) >= new Date()).length;
+	const tracks = Array.isArray(fest?.tracks) ? fest.tracks : [];
 
 	return (
 		<div className="arvantis-page" style={themeVars}>
@@ -565,54 +623,131 @@ const ArvantisPage = () => {
 				Skip to content
 			</a>
 
-			{/* lightweight live region for small toasts (used by components via window.dispatchEvent) */}
 			<div id="arvantis-toasts" aria-live="polite" className="sr-only" />
 
-			{/* ---------- Top: Title / Key info (primary entry) ---------- */}
+			{/* Editions navigation */}
+			<div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mt-4">
+				<div className="editions-strip-wrap glass-card p-3">
+					<EditionsStrip
+						editions={editions}
+						currentIdentifier={identifier}
+						onSelect={handleSelectEdition}
+						landingIdentifier={landingFest?.slug || String(landingFest?.year || '')}
+					/>
+				</div>
+			</div>
+
+			{/* ---------- Top header: Tech Fest badge + title + meta ---------- */}
 			<header className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mt-8">
 				<div className="glass-card p-6 flex flex-col md:flex-row md:items-center md:justify-between gap-4">
 					<div className="min-w-0">
-						<h1
-							className="text-3xl md:text-4xl font-extrabold"
-							style={{ color: 'var(--text-primary)' }}
-						>
-							{fest?.name || 'Arvantis'} {fest?.year ? `· ${fest.year}` : ''}
-						</h1>
-						<div
-							className="mt-2 text-sm mono"
-							style={{ color: 'var(--text-secondary)' }}
-						>
-							{fest?.tagline || 'Tech • Hack • Build'}
+						{/* Tech Fest ribbon */}
+						<div className="inline-flex items-center gap-2 mb-3">
+							<span
+								className="px-3 py-1 rounded-full text-xs font-bold"
+								style={{
+									background:
+										'linear-gradient(90deg,var(--accent-1),var(--accent-2))',
+									color: '#fff',
+								}}
+							>
+								TECH FEST · ANNUAL
+							</span>
+							<span className="text-xs muted">
+								Yearly showcase · Industry & Campus
+							</span>
 						</div>
 
-						{/* compact meta row */}
-						<div
-							className="mt-4 flex flex-wrap items-center gap-4 text-sm"
-							style={{ color: 'var(--text-secondary)' }}
-						>
-							<div className="inline-flex items-center gap-2">
-								<Calendar size={16} />
-								<span>
-									{fest?.startDate
-										? new Date(fest.startDate).toLocaleDateString()
-										: 'TBD'}
-								</span>
+						{/* Title + status/visibility chips */}
+						<div className="flex items-center gap-3 flex-wrap">
+							<h1
+								className="text-3xl md:text-4xl font-extrabold"
+								style={{ color: 'var(--text-primary)' }}
+							>
+								{fest?.name || 'Arvantis'} {fest?.year ? `· ${fest.year}` : ''}
+							</h1>
+
+							{/* status chip */}
+							<div
+								className="px-2 py-1 rounded-md text-xs font-semibold"
+								style={{
+									background:
+										computedStatus === 'ongoing'
+											? 'rgba(34,197,94,0.12)'
+											: 'rgba(14,165,233,0.08)',
+									color:
+										computedStatus === 'ongoing'
+											? '#16a34a'
+											: 'var(--accent-1)',
+								}}
+							>
+								{(computedStatus || 'upcoming').toUpperCase()}
 							</div>
-							<div className="inline-flex items-center gap-2">
-								<ExternalLink size={16} />
-								<span>{fest?.location || 'Location TBA'}</span>
+
+							{/* visibility */}
+							<div
+								className="px-2 py-1 rounded-md text-xs font-medium muted"
+								style={{ border: '1px solid var(--card-border)' }}
+							>
+								{visibility}
 							</div>
-							{fest?.contactEmail && (
-								<div className="inline-flex items-center gap-2 mono">
-									📧 {fest.contactEmail}
-								</div>
-							)}
-							{/* Countdown inline for immediate visibility */}
-							{fest?.startDate && (
-								<div className="ml-2">
-									<CountdownClock target={fest.startDate} />
-								</div>
-							)}
+
+							{/* total / upcoming quick */}
+							<div
+								className="px-2 py-1 rounded-md text-xs mono muted"
+								title="Upcoming events"
+							>
+								{upcomingCount} upcoming
+							</div>
+						</div>
+
+						{/* Tagline & social */}
+						<div className="mt-3 flex items-center gap-4 flex-wrap">
+							<div
+								className="text-sm mono"
+								style={{ color: 'var(--text-secondary)' }}
+							>
+								{fest?.tagline || 'Tech • Hack • Build'}
+							</div>
+
+							{/* Social links */}
+							<div className="flex items-center gap-2">
+								{SocialIcon({
+									keyName: 'website',
+									url: fest?.socialLinks?.website,
+								})}
+								{SocialIcon({
+									keyName: 'twitter',
+									url: fest?.socialLinks?.twitter,
+								})}
+								{SocialIcon({
+									keyName: 'instagram',
+									url: fest?.socialLinks?.instagram,
+								})}
+								{SocialIcon({
+									keyName: 'facebook',
+									url: fest?.socialLinks?.facebook,
+								})}
+								{SocialIcon({
+									keyName: 'linkedin',
+									url: fest?.socialLinks?.linkedin,
+								})}
+								{fest?.contactPhone && (
+									<div className="inline-flex items-center gap-2 text-sm muted">
+										<Phone size={14} />{' '}
+										<span className="mono">{fest.contactPhone}</span>
+									</div>
+								)}
+							</div>
+
+							{/* copy raw json */}
+							<button
+								onClick={copyFestJSON}
+								className="btn-ghost small"
+								aria-label="Copy fest data"
+							>
+								<Copy size={14} /> Raw
+							</button>
 						</div>
 					</div>
 
@@ -635,26 +770,13 @@ const ArvantisPage = () => {
 				</div>
 			</header>
 
-			{/* Editions navigation: more prominent and readable on bright backgrounds */}
-			<div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mt-4">
-				<div className="editions-strip-wrap glass-card p-3">
-					<EditionsStrip
-						editions={editions}
-						currentIdentifier={identifier}
-						onSelect={handleSelectEdition}
-						landingIdentifier={landingFest?.slug || String(landingFest?.year || '')}
-					/>
-				</div>
-			</div>
-
-			{/* Poster / Hero (prominent visual below title) */}
+			{/* Poster / Hero */}
 			<div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mt-6">
 				<PosterHero fest={fest} onImageOpen={handleImageClick} />
 			</div>
 
-			{/* Description + Prominent Partners (placed immediately after poster) */}
+			{/* Description, quick details, tracks and prominent partners */}
 			<section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mt-6">
-				{/* Description / details */}
 				<div className="glass-card p-6">
 					<h2 className="text-lg font-semibold" style={{ color: 'var(--text-primary)' }}>
 						About the Fest
@@ -698,31 +820,51 @@ const ArvantisPage = () => {
 							<div className="font-medium">{partners.length} partners</div>
 						</div>
 					</div>
+
+					{/* Tracks (if any) */}
+					{tracks.length > 0 && (
+						<div className="mt-6">
+							<div className="text-xs text-[var(--text-secondary)] font-semibold">
+								Tracks
+							</div>
+							<div className="mt-3 flex flex-wrap gap-3">
+								{tracks.map((t, i) => (
+									<div
+										key={t.key || `${t.title}-${i}`}
+										className="px-3 py-1 rounded-full border"
+										style={{
+											borderColor: 'var(--card-border)',
+											background: t.color ? `${t.color}15` : 'transparent',
+										}}
+									>
+										<span
+											className="text-sm font-medium"
+											style={{ color: t.color || 'var(--text-primary)' }}
+										>
+											{t.title}
+										</span>
+									</div>
+								))}
+							</div>
+						</div>
+					)}
 				</div>
 
-				{/* Prominent partners placed right after description */}
+				{/* Partners showcase */}
 				<div className="mt-6">
 					<PartnersShowcase partners={partners} titleSponsor={titleSponsor} />
 				</div>
 			</section>
 
-			{/* Main content container: Events + Gallery + FAQs + Sidebar */}
+			{/* Main content: Events, Gallery, FAQs */}
 			<div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mt-8 grid grid-cols-1 lg:grid-cols-3 gap-8">
-				{/* Main column */}
 				<main className="lg:col-span-2 space-y-8" id="maincontent" tabIndex={-1}>
-					{/* Events (now after partners) */}
 					<EventsGrid events={events} onEventClick={handleEventClick} />
-
-					{/* Gallery */}
 					<GalleryGrid gallery={fest?.gallery || []} onImageClick={handleImageClick} />
-
-					{/* FAQs */}
 					<FAQList faqs={fest?.faqs || []} />
 				</main>
 
-				{/* Sidebar */}
 				<aside className="space-y-6" aria-label="Sidebar">
-					{/* Overview / stats */}
 					<div className="glass-card p-4">
 						<div className="text-sm text-[var(--text-secondary)]">Overview</div>
 						<div className="mt-3 grid grid-cols-2 gap-3">
@@ -737,7 +879,6 @@ const ArvantisPage = () => {
 						</div>
 					</div>
 
-					{/* Title sponsor */}
 					{titleSponsor && (
 						<div className="glass-card p-4">
 							<div className="text-sm text-[var(--text-secondary)]">
@@ -785,11 +926,7 @@ const ArvantisPage = () => {
 			{/* Modals */}
 			{selectedImage && (
 				<Suspense fallback={<LoadingBlock label="Opening image..." />}>
-					<ImageLightbox
-						image={selectedImage}
-						onClose={() => setSelectedImage(null)}
-						// optional: enable next/prev if page has posters/gallery navigation logic
-					/>
+					<ImageLightbox image={selectedImage} onClose={() => setSelectedImage(null)} />
 				</Suspense>
 			)}
 
