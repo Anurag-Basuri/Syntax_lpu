@@ -1,17 +1,17 @@
 import React, { useEffect, useState, useMemo, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useQuery } from '@tanstack/react-query';
-import { X, Calendar, MapPin, Tag, Users, Globe, Copy, CreditCard, Sun, Moon } from 'lucide-react';
+import { X, Calendar, MapPin, Tag, Users, Globe, Copy, CreditCard } from 'lucide-react';
 import { getEventById } from '../../services/eventServices.js';
 import { useTheme } from '../../hooks/useTheme.js';
 
 /*
- EventDetailModal (refined)
- - Removed tickets / spots UI (no tickets, no spots-left shown)
- - Prominent price (shows "Free" when 0)
- - Better responsive behavior: modal stacks on small screens, right pane scrolls independently
- - Partners rendered as large logo tiles; no counts
- - Keeps "Show raw" + copy JSON
+  EventDetailModal — premium UI
+  - Poster on top, content below (single vertical scroll)
+  - Focus trap & restore previous focus
+  - Strong backdrop blur above navbar
+  - Smooth native scrolling + styled scrollbar
+  - No ticket/spot counts displayed (per request)
 */
 
 const fetchEvent = async (id, signal) => {
@@ -21,12 +21,14 @@ const fetchEvent = async (id, signal) => {
 
 const DetailRow = ({ icon: Icon, label, children }) => (
 	<div className="flex items-start gap-3">
-		<div className="p-1 rounded bg-white/10 dark:bg-white/6">
-			<Icon className="text-indigo-400" />
+		<div className="p-2 rounded-md bg-slate-100/60 dark:bg-slate-800/40">
+			<Icon className="text-indigo-500" />
 		</div>
-		<div>
-			<div className="text-xs text-slate-400 dark:text-slate-300">{label}</div>
-			<div className="font-medium text-slate-900 dark:text-white mt-0.5">{children}</div>
+		<div className="min-w-0">
+			<div className="text-xs text-slate-500 dark:text-slate-300">{label}</div>
+			<div className="font-medium text-slate-900 dark:text-white mt-0.5 truncate">
+				{children}
+			</div>
 		</div>
 	</div>
 );
@@ -46,10 +48,10 @@ const PricePill = ({ price }) => {
 			: null;
 	return (
 		<div
-			className={`inline-flex items-baseline gap-2 px-4 py-2 rounded-xl font-semibold shadow-sm
+			className={`inline-flex items-baseline gap-2 px-4 py-2 rounded-full font-semibold shadow-sm ring-1 ring-black/5
         ${
 			isFree
-				? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300'
+				? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300'
 				: 'bg-gradient-to-r from-indigo-600 to-purple-600 text-white'
 		}`}
 			aria-hidden
@@ -72,17 +74,10 @@ const EventDetailModal = ({ event: initialEvent, isOpen, onClose }) => {
 	const [showRaw, setShowRaw] = useState(false);
 	const rightPaneRef = useRef(null);
 	const modalRootRef = useRef(null);
+	const previouslyFocusedRef = useRef(null);
 
-	// follow application theme via useTheme (no local toggle in modal)
-	const themeCtx = useTheme();
-	let appTheme = undefined;
-	if (Array.isArray(themeCtx)) {
-		appTheme = themeCtx[0];
-	} else if (themeCtx && typeof themeCtx === 'object') {
-		appTheme = themeCtx.theme ?? themeCtx[0];
-	} else if (typeof themeCtx === 'string') {
-		appTheme = themeCtx;
-	}
+	// follow application theme (modal uses global theme; no toggle here)
+	const themeCtx = useTheme(); // not used locally, but ensures modal follows app theme
 
 	const { data: event } = useQuery({
 		queryKey: ['event-full', id],
@@ -117,6 +112,7 @@ const EventDetailModal = ({ event: initialEvent, isOpen, onClose }) => {
 		};
 	}, [isOpen]);
 
+	// Escape closes modal & focus management
 	useEffect(() => {
 		if (!isOpen) return;
 		const onKey = (e) => {
@@ -126,14 +122,57 @@ const EventDetailModal = ({ event: initialEvent, isOpen, onClose }) => {
 		return () => window.removeEventListener('keydown', onKey);
 	}, [isOpen, onClose]);
 
+	// Reset raw view when closing
 	useEffect(() => {
 		if (!isOpen) setShowRaw(false);
 	}, [isOpen]);
 
-	// Robust wheel & touch handling:
-	// - listen on window in capture phase, non-passive, so we can prevent other global handlers (Lenis)
-	// - only act for events that originate inside the modal
-	// - forward vertical deltas to right pane and prevent default when the pane consumed scroll
+	// Focus trap and restore
+	useEffect(() => {
+		if (!isOpen) return;
+
+		previouslyFocusedRef.current = document.activeElement;
+		const root = modalRootRef.current;
+		const focusable = () =>
+			root.querySelectorAll(
+				'a[href], button:not([disabled]), textarea, input, select, [tabindex]:not([tabindex="-1"])'
+			);
+
+		// focus first focusable element or the root
+		const first = focusable()[0];
+		(first || root)?.focus?.();
+
+		const handleTab = (e) => {
+			if (e.key !== 'Tab') return;
+			const nodes = Array.from(focusable());
+			if (!nodes.length) {
+				e.preventDefault();
+				return;
+			}
+			const firstNode = nodes[0];
+			const lastNode = nodes[nodes.length - 1];
+			if (e.shiftKey && document.activeElement === firstNode) {
+				e.preventDefault();
+				lastNode.focus();
+			} else if (!e.shiftKey && document.activeElement === lastNode) {
+				e.preventDefault();
+				firstNode.focus();
+			}
+		};
+
+		window.addEventListener('keydown', handleTab);
+		return () => {
+			window.removeEventListener('keydown', handleTab);
+			// restore focus
+			try {
+				previouslyFocusedRef.current?.focus?.();
+			} catch {
+				/* ignore */
+			}
+		};
+	}, [isOpen]);
+
+	// Robust wheel & touch handling (capture phase to beat global scrollers)
 	useEffect(() => {
 		if (!isOpen) return;
 		const root = modalRootRef.current;
@@ -141,36 +180,27 @@ const EventDetailModal = ({ event: initialEvent, isOpen, onClose }) => {
 		if (!root || !right) return;
 
 		const forwardWheel = (e) => {
-			// Only vertical scrolls
 			if (Math.abs(e.deltaY) < Math.abs(e.deltaX)) return;
-			// Only events that start inside modal
 			if (!root.contains(e.target)) return;
-			// Attempt to scroll the right pane
 			const before = right.scrollTop;
 			right.scrollBy({ top: e.deltaY, behavior: 'auto' });
 			if (right.scrollTop !== before) {
-				// stop other listeners (capture gives us earlier execution) and prevent default
 				e.stopImmediatePropagation();
 				e.preventDefault();
-			} else {
-				// If pane can't scroll in that direction, let default happen (bubbling out)
 			}
 		};
 
 		const forwardTouch = (e) => {
-			// For touchmove we don't have deltaY, but we can prevent global handlers when the touch is inside
 			if (!root.contains(e.target)) return;
-			// If right pane is scrollable, prevent global smooth scrollers from hijacking
 			const canScroll =
 				right.scrollHeight > right.clientHeight &&
 				(right.scrollTop > 0 || right.scrollTop + right.clientHeight < right.scrollHeight);
 			if (canScroll) {
 				e.stopImmediatePropagation();
-				// do not preventDefault to allow native scrolling on touch devices
+				// allow native touch scrolling
 			}
 		};
 
-		// capture: true ensures our handler runs before others; passive:false needed to preventDefault
 		window.addEventListener('wheel', forwardWheel, { passive: false, capture: true });
 		window.addEventListener('touchmove', forwardTouch, { passive: false, capture: true });
 
@@ -208,7 +238,6 @@ const EventDetailModal = ({ event: initialEvent, isOpen, onClose }) => {
 		}
 	};
 
-	// Respect navbar height variable removed — modal will float above navbar
 	const modalMaxHeight = '90vh';
 
 	return (
@@ -219,29 +248,31 @@ const EventDetailModal = ({ event: initialEvent, isOpen, onClose }) => {
 				exit={{ opacity: 0 }}
 				className="fixed inset-0 z-[9999] flex items-center justify-center"
 			>
-				{/* strong blurred backdrop above everything (including navbar) */}
+				{/* blurred backdrop above navbar */}
 				<motion.div
 					initial={{ opacity: 0 }}
 					animate={{ opacity: 1 }}
 					exit={{ opacity: 0 }}
-					className="absolute inset-0 bg-black/40 backdrop-blur-lg"
+					className="absolute inset-0 bg-black/40 backdrop-blur-xl"
 					onClick={onClose}
+					aria-hidden="true"
 				/>
 
-				{/* modal: poster on top, details below; content scrolls independently */}
+				{/* modal container */}
 				<motion.div
 					ref={modalRootRef}
-					initial={{ y: 12, scale: 0.995, opacity: 0 }}
+					initial={{ y: 8, scale: 0.995, opacity: 0 }}
 					animate={{ y: 0, scale: 1, opacity: 1 }}
-					exit={{ y: 12, scale: 0.995, opacity: 0 }}
+					exit={{ y: 8, scale: 0.995, opacity: 0 }}
 					transition={{ duration: 0.18 }}
-					className="relative z-10 w-full max-w-3xl rounded-2xl shadow-2xl overflow-hidden flex flex-col bg-white dark:bg-slate-900"
 					role="dialog"
 					aria-modal="true"
-					aria-label={`Event details: ${payload.title || 'Event'}`}
+					aria-label={`Event details: ${title}`}
+					className="relative z-10 w-full max-w-3xl rounded-2xl shadow-2xl overflow-hidden flex flex-col bg-white dark:bg-slate-900 ring-1 ring-black/5"
 					style={{ maxHeight: modalMaxHeight }}
+					tabIndex={-1}
 				>
-					{/* Poster at the top */}
+					{/* Poster */}
 					<div className="relative w-full h-64 md:h-80 flex-shrink-0 bg-slate-100 dark:bg-slate-800">
 						{poster ? (
 							<img
@@ -257,20 +288,22 @@ const EventDetailModal = ({ event: initialEvent, isOpen, onClose }) => {
 							</div>
 						)}
 
-						{/* title overlay + close in poster area */}
-						<div className="absolute inset-0 flex items-end justify-between p-4 bg-gradient-to-t from-black/60 to-transparent">
-							<div className="text-white">
-								<h2 className="text-xl font-bold leading-tight">{title}</h2>
-								<div className="text-sm opacity-90">
-									{dateLabel} • {venue}
+						{/* overlay: title/meta + close */}
+						<div className="absolute inset-0 flex flex-col justify-end p-4 bg-gradient-to-t from-black/50 to-transparent">
+							<div className="flex items-start justify-between gap-4">
+								<div className="min-w-0">
+									<h3 className="text-xl md:text-2xl font-semibold text-white truncate">
+										{title}
+									</h3>
+									<div className="text-sm text-white/90 mt-1">
+										{dateLabel} · {venue}
+									</div>
 								</div>
-							</div>
 
-							<div className="flex items-center gap-2">
 								<button
 									onClick={onClose}
-									className="p-2 rounded-md bg-white/10 text-white hover:bg-white/20"
-									aria-label="Close event details"
+									className="ml-3 p-2 rounded-full bg-white/10 hover:bg-white/20 text-white"
+									aria-label="Close"
 								>
 									<X size={20} />
 								</button>
@@ -278,21 +311,21 @@ const EventDetailModal = ({ event: initialEvent, isOpen, onClose }) => {
 						</div>
 					</div>
 
-					{/* Scrollable details area */}
+					{/* scrollable content */}
 					<div
 						ref={rightPaneRef}
 						tabIndex={0}
-						className="flex-1 overflow-y-auto p-6"
+						className="flex-1 overflow-y-auto p-6 space-y-6 scroll-smooth"
 						style={{
 							WebkitOverflowScrolling: 'touch',
 							touchAction: 'pan-y',
 							overscrollBehavior: 'contain',
 						}}
 					>
-						{/* condensed meta row */}
-						<div className="flex items-start justify-between gap-4">
-							<div className="min-w-0">
-								<div className="flex flex-wrap gap-2 items-center">
+						{/* meta row */}
+						<div className="flex flex-col md:flex-row gap-4 items-start md:items-center">
+							<div className="flex-1 min-w-0">
+								<div className="flex flex-wrap gap-2 mb-2">
 									{tags.slice(0, 8).map((t) => (
 										<span
 											key={t}
@@ -302,59 +335,215 @@ const EventDetailModal = ({ event: initialEvent, isOpen, onClose }) => {
 										</span>
 									))}
 								</div>
+								<div className="text-sm text-slate-600 dark:text-slate-300">
+									<DetailRow icon={Calendar} label="When">
+										{dateLabel}
+									</DetailRow>
+									<div className="mt-3">
+										<DetailRow icon={MapPin} label="Where">
+											{venue}
+											{payload.room ? ` • ${payload.room}` : ''}
+										</DetailRow>
+									</div>
+								</div>
 							</div>
 
-							<div className="ml-auto">
+							<div className="flex-shrink-0">
 								<PricePill price={price} />
 							</div>
 						</div>
 
 						{/* registration card */}
-						<div className="mt-5">
-							<div className="rounded-xl p-4 bg-slate-50 dark:bg-slate-800 border border-slate-100 dark:border-slate-700">
-								<div className="text-xs text-slate-500 dark:text-slate-300">
-									Registration
-								</div>
-								<div className="mt-2 flex items-center gap-3">
-									<div className="font-medium text-slate-900 dark:text-white">
+						<div className="rounded-xl p-4 bg-slate-50 dark:bg-slate-800 border border-slate-100 dark:border-slate-700">
+							<div className="flex items-center justify-between gap-4">
+								<div>
+									<div className="text-xs text-slate-500 dark:text-slate-300">
+										Registration
+									</div>
+									<div className="font-medium text-slate-900 dark:text-white mt-1">
 										{registrationInfo?.actionLabel ||
 											registrationInfo?.actionUrl ||
 											'No registration'}
 									</div>
-
-									{registrationInfo?.isOpen && registrationInfo?.actionUrl && (
-										<a
-											href={registrationInfo.actionUrl}
-											target="_blank"
-											rel="noreferrer"
-											className="ml-auto inline-flex items-center gap-2 px-3 py-1 rounded-lg bg-emerald-600 text-white text-sm shadow-sm"
-										>
-											{registrationInfo.actionLabel || 'Register'}{' '}
-											<Globe size={14} />
-										</a>
+									{registrationInfo?.message && (
+										<div className="text-xs text-slate-500 dark:text-slate-300 mt-1">
+											{registrationInfo.message}
+										</div>
 									)}
 								</div>
-								{registrationInfo?.message && (
-									<div className="mt-2 text-xs text-slate-500 dark:text-slate-300">
-										{registrationInfo.message}
-									</div>
+
+								{registrationInfo?.isOpen && registrationInfo?.actionUrl && (
+									<a
+										href={registrationInfo.actionUrl}
+										target="_blank"
+										rel="noreferrer"
+										onClick={(e) => e.stopPropagation()}
+										className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-emerald-600 text-white text-sm shadow-sm"
+									>
+										{registrationInfo.actionLabel || 'Register'}{' '}
+										<Globe size={14} />
+									</a>
 								)}
 							</div>
 						</div>
 
-						{/* About */}
-						<div className="mt-6">
-							<h3 className="text-lg font-semibold mb-2 text-slate-900 dark:text-white">
+						{/* about */}
+						<section>
+							<h4 className="text-lg font-semibold text-slate-900 dark:text-white mb-2">
 								About
-							</h3>
+							</h4>
 							<p className="text-sm text-slate-600 dark:text-slate-300 leading-relaxed whitespace-pre-wrap">
 								{desc}
 							</p>
-						</div>
+						</section>
 
-						{/* speakers / partners / resources (same structure as before) */}
-						{/* ...existing code for speakers, partners, co-organizers, resources, raw JSON ... */}
-						{/* For brevity keep existing blocks unchanged in the file here */}
+						{/* speakers */}
+						{speakers.length > 0 && (
+							<section>
+								<h4 className="text-lg font-semibold text-slate-900 dark:text-white mb-3">
+									Speakers
+								</h4>
+								<div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+									{speakers.map((s, i) => (
+										<div
+											key={i}
+											className="flex items-start gap-3 p-3 rounded-lg bg-white/50 dark:bg-slate-800 border border-slate-100 dark:border-slate-700"
+										>
+											{s.photo?.url ? (
+												<img
+													src={s.photo.url}
+													alt={s.name}
+													className="w-12 h-12 rounded-md object-cover"
+												/>
+											) : (
+												<div className="w-12 h-12 rounded-md bg-indigo-600 text-white flex items-center justify-center font-medium">
+													{(s.name || 'S').slice(0, 2).toUpperCase()}
+												</div>
+											)}
+											<div>
+												<div className="font-medium text-slate-900 dark:text-white">
+													{s.name}
+												</div>
+												<div className="text-xs text-slate-500 dark:text-slate-300">
+													{s.title}
+												</div>
+												{s.bio && (
+													<div className="text-xs mt-1 text-slate-600 dark:text-slate-300">
+														{s.bio}
+													</div>
+												)}
+											</div>
+										</div>
+									))}
+								</div>
+							</section>
+						)}
+
+						{/* partners */}
+						{partners.length > 0 && (
+							<section>
+								<h4 className="text-lg font-semibold text-slate-900 dark:text-white mb-3">
+									Partners
+								</h4>
+								<div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
+									{partners.map((p, i) => (
+										<a
+											key={i}
+											href={p.website || '#'}
+											target="_blank"
+											rel="noreferrer"
+											onClick={(e) => e.stopPropagation()}
+											className="flex flex-col items-center gap-2 p-3 rounded-lg bg-white/50 dark:bg-slate-800 border border-slate-100 dark:border-slate-700 hover:shadow-lg transition-shadow"
+										>
+											{p.logo?.url ? (
+												<img
+													src={p.logo.url}
+													alt={p.name}
+													className="w-full h-12 object-contain max-w-[140px]"
+												/>
+											) : (
+												<div className="w-full h-12 rounded bg-slate-200 dark:bg-slate-700 flex items-center justify-center text-xs text-slate-700 dark:text-slate-200 font-medium">
+													{(p.name || '—').slice(0, 12)}
+												</div>
+											)}
+											<div className="text-sm text-slate-700 dark:text-slate-200 text-center">
+												{p.name}
+											</div>
+										</a>
+									))}
+								</div>
+							</section>
+						)}
+
+						{/* co-organizers & resources */}
+						{(coOrganizers.length > 0 || resources.length > 0) && (
+							<section className="grid grid-cols-1 md:grid-cols-2 gap-4">
+								{coOrganizers.length > 0 && (
+									<div className="rounded-md p-3 bg-slate-50 dark:bg-slate-800 border border-slate-100 dark:border-slate-700">
+										<div className="text-xs text-slate-500 dark:text-slate-300">
+											Co-organizers
+										</div>
+										<ul className="mt-2 list-disc list-inside text-sm text-slate-700 dark:text-slate-200">
+											{coOrganizers.map((c, i) => (
+												<li key={i}>{c}</li>
+											))}
+										</ul>
+									</div>
+								)}
+
+								{resources.length > 0 && (
+									<div className="rounded-md p-3 bg-slate-50 dark:bg-slate-800 border border-slate-100 dark:border-slate-700">
+										<div className="text-xs text-slate-500 dark:text-slate-300">
+											Resources
+										</div>
+										<ul className="mt-2 space-y-2 text-sm">
+											{resources.map((r, i) => (
+												<li key={i}>
+													<a
+														href={r.url}
+														target="_blank"
+														rel="noreferrer"
+														onClick={(e) => e.stopPropagation()}
+														className="text-indigo-600 dark:text-indigo-400 underline"
+													>
+														{r.title || r.url}
+													</a>
+												</li>
+											))}
+										</ul>
+									</div>
+								)}
+							</section>
+						)}
+
+						{/* raw JSON */}
+						{showRaw && (
+							<section>
+								<h4 className="text-lg font-semibold text-slate-900 dark:text-white mb-2">
+									Raw event JSON
+								</h4>
+								<pre className="bg-slate-100 dark:bg-slate-800 p-3 rounded text-xs overflow-auto max-h-60 text-slate-800 dark:text-slate-200">
+									{rawJson}
+								</pre>
+							</section>
+						)}
+
+						{/* actions footer */}
+						<div className="flex items-center gap-2 justify-end">
+							<button
+								onClick={copyRaw}
+								className="px-3 py-1 rounded-md border bg-transparent text-sm text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800"
+							>
+								Copy JSON
+							</button>
+
+							<button
+								onClick={() => setShowRaw((s) => !s)}
+								className="px-3 py-1 rounded-md border bg-transparent text-sm"
+							>
+								{showRaw ? 'Hide raw' : 'Show raw'}
+							</button>
+						</div>
 					</div>
 				</motion.div>
 			</motion.div>
