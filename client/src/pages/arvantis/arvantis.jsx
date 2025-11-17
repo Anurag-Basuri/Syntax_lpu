@@ -1,12 +1,12 @@
 import React, { useEffect, useMemo, useState, useCallback, useRef } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import {
-  getArvantisLandingData,
-  getFestDetails,
-  getAllFests,
+	getArvantisLandingData,
+	getFestDetails,
+	getAllFests,
 } from '../../services/arvantisServices.js';
 import EventDetailModal from '../../components/event/EventDetailModal.jsx';
-import { Calendar, Image as ImageIcon, Layers3, Users, Search, Filter, ChevronDown } from 'lucide-react';
+import { Calendar, Image as ImageIcon, Layers3, Users, Filter, ChevronDown } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import PosterHero from '../../components/Arvantis/PosterHero.jsx';
 import EditionsStrip from '../../components/Arvantis/EditionsStrip.jsx';
@@ -23,18 +23,50 @@ const ITEMS_IN_PAST_SECTION = 8;
 
 const safeArray = (v) => (Array.isArray(v) ? v : v ? [v] : []);
 
+const normalizeLanding = (raw) => {
+	// server may return { fest, partners, events, hero, computed } or raw fest directly
+	if (!raw) return null;
+	if (raw.fest) {
+		// merge subkeys into single "fest" shaped object for components
+		const f = { ...raw.fest };
+		f.hero = raw.hero ?? f.hero ?? (f.poster ? f.poster : null);
+		f.events = raw.events ?? f.events ?? [];
+		f.partners = raw.partners ?? f.partners ?? [];
+		f.computed = raw.computed ?? {};
+		return f;
+	}
+	return raw;
+};
+
+const findTitleSponsor = (partners = []) => {
+	if (!partners || partners.length === 0) return null;
+	// prefer explicit tier names, then keywords in name/description
+	const byTier = partners.find(
+		(p) => p.tier && /title|title-sponsor|presenting|powered by|lead/i.test(p.tier)
+	);
+	if (byTier) return byTier;
+	const byFlag = partners.find((p) => p.isTitleSponsor || p.role === 'title' || p.titleSponsor);
+	if (byFlag) return byFlag;
+	// fallback look-up by name/description heuristics
+	return (
+		partners.find((p) =>
+			/title sponsor|powered by|presented by/i.test(`${p.name} ${p.description || ''}`)
+		) || null
+	);
+};
+
 const ArvantisPage = () => {
 	const [identifier, setIdentifier] = useState(null);
 	const [selectedEvent, setSelectedEvent] = useState(null);
 	const [selectedImage, setSelectedImage] = useState(null);
 
 	// Event controls
-	const [eventQuery, setEventQuery] = useState('');
 	const [eventType, setEventType] = useState('all');
 	const [eventSort, setEventSort] = useState('date-desc');
 
-	// Past editions drawer
+	// UI controls
 	const [showPastEditions, setShowPastEditions] = useState(false);
+	const [showLandingFirst, setShowLandingFirst] = useState(true);
 
 	// Landing (latest) edition
 	const landingQuery = useQuery({
@@ -65,29 +97,28 @@ const ArvantisPage = () => {
 		return [];
 	}, [editionsQuery.data]);
 
-	// When the page opens, prefer landing (latest) edition; otherwise first edition
-	useEffect(() => {
-		// If identifier already set (user navigated), keep it
-		if (identifier) return;
+	// landing normalized
+	const landingRaw = landingQuery.data;
+	const landingFest = useMemo(() => normalizeLanding(landingRaw), [landingRaw]);
 
-		// pick landing first
-		const landing = landingQuery.data;
-		if (landing) {
-			const id = landing.slug || String(landing.year || '');
+	// Default identifier behavior: prefer landing slug/year first
+	useEffect(() => {
+		if (identifier) return;
+		if (landingFest) {
+			const id = landingFest.slug || String(landingFest.year || '');
 			if (id) {
 				setIdentifier(id);
 				return;
 			}
 		}
-		// fallback to first edition in list
 		if (editions.length > 0) {
 			const first = editions[0];
 			const id = first?.slug || String(first?.year || '');
 			if (id) setIdentifier(id);
 		}
-	}, [identifier, landingQuery.data, editions]);
+	}, [identifier, landingFest, editions]);
 
-	// Details for selected identifier (fetch when identifier exists)
+	// Details for selected identifier
 	const detailsQuery = useQuery({
 		queryKey: ['arvantis', 'details', identifier],
 		queryFn: () => getFestDetails(identifier),
@@ -96,8 +127,18 @@ const ArvantisPage = () => {
 		retry: 1,
 	});
 
-	// Resolve which fest to display: detailsQuery -> landing fallback
-	const fest = useMemo(() => detailsQuery.data ?? landingQuery.data ?? null, [detailsQuery.data, landingQuery.data]);
+	// Resolve which fest to display: detailsQuery -> landing fallback (landing first if requested)
+	const fest = useMemo(() => {
+		// If user wants landing first and landing matches identifier -> use landingFest
+		if (showLandingFirst && landingFest) {
+			const landingId = landingFest.slug || String(landingFest.year || '');
+			if (!identifier || landingId === identifier) return landingFest;
+		}
+		// prefer explicit detailsQuery result
+		if (detailsQuery.data) return detailsQuery.data;
+		// fallback to landingFest
+		return landingFest ?? null;
+	}, [detailsQuery.data, landingFest, identifier, showLandingFirst]);
 
 	// Stats for cards with defensive access
 	const stats = useMemo(() => {
@@ -124,8 +165,8 @@ const ArvantisPage = () => {
 		'Unknown error occurred.';
 
 	/* -------------------------
-	   Event selection and filtering
-	   ------------------------- */
+     Event selection and filtering
+     ------------------------- */
 	const events = useMemo(() => safeArray(fest?.events), [fest]);
 	const eventTypes = useMemo(() => {
 		const types = new Set(events.map((e) => e.type || 'general'));
@@ -134,14 +175,8 @@ const ArvantisPage = () => {
 
 	const filteredEvents = useMemo(() => {
 		let out = events.slice();
-		if (eventType && eventType !== 'all') out = out.filter((e) => (e.type || 'general') === eventType);
-		if (eventQuery && eventQuery.trim()) {
-			const q = eventQuery.trim().toLowerCase();
-			out = out.filter((e) => {
-				const hay = `${e.title || e.name || ''} ${e.description || ''}`.toLowerCase();
-				return hay.includes(q);
-			});
-		}
+		if (eventType && eventType !== 'all')
+			out = out.filter((e) => (e.type || 'general') === eventType);
 		// sort
 		out.sort((a, b) => {
 			const ad = new Date(a.eventDate || a.date || 0).getTime();
@@ -151,11 +186,11 @@ const ArvantisPage = () => {
 			return bd - ad;
 		});
 		return out;
-	}, [events, eventType, eventQuery, eventSort]);
+	}, [events, eventType, eventSort]);
 
 	/* -------------------------
-	   Previous editions subset (cards)
-	   ------------------------- */
+     Previous editions subset (cards)
+     ------------------------- */
 	const otherEditions = useMemo(() => {
 		if (!editions || editions.length === 0) return [];
 		const id = identifier;
@@ -166,14 +201,34 @@ const ArvantisPage = () => {
 	}, [editions, identifier]);
 
 	/* -------------------------
-	   Handlers
-	   ------------------------- */
+     Partners handling & title sponsor
+     ------------------------- */
+	const partners = useMemo(() => (Array.isArray(fest?.partners) ? fest.partners : []), [fest]);
+	const titleSponsor = useMemo(() => findTitleSponsor(partners), [partners]);
+	const otherPartnersByTier = useMemo(() => {
+		const map = {};
+		(partners || []).forEach((p) => {
+			const tier = (p.tier || 'partner').toLowerCase();
+			if (titleSponsor && p.name === titleSponsor.name) return;
+			map[tier] = map[tier] || [];
+			map[tier].push(p);
+		});
+		return map;
+	}, [partners, titleSponsor]);
+
+	/* -------------------------
+     Handlers
+     ------------------------- */
 	const handleEventClick = useCallback((event) => {
 		const normalized = {
 			...event,
 			title: event.title ?? event.name ?? '',
 			eventDate: event.eventDate ?? event.date ?? null,
-			posters: Array.isArray(event.posters) ? event.posters : event.posters ? [event.posters] : [],
+			posters: Array.isArray(event.posters)
+				? event.posters
+				: event.posters
+				? [event.posters]
+				: [],
 		};
 		setSelectedEvent(normalized);
 	}, []);
@@ -187,6 +242,7 @@ const ArvantisPage = () => {
 	// When user selects an edition from strip or cards: set identifier and scroll to top
 	const handleSelectEdition = useCallback((id) => {
 		if (!id) return;
+		setShowLandingFirst(false); // user chose explicit edition
 		setIdentifier(id);
 		window.scrollTo({ top: 0, behavior: 'smooth' });
 	}, []);
@@ -194,17 +250,12 @@ const ArvantisPage = () => {
 	// Prefetch details for the identifiers in the editions list (optional: warms cache)
 	const prefetchRef = useRef(false);
 	useEffect(() => {
-		// Only prefetch once and when we have editions
 		if (prefetchRef.current) return;
 		if (!editions || editions.length === 0) return;
-		// ask react-query to warm fetch details for first few editions
 		try {
-			// minimal: fetch first 4 editions details in background
-			editions.slice(0, 4).forEach((f) => {
+			editions.slice(0, 6).forEach((f) => {
 				const id = f?.slug || String(f?.year || '');
 				if (id && id !== identifier) {
-					// calling getFestDetails directly is fine, but better: use queryCache (not necessary here)
-					// Keep light: don't block UI
 					getFestDetails(id).catch(() => {});
 				}
 			});
@@ -213,140 +264,433 @@ const ArvantisPage = () => {
 	}, [editions, identifier]);
 
 	/* -------------------------
-	   Render
-	   ------------------------- */
+     Render
+     ------------------------- */
 	return (
-		<div className="min-h-screen" style={{ background: 'transparent', color: 'var(--text-primary)' }}>
+		<div className="min-h-screen arvantis-page" style={{ color: 'var(--text-primary)' }}>
 			<div className="max-w-7xl mx-auto px-4 sm:px-8 lg:px-12 py-10 sm:py-16">
-				{/* Header / Title */}
-				<header className="mb-8 flex flex-col lg:flex-row lg:items-center lg:justify-between gap-6">
+				{/* Header / Title + Powered by */}
+				<header className="mb-6 flex flex-col lg:flex-row lg:items-center lg:justify-between gap-6">
 					<div>
-						<h2 className="text-4xl md:text-5xl lg:text-6xl font-extrabold tracking-tight leading-tight" style={{ color: 'var(--text-primary)', fontFamily: 'Space Grotesk, system-ui' }}>
+						<h1
+							className="text-4xl md:text-5xl lg:text-6xl font-extrabold leading-tight"
+							style={{ fontFamily: 'Space Grotesk, system-ui' }}
+						>
 							Arvantis
-							<span className="ml-2 text-[var(--accent-1)]">{fest?.year ? ` ’${String(fest.year).slice(-2)}` : ''}</span>
-						</h2>
-						<p className="text-base md:text-lg mt-2 max-w-2xl" style={{ color: 'var(--text-secondary)' }}>
-							{fest?.subtitle || 'The annual flagship fest by Syntax Club focused on tech, creativity and collaboration.'}
+							<span className="ml-3 accent-neon">
+								{fest?.year ? ` ${fest.year}` : ''}
+							</span>
+						</h1>
+						<p className="mt-2 text-base md:text-lg text-[var(--text-secondary)] max-w-2xl">
+							{fest?.tagline ||
+								fest?.subtitle ||
+								'A celebration of tech, creativity and collaboration — by Syntax Club.'}
 						</p>
+
+						{/* Powered by title sponsor line */}
+						{titleSponsor ? (
+							<div className="mt-3 flex items-center gap-3">
+								<div className="text-sm text-[var(--text-secondary)]">
+									Powered by
+								</div>
+								<a
+									href={titleSponsor.website || '#'}
+									target="_blank"
+									rel="noreferrer"
+									className="flex items-center gap-3"
+								>
+									{titleSponsor.logo?.url ? (
+										<img
+											src={titleSponsor.logo.url}
+											alt={titleSponsor.name}
+											style={{ height: 36, objectFit: 'contain' }}
+										/>
+									) : (
+										<div className="font-semibold">{titleSponsor.name}</div>
+									)}
+								</a>
+							</div>
+						) : null}
 					</div>
 
 					<div className="flex gap-3 items-center">
-						<a href="#register" className="inline-flex items-center gap-2 px-5 py-3 rounded-full font-semibold shadow-xl transition-transform transform hover:scale-105" style={{ background: 'var(--button-primary-bg)', color: 'var(--text-primary)' }}>
-							Register
-						</a>
-						<button onClick={() => window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' })} className="hidden md:inline-flex items-center gap-2 px-4 py-2 rounded-lg text-sm" style={{ background: 'var(--button-secondary-bg)', color: 'var(--text-primary)', border: `1px solid var(--button-secondary-border)` }}>
-							See Gallery
+						<button
+							onClick={() => {
+								setShowLandingFirst(true);
+								setIdentifier(landingFest?.slug || String(landingFest?.year || ''));
+								window.scrollTo({ top: 0, behavior: 'smooth' });
+							}}
+							className="btn-primary neon-btn"
+							title="Show landing (latest) edition"
+						>
+							View Landing
 						</button>
+
+						<div className="relative inline-flex items-center gap-2 p-2 rounded-md bg-[var(--button-secondary-bg)] border border-[var(--button-secondary-border)]">
+							<button
+								title="Filters"
+								onClick={() => setShowPastEditions((s) => !s)}
+								className="ml-2 p-2 rounded-md bg-transparent"
+							>
+								<Filter size={16} />
+							</button>
+						</div>
 					</div>
 				</header>
 
 				{/* Error / Loading / No data */}
 				{isErrorOverall ? (
-					<ErrorBlock message={errorMsg} onRetry={() => { landingQuery.refetch(); editionsQuery.refetch(); if (identifier) detailsQuery.refetch(); }} />
+					<ErrorBlock
+						message={errorMsg}
+						onRetry={() => {
+							landingQuery.refetch();
+							editionsQuery.refetch();
+							if (identifier) detailsQuery.refetch();
+						}}
+					/>
 				) : isLoadingOverall && !fest ? (
 					<LoadingBlock />
 				) : !fest ? (
 					<div className="py-24 text-center">
 						<h3 className="text-3xl font-bold mb-3">No Fest Data Available</h3>
-						<p className="text-lg" style={{ color: 'var(--text-secondary)' }}>Please check back later for updates on Arvantis.</p>
+						<p className="text-lg text-[var(--text-secondary)]">
+							Please check back later for updates on Arvantis.
+						</p>
 					</div>
 				) : (
-					<motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.6 }} className="space-y-12">
-						{/* Poster / Hero (primary detail) */}
+					<motion.div
+						initial={{ opacity: 0, y: 12 }}
+						animate={{ opacity: 1, y: 0 }}
+						transition={{ duration: 0.5 }}
+						className="space-y-8"
+					>
+						{/* Hero / Poster */}
 						<PosterHero fest={fest} />
 
-						{/* Editions strip (prominent) */}
-						<EditionsStrip
-							editions={editions}
-							currentIdentifier={identifier}
-							onSelect={handleSelectEdition}
-							landingIdentifier={landingQuery.data ? (landingQuery.data.slug || String(landingQuery.data.year || '')) : null}
-						/>
+						{/* Editions strip + quick access to previous ones */}
+						<div className="flex flex-col lg:flex-row gap-6 items-start">
+							<div className="flex-1">
+								<EditionsStrip
+									editions={editions}
+									currentIdentifier={identifier}
+									onSelect={handleSelectEdition}
+									landingIdentifier={
+										landingFest
+											? landingFest.slug || String(landingFest.year || '')
+											: null
+									}
+								/>
+							</div>
 
-						{/* Stats row */}
-						<div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-6">
-							{stats.map((s, idx) => (
-								<StatCard key={idx} icon={s.icon} label={s.label} value={s.value} index={idx} />
-							))}
-						</div>
-
-						{/* Events section with inline filters */}
-						<section id="events" className="rounded-3xl p-6" style={{ background: 'transparent', border: '1px solid var(--glass-border)' }}>
-							<div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-4">
-								<div>
-									<h3 className="text-xl font-semibold">Events</h3>
-									<p className="text-sm mt-1 text-[var(--text-secondary)]">Explore sessions, workshops and competitions from this edition.</p>
-								</div>
-
-								{/* Controls */}
-								<div className="flex items-center gap-2">
-									<div className="relative">
-										<Search className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--text-muted)]" />
-										<input value={eventQuery} onChange={(e) => setEventQuery(e.target.value)} placeholder="Search events..." className="pl-10 pr-3 py-2 rounded-lg border border-[var(--glass-border)] bg-[var(--input-bg)]" />
+							<div className="w-full lg:w-64">
+								<div className="glass-card p-4">
+									<div className="flex items-center justify-between">
+										<div>
+											<div className="text-xs text-[var(--text-secondary)]">
+												Quick stats
+											</div>
+											<div className="font-semibold">
+												{fest?.name || `Arvantis ${fest?.year || ''}`}
+											</div>
+										</div>
+										<div className="text-sm mono text-[var(--text-secondary)]">
+											{fest?.computed?.computedStatus || fest?.status}
+										</div>
 									</div>
 
-									<select value={eventType} onChange={(e) => setEventType(e.target.value)} className="rounded-md border border-[var(--glass-border)] py-2 px-3 bg-[var(--input-bg)]">
-										{eventTypes.map((t) => <option key={t} value={t}>{t === 'all' ? 'All types' : t}</option>)}
-									</select>
+									<div className="mt-3 grid grid-cols-2 gap-2">
+										{stats.map((s, i) => (
+											<div
+												key={i}
+												className="p-2 rounded-md bg-[var(--glass-bg)] border border-[var(--glass-border)] text-center"
+											>
+												<div className="text-xs text-[var(--text-secondary)]">
+													{s.label}
+												</div>
+												<div
+													className="font-mono font-bold"
+													style={{ color: 'var(--text-primary)' }}
+												>
+													{s.value}
+												</div>
+											</div>
+										))}
+									</div>
 
-									<select value={eventSort} onChange={(e) => setEventSort(e.target.value)} className="rounded-md border border-[var(--glass-border)] py-2 px-3 bg-[var(--input-bg)]">
+									<div className="mt-3 flex gap-2">
+										<a href="#events" className="btn-ghost" style={{ flex: 1 }}>
+											View events
+										</a>
+										<a
+											href="#register"
+											className="btn-primary neon-btn"
+											style={{ flex: 1 }}
+										>
+											Register
+										</a>
+									</div>
+								</div>
+							</div>
+						</div>
+
+						{/* Events */}
+						<section
+							id="events"
+							className="rounded-3xl p-6"
+							style={{
+								background: 'transparent',
+								border: '1px solid var(--glass-border)',
+							}}
+						>
+							<div className="flex items-center justify-between mb-4">
+								<div>
+									<h3 className="text-xl font-semibold">Events</h3>
+									<p className="text-sm mt-1 text-[var(--text-secondary)]">
+										Explore sessions, workshops and competitions from this
+										edition.
+									</p>
+								</div>
+
+								<div className="flex items-center gap-2">
+									<select
+										value={eventType}
+										onChange={(e) => setEventType(e.target.value)}
+										className="rounded-md border border-[var(--glass-border)] py-2 px-3 bg-[var(--input-bg)]"
+									>
+										{eventTypes.map((t) => (
+											<option key={t} value={t}>
+												{t === 'all' ? 'All types' : t}
+											</option>
+										))}
+									</select>
+									<select
+										value={eventSort}
+										onChange={(e) => setEventSort(e.target.value)}
+										className="rounded-md border border-[var(--glass-border)] py-2 px-3 bg-[var(--input-bg)]"
+									>
 										<option value="date-desc">Newest first</option>
 										<option value="date-asc">Oldest first</option>
 									</select>
 								</div>
 							</div>
 
-							{/* Events grid with filteredEvents */}
 							<EventsGrid events={filteredEvents} onEventClick={handleEventClick} />
 						</section>
 
-						{/* Partners */}
-						<section className="rounded-3xl p-6" style={{ background: 'transparent', border: '1px solid var(--glass-border)' }}>
-							<h3 className="text-xl font-semibold mb-4">Partners</h3>
-							<PartnersGrid partners={Array.isArray(fest?.partners) ? fest.partners : []} />
+						{/* Partners - emphasize title sponsor and tiers */}
+						<section
+							className="rounded-3xl p-6"
+							style={{
+								background: 'transparent',
+								border: '1px solid var(--glass-border)',
+							}}
+						>
+							<div className="flex items-center justify-between mb-4">
+								<div>
+									<h3 className="text-xl font-semibold">Partners</h3>
+									<p className="text-sm mt-1 text-[var(--text-secondary)]">
+										Our partners power Arvantis — special thanks to the title
+										sponsor.
+									</p>
+								</div>
+								<div className="text-sm text-[var(--text-secondary)]">
+									{partners.length} partners
+								</div>
+							</div>
+
+							{titleSponsor && (
+								<div
+									className="mb-6 rounded-xl p-4 flex items-center gap-4"
+									style={{
+										background:
+											'linear-gradient(90deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01))',
+										border: '1px solid rgba(255,255,255,0.03)',
+									}}
+								>
+									<div
+										style={{
+											width: 120,
+											height: 56,
+											display: 'flex',
+											alignItems: 'center',
+											justifyContent: 'center',
+										}}
+									>
+										{titleSponsor.logo?.url ? (
+											<img
+												src={titleSponsor.logo.url}
+												alt={titleSponsor.name}
+												style={{ maxHeight: 56, objectFit: 'contain' }}
+											/>
+										) : (
+											<div className="font-semibold">{titleSponsor.name}</div>
+										)}
+									</div>
+									<div>
+										<div className="text-sm text-[var(--text-secondary)]">
+											Title sponsor
+										</div>
+										<div
+											className="text-lg font-bold"
+											style={{ color: 'var(--text-primary)' }}
+										>
+											{titleSponsor.name}
+										</div>
+										{titleSponsor.description && (
+											<div className="text-sm mt-1 text-[var(--text-secondary)]">
+												{titleSponsor.description}
+											</div>
+										)}
+									</div>
+									<div className="ml-auto">
+										{titleSponsor.website && (
+											<a
+												href={titleSponsor.website}
+												target="_blank"
+												rel="noreferrer"
+												className="btn-primary neon-btn"
+											>
+												Visit
+											</a>
+										)}
+									</div>
+								</div>
+							)}
+
+							{/* other partners grouped by tier */}
+							<div className="grid gap-6">
+								{Object.keys(otherPartnersByTier).length === 0 ? (
+									<div className="text-sm text-[var(--text-secondary)]">
+										No partners listed yet.
+									</div>
+								) : (
+									Object.entries(otherPartnersByTier).map(([tier, list]) => (
+										<div key={tier}>
+											<div className="flex items-center justify-between mb-3">
+												<div
+													className="text-sm font-semibold"
+													style={{ color: 'var(--text-secondary)' }}
+												>
+													{tier.toUpperCase()}
+												</div>
+												<div className="text-xs text-[var(--text-secondary)]">
+													{list.length} partners
+												</div>
+											</div>
+											<PartnersGrid partners={list} />
+										</div>
+									))
+								)}
+							</div>
 						</section>
 
 						{/* Gallery */}
-						<section className="rounded-3xl p-6" style={{ background: 'transparent', border: '1px solid var(--glass-border)' }}>
+						<section
+							className="rounded-3xl p-6"
+							style={{
+								background: 'transparent',
+								border: '1px solid var(--glass-border)',
+							}}
+						>
 							<h3 className="text-xl font-semibold mb-4">Gallery</h3>
-							<GalleryGrid gallery={Array.isArray(fest?.gallery) ? fest.gallery : []} onImageClick={handleImageClick} />
+							<GalleryGrid
+								gallery={Array.isArray(fest?.gallery) ? fest.gallery : []}
+								onImageClick={handleImageClick}
+							/>
 						</section>
 
 						{/* Past editions preview */}
-						<section className="rounded-3xl p-6" style={{ background: 'transparent', border: '1px solid var(--glass-border)' }}>
+						<section
+							className="rounded-3xl p-6"
+							style={{
+								background: 'transparent',
+								border: '1px solid var(--glass-border)',
+							}}
+						>
 							<div className="flex items-center justify-between gap-3 mb-4">
 								<div>
 									<h3 className="text-xl font-semibold">Past Editions</h3>
-									<p className="text-sm mt-1 text-[var(--text-secondary)]">Browse earlier Arvantis editions and their highlights.</p>
+									<p className="text-sm mt-1 text-[var(--text-secondary)]">
+										Browse previous Arvantis editions and jump to the one you
+										want to explore.
+									</p>
 								</div>
-								<button onClick={() => setShowPastEditions((s) => !s)} className="inline-flex items-center gap-2 px-3 py-2 rounded-md bg-[var(--button-secondary-bg)] border border-[var(--button-secondary-border)]">
-									<Filter size={14} /> {showPastEditions ? 'Hide' : 'Show'} editions
-								</button>
+
+								<div className="flex items-center gap-2">
+									<button
+										onClick={() => setShowPastEditions((s) => !s)}
+										className="inline-flex items-center gap-2 px-3 py-2 rounded-md bg-[var(--button-secondary-bg)] border border-[var(--button-secondary-border)]"
+									>
+										<Filter size={14} />{' '}
+										{showPastEditions ? 'Collapse' : 'Expand'}
+									</button>
+									<button
+										onClick={() => {
+											window.scrollTo({ top: 0, behavior: 'smooth' });
+											setShowLandingFirst(true);
+											setIdentifier(
+												landingFest?.slug || String(landingFest?.year || '')
+											);
+										}}
+										className="btn-ghost"
+									>
+										Back to landing
+									</button>
+								</div>
 							</div>
 
-							{/* Collapsible list */}
 							{showPastEditions ? (
 								<div className="grid gap-4 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
 									{otherEditions.length === 0 ? (
-										<div className="text-sm text-[var(--text-secondary)]">No previous editions found.</div>
+										<div className="text-sm text-[var(--text-secondary)]">
+											No previous editions found.
+										</div>
 									) : (
 										otherEditions.slice(0, ITEMS_IN_PAST_SECTION).map((e) => {
 											const id = e?.slug || String(e?.year || '');
 											return (
-												<article key={id} className="rounded-xl overflow-hidden border border-[var(--glass-border)] bg-[var(--card-bg)] shadow-sm">
-													{/* poster */}
+												<article
+													key={id}
+													className="rounded-xl overflow-hidden border border-[var(--glass-border)] bg-[var(--card-bg)] shadow-sm"
+												>
 													<div className="h-36 w-full overflow-hidden bg-gray-100">
-														<img src={e?.poster?.url || e?.cover || ''} alt={e?.name || `Arvantis ${e?.year}`} className="w-full h-full object-cover" loading="lazy" />
+														<img
+															src={
+																e?.poster?.url ||
+																e?.cover ||
+																e?.hero?.url ||
+																''
+															}
+															alt={e?.name || `Arvantis ${e?.year}`}
+															className="w-full h-full object-cover"
+															loading="lazy"
+														/>
 													</div>
 													<div className="p-4">
 														<div className="flex items-center justify-between">
 															<div>
-																<div className="font-semibold">{e?.name || `Arvantis ${e?.year}`}</div>
-																<div className="text-xs text-[var(--text-muted)] mt-1">{e?.year}</div>
+																<div className="font-semibold">
+																	{e?.name ||
+																		`Arvantis ${e?.year}`}
+																</div>
+																<div className="text-xs text-[var(--text-muted)] mt-1">
+																	{e?.year}
+																</div>
 															</div>
-															<button onClick={() => handleSelectEdition(id)} className="text-sm px-3 py-1 rounded-md bg-[var(--button-primary-bg)] text-white">View</button>
+															<button
+																onClick={() =>
+																	handleSelectEdition(id)
+																}
+																className="text-sm px-3 py-1 rounded-md bg-[var(--button-primary-bg)] text-white"
+															>
+																View
+															</button>
 														</div>
-														{e?.subtitle && <p className="mt-2 text-sm text-[var(--text-secondary)] truncate">{e.subtitle}</p>}
+														{e?.tagline && (
+															<p className="mt-2 text-sm text-[var(--text-secondary)] truncate">
+																{e.tagline}
+															</p>
+														)}
 													</div>
 												</article>
 											);
@@ -354,8 +698,16 @@ const ArvantisPage = () => {
 									)}
 								</div>
 							) : (
-								// compact inline strip if collapsed: show a few pills (reuses EditionsStrip)
-								<EditionsStrip editions={editions} currentIdentifier={identifier} onSelect={handleSelectEdition} landingIdentifier={landingQuery.data ? (landingQuery.data.slug || String(landingQuery.data.year || '')) : null} />
+								<EditionsStrip
+									editions={editions}
+									currentIdentifier={identifier}
+									onSelect={handleSelectEdition}
+									landingIdentifier={
+										landingFest
+											? landingFest.slug || String(landingFest.year || '')
+											: null
+									}
+								/>
 							)}
 						</section>
 					</motion.div>
@@ -364,7 +716,13 @@ const ArvantisPage = () => {
 
 			{/* Modals */}
 			<AnimatePresence>
-				{selectedEvent && <EventDetailModal event={selectedEvent} isOpen={!!selectedEvent} onClose={closeModal} />}
+				{selectedEvent && (
+					<EventDetailModal
+						event={selectedEvent}
+						isOpen={!!selectedEvent}
+						onClose={closeModal}
+					/>
+				)}
 				{selectedImage && <ImageLightbox image={selectedImage} onClose={closeModal} />}
 			</AnimatePresence>
 		</div>
