@@ -5,6 +5,7 @@ import EventsPreview from '../components/EventsPreview.jsx';
 import TeamPreview from '../components/TeamPreview.jsx';
 import Footer from '../components/Footer.jsx';
 import AboutSyntax from '../components/AboutSyntax.jsx';
+import ArvantisIntro from '../components/ArvantisIntro.jsx';
 
 const Home = () => {
 	return (
@@ -14,6 +15,7 @@ const Home = () => {
 				<main className="relative">
 					{/* The Guiding Line will be rendered inside the sections */}
 					<AboutSyntax />
+					<ArvantisIntro />
 					<ClubDescription />
 				</main>
 				<EventsPreview />
