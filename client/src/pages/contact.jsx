@@ -16,28 +16,9 @@ import { sendContactMessage } from '../services/contactServices.js';
 import { toast } from 'react-hot-toast';
 import { useTheme } from '../hooks/useTheme.js';
 
-/**
- * ContactPage (industry-grade)
- *
- * - Public, responsive contact page with:
- *   - Robust validation & server error mapping
- *   - Honeypot anti-spam
- *   - Submission cooldown + retry/backoff on failure
- *   - Autosave to localStorage with debounce
- *   - Accessibility: aria-live, roles, keyboard-friendly controls
- *   - Keyboard shortcut: Ctrl/Cmd+Enter to submit
- *   - Responsive layout: stacked on small screens, 2-column on larger
- *
- * Notes:
- * - The backend endpoint `/api/v1/contact/send` already validates server-side.
- * - Client-side validation is a UX convenience; do not rely on it for security.
- */
-
 /* ----------------------
    Config
    ---------------------- */
-const DRAFT_KEY = 'contact_form_draft_v2';
-const AUTOSAVE_DEBOUNCE = 700; // ms
 const SUBMIT_COOLDOWN = 20; // seconds after successful send
 const MESSAGE_MAX = 2000;
 const MAX_RETRY_ATTEMPTS = 3;
@@ -127,14 +108,7 @@ const ContactPage = () => {
 	const { theme } = useTheme();
 	const isDark = theme === 'dark';
 
-	const [form, setForm] = useState(() => {
-		try {
-			const raw = localStorage.getItem(DRAFT_KEY);
-			return raw ? { ...defaultForm, ...JSON.parse(raw) } : { ...defaultForm };
-		} catch {
-			return { ...defaultForm };
-		}
-	});
+	const [form, setForm] = useState(() => ({ ...defaultForm }));
 	const [touched, setTouched] = useState({});
 	const [errors, setErrors] = useState({});
 	const [nonFieldError, setNonFieldError] = useState('');
@@ -145,7 +119,6 @@ const ContactPage = () => {
 	const [lastFailedPayload, setLastFailedPayload] = useState(null);
 	const [retryAttempts, setRetryAttempts] = useState(0);
 
-	const autosaveTimer = useRef(null);
 	const cooldownTimer = useRef(null);
 	const firstInputRef = useRef(null);
 	const statusLiveRef = useRef(null);
@@ -158,24 +131,9 @@ const ContactPage = () => {
 	useEffect(() => {
 		// cleanup timers on unmount
 		return () => {
-			if (autosaveTimer.current) clearTimeout(autosaveTimer.current);
 			if (cooldownTimer.current) clearInterval(cooldownTimer.current);
 		};
 	}, []);
-
-	// Autosave with debounce
-	useEffect(() => {
-		if (autosaveTimer.current) clearTimeout(autosaveTimer.current);
-		autosaveTimer.current = setTimeout(() => {
-			try {
-				const toSave = { ...form };
-				delete toSave.website; // don't persist honeypot
-				localStorage.setItem(DRAFT_KEY, JSON.stringify(toSave));
-			} catch {
-				// ignore storage errors
-			}
-		}, AUTOSAVE_DEBOUNCE);
-	}, [form]);
 
 	// Start cooldown helper
 	const startCooldown = (secs = SUBMIT_COOLDOWN) => {
@@ -208,8 +166,8 @@ const ContactPage = () => {
 	}, [isSubmitting, cooldown, form, errors]);
 
 	/* ----------------------
-	   Event handlers
-	   ---------------------- */
+       Event handlers
+       ---------------------- */
 
 	const onChange = (e) => {
 		const { name, value } = e.target;
@@ -236,15 +194,6 @@ const ContactPage = () => {
 			else delete copy[name];
 			return copy;
 		});
-	};
-
-	const onResetDraft = () => {
-		setForm({ ...defaultForm });
-		setErrors({});
-		setTouched({});
-		localStorage.removeItem(DRAFT_KEY);
-		toast.success('Draft cleared');
-		firstInputRef.current?.focus();
 	};
 
 	// send - wrapped so retry/backoff can reuse
@@ -294,17 +243,17 @@ const ContactPage = () => {
 			setSuccess(true);
 			setTicketRef(ref);
 			toast.success('Message sent — thank you!');
-			localStorage.removeItem(DRAFT_KEY);
 			setForm({ ...defaultForm });
 			startCooldown(SUBMIT_COOLDOWN);
 			// announce to screen readers
-			statusLiveRef.current?.focus?.();
+			setTimeout(() => statusLiveRef.current?.focus?.(), 100);
 			// auto-clear success after some time
 			setTimeout(() => setSuccess(false), 9000);
 		} catch (err) {
 			// robust error handling: map potential shapes
 			const resp = err?.response?.data ?? null;
-			const serverMessage = resp?.message || err?.message || 'Failed to send message. Try again later.';
+			const serverMessage =
+				resp?.message || err?.message || 'Failed to send message. Try again later.';
 			const mapped = mapServerErrors(resp);
 			if (Object.keys(mapped).length) {
 				setErrors(mapped);
@@ -338,10 +287,9 @@ const ContactPage = () => {
 			setSuccess(true);
 			setTicketRef(ref);
 			toast.success('Message sent — thank you!');
-			localStorage.removeItem(DRAFT_KEY);
 			setForm({ ...defaultForm });
 			startCooldown(SUBMIT_COOLDOWN);
-			statusLiveRef.current?.focus?.();
+			setTimeout(() => statusLiveRef.current?.focus?.(), 100);
 			setTimeout(() => setSuccess(false), 9000);
 			// clear lastFailedPayload
 			setLastFailedPayload(null);
@@ -352,7 +300,9 @@ const ContactPage = () => {
 			toast.error(serverMessage);
 			// if we've exhausted attempts, keep lastFailedPayload for manual copy
 			if (nextAttempt >= MAX_RETRY_ATTEMPTS) {
-				toast.error('Max retry attempts reached. You can copy the message and email us directly.');
+				toast.error(
+					'Max retry attempts reached. You can copy the message and email us directly.'
+				);
 			}
 		} finally {
 			setIsSubmitting(false);
@@ -380,9 +330,17 @@ const ContactPage = () => {
 		}
 	};
 
+	// clear form / draft
+	const onResetDraft = useCallback(() => {
+		setForm({ ...defaultForm });
+		setErrors({});
+		setTouched({});
+		setNonFieldError('');
+	}, []);
+
 	/* ----------------------
-	   Presentation & Layout
-	   ---------------------- */
+       Presentation & Layout
+       ---------------------- */
 
 	const panelCls = isDark
 		? 'rounded-3xl p-6 sm:p-8 lg:p-10 backdrop-blur-md bg-gradient-to-br from-slate-900/64 to-slate-800/48 border border-white/6 text-white shadow-2xl'
@@ -396,12 +354,25 @@ const ContactPage = () => {
 						{/* Left column: contact info */}
 						<div className="lg:col-span-2">
 							<div className="flex items-start gap-4">
-								<div className="w-14 h-14 rounded-2xl flex items-center justify-center shadow-md" style={{ background: 'linear-gradient(135deg,#06b6d4,#3b82f6)' }}>
+								<div
+									className="w-14 h-14 rounded-2xl flex items-center justify-center shadow-md"
+									style={{
+										background: 'linear-gradient(135deg,#06b6d4,#3b82f6)',
+									}}
+								>
 									<Mail className="w-7 h-7 text-white" />
 								</div>
 								<div className="min-w-0">
-									<h1 id="contact-heading" className="text-2xl sm:text-3xl font-extrabold leading-tight">Get in touch</h1>
-									<p className="mt-2 text-sm text-[var(--text-muted)]">We’re here to help — send a message and our team will respond within 48–72 hours.</p>
+									<h1
+										id="contact-heading"
+										className="text-2xl sm:text-3xl font-extrabold leading-tight"
+									>
+										Get in touch
+									</h1>
+									<p className="mt-2 text-sm text-[var(--text-muted)]">
+										We’re here to help — send a message and our team will
+										respond within 48–72 hours.
+									</p>
 								</div>
 							</div>
 
@@ -412,7 +383,9 @@ const ContactPage = () => {
 									</div>
 									<div>
 										<h4 className="font-semibold">Phone</h4>
-										<p className="text-sm text-[var(--text-muted)]">+91 93349 86732 (Mon–Fri, 9am–6pm)</p>
+										<p className="text-sm text-[var(--text-muted)]">
+											+91 93349 86732 (Mon–Fri, 9am–6pm)
+										</p>
 									</div>
 								</div>
 
@@ -422,26 +395,20 @@ const ContactPage = () => {
 									</div>
 									<div>
 										<h4 className="font-semibold">Email</h4>
-										<p className="text-sm text-[var(--text-muted)]">syntax.studorg@gmail.com</p>
+										<p className="text-sm text-[var(--text-muted)]">
+											syntax.studorg@gmail.com
+										</p>
 									</div>
 								</div>
 
 								<p className="text-xs text-[var(--text-muted)]">
-									<strong>Privacy</strong> — we only use your details to respond to your enquiry. By sending a message you agree to our{' '}
-									<a className="underline" href="/policies/privacy">privacy policy</a>.
+									<strong>Privacy</strong> — we only use your details to respond
+									to your enquiry. By sending a message you agree to our{' '}
+									<a className="underline" href="/policies/privacy">
+										privacy policy
+									</a>
+									.
 								</p>
-
-								{/* Draft controls */}
-								<div className="flex gap-2 mt-2 items-center">
-									<button
-										type="button"
-										onClick={onResetDraft}
-										className="inline-flex items-center gap-2 px-3 py-2 rounded-md bg-[var(--glass-bg)] border border-[var(--glass-border)] text-sm"
-									>
-										<X className="w-4 h-4" /> Clear draft
-									</button>
-									<span className="text-xs text-[var(--text-muted)]">Autosave enabled</span>
-								</div>
 							</div>
 						</div>
 
@@ -457,16 +424,29 @@ const ContactPage = () => {
 
 							<AnimatePresence>
 								{success && (
-									<motion.div initial={{ opacity: 0, y: -6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} className="mb-4 p-3 rounded-md bg-emerald-50 border border-emerald-100">
+									<motion.div
+										initial={{ opacity: 0, y: -6 }}
+										animate={{ opacity: 1, y: 0 }}
+										exit={{ opacity: 0 }}
+										className="mb-4 p-3 rounded-md bg-emerald-50 border border-emerald-100"
+									>
 										<div className="flex items-start gap-3">
 											<CheckCircle2 className="text-emerald-600 w-5 h-5" />
-											<div className="text-sm font-medium text-emerald-700">Thanks — your message was sent successfully. We'll reply within 48–72 hours.</div>
+											<div className="text-sm font-medium text-emerald-700">
+												Thanks — your message was sent successfully. We'll
+												reply within 48–72 hours.
+											</div>
 										</div>
 										{ticketRef && (
 											<div className="mt-3 flex items-center gap-3">
-												<div className="text-sm text-[var(--text-muted)]">Reference:</div>
+												<div className="text-sm text-[var(--text-muted)]">
+													Reference:
+												</div>
 												<div className="font-mono text-sm">{ticketRef}</div>
-												<button onClick={copyTicketRef} className="inline-flex items-center gap-2 px-2 py-1 rounded-md bg-[var(--glass-bg)] border border-[var(--glass-border)] text-sm">
+												<button
+													onClick={copyTicketRef}
+													className="inline-flex items-center gap-2 px-2 py-1 rounded-md bg-[var(--glass-bg)] border border-[var(--glass-border)] text-sm"
+												>
 													<Copy className="w-4 h-4" /> Copy
 												</button>
 											</div>
@@ -476,17 +456,35 @@ const ContactPage = () => {
 							</AnimatePresence>
 
 							{nonFieldError && (
-								<div role="alert" className="mb-4 p-3 rounded-md bg-rose-50 border border-rose-100">
+								<div
+									role="alert"
+									className="mb-4 p-3 rounded-md bg-rose-50 border border-rose-100"
+								>
 									<div className="flex items-start gap-3">
 										<AlertCircle className="text-rose-600 w-5 h-5" />
 										<div className="text-sm text-rose-700">{nonFieldError}</div>
 									</div>
 									{lastFailedPayload && (
 										<div className="mt-3 flex gap-2">
-											<button onClick={retryLast} disabled={isSubmitting || retryAttempts >= MAX_RETRY_ATTEMPTS} className="inline-flex items-center gap-2 px-3 py-2 rounded-md bg-[var(--button-primary-bg)] text-white">
-												{isSubmitting ? <Loader2 className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />} Retry
+											<button
+												onClick={retryLast}
+												disabled={
+													isSubmitting ||
+													retryAttempts >= MAX_RETRY_ATTEMPTS
+												}
+												className="inline-flex items-center gap-2 px-3 py-2 rounded-md bg-[var(--button-primary-bg)] text-white"
+											>
+												{isSubmitting ? (
+													<Loader2 className="w-4 h-4 animate-spin" />
+												) : (
+													<RefreshCw className="w-4 h-4" />
+												)}{' '}
+												Retry
 											</button>
-											<button onClick={copyFailure} className="inline-flex items-center gap-2 px-3 py-2 rounded-md bg-[var(--glass-bg)] border border-[var(--glass-border)] text-sm">
+											<button
+												onClick={copyFailure}
+												className="inline-flex items-center gap-2 px-3 py-2 rounded-md bg-[var(--glass-bg)] border border-[var(--glass-border)] text-sm"
+											>
 												<Copy className="w-4 h-4" /> Copy message
 											</button>
 										</div>
@@ -498,7 +496,11 @@ const ContactPage = () => {
 								{/* Honeypot (hidden) */}
 								<div style={{ display: 'none' }} aria-hidden>
 									<label>Website</label>
-									<input name="website" value={form.website} onChange={onChange} />
+									<input
+										name="website"
+										value={form.website}
+										onChange={onChange}
+									/>
 								</div>
 
 								{/* name / email */}
@@ -512,12 +514,23 @@ const ContactPage = () => {
 											onChange={onChange}
 											onBlur={onBlur}
 											disabled={isSubmitting || cooldown > 0}
-											className={`px-3 py-2 rounded-md border ${errors.name ? 'border-rose-400' : 'border-[var(--glass-border)]'} bg-transparent`}
+											className={`px-3 py-2 rounded-md border ${
+												errors.name
+													? 'border-rose-400'
+													: 'border-[var(--glass-border)]'
+											} bg-transparent`}
 											placeholder="John Doe"
 											aria-invalid={!!errors.name}
 											aria-describedby={errors.name ? 'err-name' : undefined}
 										/>
-										{errors.name && <div id="err-name" className="text-rose-500 text-xs mt-1">{errors.name}</div>}
+										{errors.name && (
+											<div
+												id="err-name"
+												className="text-rose-500 text-xs mt-1"
+											>
+												{errors.name}
+											</div>
+										)}
 									</label>
 
 									<label className="flex flex-col">
@@ -529,12 +542,25 @@ const ContactPage = () => {
 											onChange={onChange}
 											onBlur={onBlur}
 											disabled={isSubmitting || cooldown > 0}
-											className={`px-3 py-2 rounded-md border ${errors.email ? 'border-rose-400' : 'border-[var(--glass-border)]'} bg-transparent`}
+											className={`px-3 py-2 rounded-md border ${
+												errors.email
+													? 'border-rose-400'
+													: 'border-[var(--glass-border)]'
+											} bg-transparent`}
 											placeholder="you@example.com"
 											aria-invalid={!!errors.email}
-											aria-describedby={errors.email ? 'err-email' : undefined}
+											aria-describedby={
+												errors.email ? 'err-email' : undefined
+											}
 										/>
-										{errors.email && <div id="err-email" className="text-rose-500 text-xs mt-1">{errors.email}</div>}
+										{errors.email && (
+											<div
+												id="err-email"
+												className="text-rose-500 text-xs mt-1"
+											>
+												{errors.email}
+											</div>
+										)}
 									</label>
 								</div>
 
@@ -548,15 +574,32 @@ const ContactPage = () => {
 											onChange={onChange}
 											onBlur={onBlur}
 											disabled={isSubmitting || cooldown > 0}
-											className={`px-3 py-2 rounded-md border ${errors.phone ? 'border-rose-400' : 'border-[var(--glass-border)]'} bg-transparent`}
+											className={`px-3 py-2 rounded-md border ${
+												errors.phone
+													? 'border-rose-400'
+													: 'border-[var(--glass-border)]'
+											} bg-transparent`}
 											placeholder="+91 93349 86732"
 											aria-invalid={!!errors.phone}
-											aria-describedby={errors.phone ? 'err-phone' : undefined}
+											aria-describedby={
+												errors.phone ? 'err-phone' : undefined
+											}
 										/>
-										{errors.phone && <div id="err-phone" className="text-rose-500 text-xs mt-1">{errors.phone}</div>}
-										{form.phone.trim().length > 0 && normalizePhone(form.phone) && (
-											<div className="text-xs text-[var(--text-muted)] mt-1">Will be submitted as: <span className="font-mono">{normalizePhone(form.phone)}</span></div>
+										{errors.phone && (
+											<div
+												id="err-phone"
+												className="text-rose-500 text-xs mt-1"
+											>
+												{errors.phone}
+											</div>
 										)}
+										{form.phone.trim().length > 0 &&
+											normalizePhone(form.phone) && (
+												<div className="text-xs text-[var(--text-muted)] mt-1">
+													Detected number: +91{' '}
+													{normalizePhone(form.phone)}
+												</div>
+											)}
 									</label>
 
 									<label className="flex flex-col">
@@ -567,12 +610,25 @@ const ContactPage = () => {
 											onChange={onChange}
 											onBlur={onBlur}
 											disabled={isSubmitting || cooldown > 0}
-											className={`px-3 py-2 rounded-md border ${errors.subject ? 'border-rose-400' : 'border-[var(--glass-border)]'} bg-transparent`}
+											className={`px-3 py-2 rounded-md border ${
+												errors.subject
+													? 'border-rose-400'
+													: 'border-[var(--glass-border)]'
+											} bg-transparent`}
 											placeholder="How can we help?"
 											aria-invalid={!!errors.subject}
-											aria-describedby={errors.subject ? 'err-subject' : undefined}
+											aria-describedby={
+												errors.subject ? 'err-subject' : undefined
+											}
 										/>
-										{errors.subject && <div id="err-subject" className="text-rose-500 text-xs mt-1">{errors.subject}</div>}
+										{errors.subject && (
+											<div
+												id="err-subject"
+												className="text-rose-500 text-xs mt-1"
+											>
+												{errors.subject}
+											</div>
+										)}
 									</label>
 								</div>
 
@@ -587,14 +643,30 @@ const ContactPage = () => {
 										rows={7}
 										maxLength={MESSAGE_MAX}
 										disabled={isSubmitting || cooldown > 0}
-										className={`px-3 py-2 rounded-md border ${errors.message ? 'border-rose-400' : 'border-[var(--glass-border)]'} bg-transparent resize-vertical`}
+										className={`px-3 py-2 rounded-md border ${
+											errors.message
+												? 'border-rose-400'
+												: 'border-[var(--glass-border)]'
+										} bg-transparent resize-vertical`}
 										placeholder="Tell us more..."
 										aria-invalid={!!errors.message}
-										aria-describedby={errors.message ? 'err-message' : undefined}
+										aria-describedby={
+											errors.message ? 'err-message' : undefined
+										}
 									/>
 									<div className="flex items-center justify-between mt-1">
-										{errors.message ? <div id="err-message" className="text-rose-500 text-xs">{errors.message}</div> : <div className="text-xs text-[var(--text-muted)]">Be specific — helps us respond faster.</div>}
-										<div className="text-xs text-[var(--text-muted)]">{form.message.length}/{MESSAGE_MAX}</div>
+										{errors.message ? (
+											<div id="err-message" className="text-rose-500 text-xs">
+												{errors.message}
+											</div>
+										) : (
+											<div className="text-xs text-[var(--text-muted)]">
+												Be specific — helps us respond faster.
+											</div>
+										)}
+										<div className="text-xs text-[var(--text-muted)]">
+											{form.message.length}/{MESSAGE_MAX}
+										</div>
 									</div>
 								</label>
 
@@ -604,29 +676,58 @@ const ContactPage = () => {
 										<button
 											type="submit"
 											disabled={isSubmitting || cooldown > 0}
-											className={`inline-flex items-center gap-2 px-4 py-2 rounded-md font-semibold text-white ${isSubmitting ? 'opacity-90' : ''}`}
-											style={{ background: 'linear-gradient(90deg,var(--accent-1),var(--accent-2))' }}
+											className={`inline-flex items-center gap-2 px-4 py-2 rounded-md font-semibold text-white ${
+												isSubmitting ? 'opacity-90' : ''
+											}`}
+											style={{
+												background:
+													'linear-gradient(90deg,var(--accent-1),var(--accent-2))',
+											}}
 											aria-disabled={isSubmitting || cooldown > 0}
 										>
-											{isSubmitting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
-											<span>{isSubmitting ? 'Sending...' : (cooldown > 0 ? `Try again in ${cooldown}s` : 'Send Message')}</span>
+											{isSubmitting ? (
+												<Loader2 className="w-4 h-4 animate-spin" />
+											) : (
+												<Send className="w-4 h-4" />
+											)}
+											<span>
+												{isSubmitting
+													? 'Sending...'
+													: cooldown > 0
+													? `Try again in ${cooldown}s`
+													: 'Send Message'}
+											</span>
 										</button>
 
-										<button type="button" onClick={onResetDraft} className="inline-flex items-center gap-2 px-3 py-2 rounded-md bg-[var(--glass-bg)] border border-[var(--glass-border)] text-sm">
+										<button
+											type="button"
+											onClick={onResetDraft}
+											className="inline-flex items-center gap-2 px-3 py-2 rounded-md bg-[var(--glass-bg)] border border-[var(--glass-border)] text-sm"
+										>
 											<X className="w-4 h-4" /> Clear
 										</button>
 									</div>
 
 									<div className="text-sm text-[var(--text-muted)]">
-										<div>Typical response time: <span className="font-medium">48–72 hours</span></div>
-										{cooldown > 0 && <div className="text-xs text-[var(--text-muted)]">Submission cooldown active</div>}
+										<div>
+											Typical response time:{' '}
+											<span className="font-medium">48–72 hours</span>
+										</div>
+										{cooldown > 0 && (
+											<div className="text-xs text-[var(--text-muted)]">
+												Submission cooldown active
+											</div>
+										)}
 									</div>
 								</div>
 							</form>
 
 							{/* accessibility / hint */}
 							<div className="mt-3 text-xs text-[var(--text-muted)]">
-								Tip: press <kbd className="px-2 py-0.5 bg-white/5 rounded">Ctrl</kbd> + <kbd className="px-2 py-0.5 bg-white/5 rounded">Enter</kbd> (or Cmd+Enter on Mac) to submit quickly.
+								Tip: press{' '}
+								<kbd className="px-2 py-0.5 bg-white/5 rounded">Ctrl</kbd> +{' '}
+								<kbd className="px-2 py-0.5 bg-white/5 rounded">Enter</kbd> (or
+								Cmd+Enter on Mac) to submit quickly.
 							</div>
 						</div>
 					</div>
