@@ -22,7 +22,7 @@ import EditionsStrip from '../../components/Arvantis/EditionsStrip.jsx';
 import StatCard from '../../components/Arvantis/StatCard.jsx';
 import EventsGrid from '../../components/Arvantis/EventsGrid.jsx';
 import GalleryGrid from '../../components/Arvantis/GalleryGrid.jsx';
-import ImageLightbox from '../../components/ArvantisImageLightbox.jsx';
+import ImageLightbox from '../../components/Arvantis/ImageLightbox.jsx';
 import ErrorBlock from '../../components/Arvantis/ErrorBlock.jsx';
 import LoadingBlock from '../../components/Arvantis/LoadingBlock.jsx';
 import '../../arvantis.css';
@@ -138,10 +138,8 @@ const ArvantisPage = () => {
 		const raw = editionsQuery.data;
 		if (!raw) return [];
 		if (Array.isArray(raw)) return raw;
-		// if pagination object { docs, ... }
 		if (Array.isArray(raw.docs)) return raw.docs;
 		if (Array.isArray(raw.data)) return raw.data;
-		// fallback: if resp is { docs: [...], ... } returned by service normalizePagination
 		if (raw?.docs && Array.isArray(raw.docs)) return raw.docs;
 		return [];
 	}, [editionsQuery.data]);
@@ -188,6 +186,40 @@ const ArvantisPage = () => {
 		() => groupPartnersByTier(partners, titleSponsor),
 		[partners, titleSponsor]
 	);
+
+	// helper: detect if an event offers registration now (safe checks)
+	const isEventRegistrationOpen = useCallback((ev) => {
+		if (!ev) return false;
+		// prefer server-provided virtual
+		if (
+			typeof ev.registrationInfo === 'object' &&
+			typeof ev.registrationInfo.isOpen === 'boolean'
+		) {
+			return Boolean(ev.registrationInfo.isOpen);
+		}
+		// external registration with URL -> treat as available
+		if (ev.registration?.mode === 'external' && ev.registration?.externalUrl) return true;
+		// internal registration: respect optional window
+		if (ev.registration?.mode === 'internal') {
+			const open = ev.registrationOpenDate
+				? new Date(ev.registrationOpenDate).getTime()
+				: null;
+			const close = ev.registrationCloseDate
+				? new Date(ev.registrationCloseDate).getTime()
+				: null;
+			const now = Date.now();
+			if (open && now < open) return false;
+			if (close && now > close) return false;
+			// if capacity exists, we assume open unless closed by virtual flag
+			return true;
+		}
+		return false;
+	}, []);
+
+	// count events that currently allow registration (used for CTA)
+	const openEventRegistrationCount = useMemo(() => {
+		return events.reduce((acc, ev) => acc + (isEventRegistrationOpen(ev) ? 1 : 0), 0);
+	}, [events, isEventRegistrationOpen]);
 
 	// filtered events
 	const filteredEvents = useMemo(() => {
@@ -247,13 +279,11 @@ const ArvantisPage = () => {
 		[]
 	);
 
-	// ticket CTA
-	const ticketUrl = fest?.registrationUrl || fest?.tickets?.url || null;
-
 	// accessibility: focus edition strip on mount
 	const stripRef = useRef(null);
 	useEffect(() => {
-		if (stripRef.current) stripRef.current.focus();
+		if (stripRef.current && typeof stripRef.current.focus === 'function')
+			stripRef.current.focus();
 	}, []);
 
 	// small presentational helpers
@@ -351,11 +381,14 @@ const ArvantisPage = () => {
 							>
 								Latest landing
 							</button>
+
+							{/* CTA changed: festival-level registration is not supported; link to events instead */}
 							<button
-								onClick={() => setShowPastEditions((s) => !s)}
+								onClick={() => (window.location.hash = '#events')}
 								className="btn-primary neon-btn"
+								title="Register for events (per-event registration)"
 							>
-								{showPastEditions ? 'Hide editions' : 'Past editions'}
+								Register for events
 							</button>
 						</div>
 					</div>
@@ -424,39 +457,20 @@ const ArvantisPage = () => {
 										<a href="#events" className="btn-ghost">
 											Explore events
 										</a>
-										{ticketUrl ? (
-											<a
-												href={ticketUrl}
-												target="_blank"
-												rel="noreferrer"
-												className="btn-primary neon-btn"
-											>
-												<ExternalLink size={16} /> Tickets
-											</a>
-										) : (
-											<button
-												className="btn-primary neon-btn"
-												onClick={() =>
-													window.scrollTo({
-														top: document.body.scrollHeight,
-														behavior: 'smooth',
-													})
-												}
-											>
-												Register
-											</button>
-										)}
+
+										{/* festival-level tickets removed; guide users to events */}
+										<button
+											className="btn-primary neon-btn"
+											onClick={() => (window.location.hash = '#events')}
+											title="Open events list; register per-event"
+										>
+											Register for events
+										</button>
 									</div>
 
 									<div className="mt-3 text-sm text-[var(--text-secondary)]">
-										Contact:{' '}
-										{fest.contactEmail ? (
-											<a href={`mailto:${fest.contactEmail}`}>
-												{fest.contactEmail}
-											</a>
-										) : (
-											fest.contactPhone || '—'
-										)}
+										Registration is per-event. Open an event to view
+										registration details and register.
 									</div>
 								</div>
 							</div>
@@ -804,17 +818,12 @@ const ArvantisPage = () => {
 				)}
 			</div>
 
-			{/* Sticky ticket CTA */}
-			{ticketUrl && (
-				<a
-					href={ticketUrl}
-					target="_blank"
-					rel="noreferrer"
-					className="arv-sticky-cta"
-					title="Buy tickets"
-				>
+			{/* Sticky CTA: shows when any event has registration open or external registration link */}
+			{openEventRegistrationCount > 0 && (
+				<a href="#events" className="arv-sticky-cta" title="Events open for registration">
 					<div className="cta-btn">
-						<TicketIcon /> Tickets
+						Register — {openEventRegistrationCount} event
+						{openEventRegistrationCount > 1 ? 's' : ''}
 					</div>
 					<div className="mini">Open</div>
 				</a>
