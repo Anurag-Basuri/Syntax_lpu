@@ -65,50 +65,89 @@ const findTitleSponsor = (partners = []) => {
 	);
 };
 
-// --- FAQ Section ---
+/* --- Partners showcase: prominent full-width section --- */
+const PartnersShowcase = ({ partners = [], titleSponsor = null }) => {
+	if (!partners || partners.length === 0) return null;
+
+	return (
+		<section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mt-8">
+			<div className="glass-card p-6">
+				<div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-6">
+					<div className="min-w-0">
+						<h2
+							className="text-xl font-extrabold"
+							style={{ color: 'var(--text-primary)' }}
+						>
+							Our Partners
+						</h2>
+						<p className="mt-2 muted">
+							We work with organizations across tiers — from title sponsors to
+							community partners.
+							{titleSponsor ? ` Proudly presented by ${titleSponsor.name}.` : ''}
+						</p>
+					</div>
+
+					<div className="flex items-center gap-3">
+						{titleSponsor && (
+							<a
+								href={titleSponsor.website || '#'}
+								target={titleSponsor.website ? '_blank' : '_self'}
+								rel={titleSponsor.website ? 'noopener noreferrer' : undefined}
+								className="btn-ghost small"
+							>
+								{titleSponsor.logo?.url ? (
+									<img
+										src={titleSponsor.logo.url}
+										alt={titleSponsor.name}
+										className="h-6 object-contain"
+									/>
+								) : (
+									<span>{titleSponsor.name}</span>
+								)}
+							</a>
+						)}
+						<a href="#partners" className="btn-primary small">
+							View all partners
+						</a>
+					</div>
+				</div>
+
+				<div className="mt-6">
+					{/* larger grid to make partners prominent */}
+					<PartnersGrid
+						partners={partners.slice(0, 24)}
+						className="!grid-cols-3 sm:!grid-cols-4 md:!grid-cols-6"
+					/>
+				</div>
+			</div>
+		</section>
+	);
+};
+
+// --- FAQ Section (search removed, kept accessible) ---
 const FAQList = ({ faqs = [] }) => {
-	const [query, setQuery] = useState('');
+	// search removed as requested
 	const [expanded, setExpanded] = useState({});
 
-	useEffect(() => {
-		// collapse when faqs change
-		setExpanded({});
-	}, [faqs]);
-
-	const filtered = useMemo(() => {
-		if (!query) return faqs;
-		const q = query.toLowerCase();
-		return faqs.filter(
-			(f) =>
-				(f.question || '').toLowerCase().includes(q) ||
-				(f.answer || '').toLowerCase().includes(q)
-		);
-	}, [faqs, query]);
+	useEffect(() => setExpanded({}), [faqs]);
 
 	const toggle = useCallback((id) => setExpanded((s) => ({ ...s, [id]: !s[id] })), []);
 
 	if (!faqs || faqs.length === 0) return null;
 
 	return (
-		<section aria-labelledby="arvantis-faqs" className="mt-10">
+		<section
+			aria-labelledby="arvantis-faqs"
+			className="mt-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8"
+		>
 			<div className="flex items-center justify-between mb-4">
 				<h3 id="arvantis-faqs" className="section-title flex items-center gap-2">
 					<HelpCircle size={20} className="text-[var(--accent-1)]" /> FAQs
 				</h3>
-				<div className="flex items-center gap-2">
-					<input
-						type="search"
-						placeholder="Search FAQs…"
-						value={query}
-						onChange={(e) => setQuery(e.target.value)}
-						className="rounded-md border py-2 px-3 bg-[var(--input-bg)]"
-						aria-label="Search FAQs"
-					/>
-				</div>
 			</div>
 
 			<div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-				{filtered.map((f, i) => {
+				{faqs.map((f, i) => {
 					const id = f._id || i;
 					const open = !!expanded[id];
 					return (
@@ -135,6 +174,7 @@ const FAQList = ({ faqs = [] }) => {
 									)}
 								</button>
 							</header>
+
 							{open && (
 								<div
 									id={`faq-body-${id}`}
@@ -278,6 +318,9 @@ const ArvantisPage = () => {
 
 			{/* Hero */}
 			<PosterHero fest={fest} />
+
+			{/* Prominent partners showcase (full width) */}
+			<PartnersShowcase partners={partners} titleSponsor={titleSponsor} />
 
 			{/* Organized layout: main + right sidebar */}
 			<div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mt-8 grid grid-cols-1 lg:grid-cols-3 gap-8">
