@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import React, { useState, useEffect, useMemo, useCallback, Suspense } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import {
 	HelpCircle,
@@ -16,8 +16,6 @@ import StatCard from '../../components/Arvantis/StatCard.jsx';
 import EventsGrid from '../../components/Arvantis/EventsGrid.jsx';
 import PartnersGrid from '../../components/Arvantis/PartnersGrid.jsx';
 import GalleryGrid from '../../components/Arvantis/GalleryGrid.jsx';
-import ImageLightbox from '../../components/Arvantis/ImageLightbox.jsx';
-import EventDetailModal from '../../components/event/EventDetailModal.jsx';
 import LoadingBlock from '../../components/Arvantis/LoadingBlock.jsx';
 import ErrorBlock from '../../components/Arvantis/ErrorBlock.jsx';
 import EditionsStrip from '../../components/Arvantis/EditionsStrip.jsx';
@@ -27,6 +25,10 @@ import {
 	getFestDetails,
 } from '../../services/arvantisServices.js';
 import '../../arvantis.css';
+
+// --- lazy loaded heavy UI (modal / lightbox) to improve initial bundle & perceived perf
+const EventDetailModal = React.lazy(() => import('../../components/event/EventDetailModal.jsx'));
+const ImageLightbox = React.lazy(() => import('../../components/Arvantis/ImageLightbox.jsx'));
 
 /*
   Refactor notes:
@@ -305,6 +307,52 @@ const ArvantisPage = () => {
 	const handleEventClick = useCallback((ev) => setSelectedEvent(ev), []);
 	const closeEventModal = useCallback(() => setSelectedEvent(null), []);
 
+	// set page title & meta for SEO + inject JSON-LD structured data for fest (lightweight)
+	useEffect(() => {
+		const title = fest?.name
+			? `${fest.name}${fest?.year ? ` · ${fest.year}` : ''} — Arvantis`
+			: 'Arvantis';
+		document.title = title;
+
+		// meta description update (non-destructive)
+		let descTag = document.querySelector('meta[name="description"]');
+		if (!descTag) {
+			descTag = document.createElement('meta');
+			descTag.name = 'description';
+			document.head.appendChild(descTag);
+		}
+		descTag.content = fest?.description
+			? String(fest.description).slice(0, 160)
+			: 'Arvantis — annual tech fest by Syntax Club.';
+
+		// inject lightweight JSON-LD for better rich results (best-effort, non-blocking)
+		const ldId = 'arvantis-jsonld';
+		let existing = document.getElementById(ldId);
+		if (existing) existing.remove();
+
+		if (fest) {
+			const ld = {
+				'@context': 'https://schema.org',
+				'@type': 'Event',
+				name: fest.name,
+				description: fest.description || '',
+				startDate: fest.startDate || undefined,
+				endDate: fest.endDate || undefined,
+				location: fest.location || undefined,
+				url: window.location.href,
+				organizer: {
+					'@type': 'Organization',
+					name: 'Syntax Club',
+				},
+			};
+			const script = document.createElement('script');
+			script.type = 'application/ld+json';
+			script.id = ldId;
+			script.text = JSON.stringify(ld);
+			document.head.appendChild(script);
+		}
+	}, [fest]);
+
 	// theming: apply fest theme colors non-destructively
 	const themeVars = useMemo(() => {
 		const vars = {};
@@ -318,6 +366,18 @@ const ArvantisPage = () => {
 
 	return (
 		<div className="arvantis-page" style={themeVars}>
+			{/* Skip link for keyboard users */}
+			<a
+				href="#maincontent"
+				className="sr-only focus:not-sr-only p-2 rounded glass-card"
+				style={{ position: 'absolute', left: 8, top: 8, zIndex: 999 }}
+			>
+				Skip to content
+			</a>
+
+			{/* lightweight live region for small toasts (used by components via window.dispatchEvent) */}
+			<div id="arvantis-toasts" aria-live="polite" className="sr-only" />
+
 			{/* Editions navigation */}
 			<EditionsStrip
 				editions={editions}
@@ -494,16 +554,21 @@ const ArvantisPage = () => {
 				</aside>
 			</div>
 
-			{/* Modals */}
+			{/* Modals - lazy loaded with Suspense to keep initial bundle small */}
 			{selectedImage && (
-				<ImageLightbox image={selectedImage} onClose={() => setSelectedImage(null)} />
+				<Suspense fallback={<LoadingBlock label="Opening image..." />}>
+					<ImageLightbox image={selectedImage} onClose={() => setSelectedImage(null)} />
+				</Suspense>
 			)}
+
 			{selectedEvent && (
-				<EventDetailModal
-					event={selectedEvent}
-					isOpen={!!selectedEvent}
-					onClose={closeEventModal}
-				/>
+				<Suspense fallback={<LoadingBlock label="Loading event..." />}>
+					<EventDetailModal
+						event={selectedEvent}
+						isOpen={!!selectedEvent}
+						onClose={closeEventModal}
+					/>
+				</Suspense>
 			)}
 		</div>
 	);
