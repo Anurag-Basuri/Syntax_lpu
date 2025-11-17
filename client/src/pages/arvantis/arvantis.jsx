@@ -6,28 +6,53 @@ import {
 	getAllFests,
 } from '../../services/arvantisServices.js';
 import EventDetailModal from '../../components/event/EventDetailModal.jsx';
-import { Calendar, Image as ImageIcon, Layers3, Users, Filter } from 'lucide-react';
+import {
+	Calendar,
+	Image as ImageIcon,
+	Layers3,
+	Users,
+	Filter,
+	ExternalLink,
+	ChevronDown,
+	ChevronUp,
+} from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import PosterHero from '../../components/Arvantis/PosterHero.jsx';
 import EditionsStrip from '../../components/Arvantis/EditionsStrip.jsx';
 import StatCard from '../../components/Arvantis/StatCard.jsx';
 import EventsGrid from '../../components/Arvantis/EventsGrid.jsx';
-import PartnersGrid from '../../components/Arvantis/PartnersGrid.jsx';
 import GalleryGrid from '../../components/Arvantis/GalleryGrid.jsx';
-import ImageLightbox from '../../components/Arvantis/ImageLightbox.jsx';
+import ImageLightbox from '../../components/ArvantisImageLightbox.jsx';
 import ErrorBlock from '../../components/Arvantis/ErrorBlock.jsx';
 import LoadingBlock from '../../components/Arvantis/LoadingBlock.jsx';
 import '../../arvantis.css';
 
+/**
+ * Major rewrite: industry-grade Arvantis page
+ * - Edition switcher moved to top
+ * - "Arvantis {year} — powered by {TitleSponsor}" heading
+ * - Improved partners presentation with tier grouping and expandable lists
+ * - Full event, tracks, faqs, contacts presentation where available
+ * - Sticky ticket CTA, robust loading + error handling
+ * - Accessibility & keyboard friendly interactions
+ */
+
 const ITEMS_IN_PAST_SECTION = 8;
+const PARTNERS_PREVIEW = 8;
 
 const safeArray = (v) => (Array.isArray(v) ? v : v ? [v] : []);
+const fmtDate = (d) => {
+	if (!d) return 'TBA';
+	const dt = new Date(d);
+	if (isNaN(dt.getTime())) return String(d);
+	return dt.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
+};
 
 const normalizeLanding = (raw) => {
 	if (!raw) return null;
 	if (raw.fest) {
 		const f = { ...raw.fest };
-		f.hero = raw.hero ?? f.hero ?? (f.poster ? f.poster : null);
+		f.hero = raw.hero ?? f.hero ?? f.posters?.[0] ?? null;
 		f.events = raw.events ?? f.events ?? [];
 		f.partners = raw.partners ?? f.partners ?? [];
 		f.computed = raw.computed ?? {};
@@ -51,54 +76,79 @@ const findTitleSponsor = (partners = []) => {
 	);
 };
 
+const groupPartnersByTier = (partners = [], titleSponsor = null) => {
+	const map = new Map();
+	(partners || []).forEach((p) => {
+		if (!p) return;
+		if (titleSponsor && p.name === titleSponsor.name) return;
+		const tier = (p.tier || 'partner').toLowerCase();
+		if (!map.has(tier)) map.set(tier, []);
+		map.get(tier).push(p);
+	});
+	// return array of [tier, list] sorted by common priority
+	const order = [
+		'title',
+		'presenting',
+		'platinum',
+		'gold',
+		'silver',
+		'sponsor',
+		'partner',
+		'collaborator',
+	];
+	const arr = Array.from(map.entries()).sort((a, b) => {
+		const ai = order.indexOf(a[0]);
+		const bi = order.indexOf(b[0]);
+		return (ai === -1 ? 99 : ai) - (bi === -1 ? 99 : bi);
+	});
+	return arr;
+};
+
 const ArvantisPage = () => {
+	// primary state
 	const [identifier, setIdentifier] = useState(null);
 	const [selectedEvent, setSelectedEvent] = useState(null);
 	const [selectedImage, setSelectedImage] = useState(null);
+	const [showPastEditions, setShowPastEditions] = useState(false);
+	const [showAllPartners, setShowAllPartners] = useState(false);
+	const [expandedTiers, setExpandedTiers] = useState({});
+	const [showTracks, setShowTracks] = useState(false);
+	const [showFaqs, setShowFaqs] = useState(false);
 
-	// Event controls
+	// Event filters
 	const [eventType, setEventType] = useState('all');
 	const [eventSort, setEventSort] = useState('date-desc');
 
-	// UI controls
-	const [showPastEditions, setShowPastEditions] = useState(false);
-	const [showLandingFirst, setShowLandingFirst] = useState(true);
-	const [showAllPartners, setShowAllPartners] = useState(false); // new: toggle view all partners
-
-	// Landing (latest) edition
+	// queries
 	const landingQuery = useQuery({
 		queryKey: ['arvantis', 'landing'],
 		queryFn: getArvantisLandingData,
 		staleTime: 60_000,
 		retry: 1,
 	});
-
-	// Editions list (past editions)
 	const editionsQuery = useQuery({
-		queryKey: ['arvantis', 'editions', { page: 1, limit: 50 }],
+		queryKey: ['arvantis', 'editions'],
 		queryFn: () => getAllFests({ page: 1, limit: 50, sortBy: 'year', sortOrder: 'desc' }),
 		staleTime: 60_000,
 		retry: 1,
 	});
 
-	// Normalize editions array from possible server shapes
+	// normalize editions result (support paginated shape)
 	const editions = useMemo(() => {
 		const raw = editionsQuery.data;
 		if (!raw) return [];
 		if (Array.isArray(raw)) return raw;
+		// if pagination object { docs, ... }
 		if (Array.isArray(raw.docs)) return raw.docs;
 		if (Array.isArray(raw.data)) return raw.data;
-		const payload = raw?.data ?? raw;
-		if (Array.isArray(payload)) return payload;
-		if (Array.isArray(payload?.docs)) return payload.docs;
+		// fallback: if resp is { docs: [...], ... } returned by service normalizePagination
+		if (raw?.docs && Array.isArray(raw.docs)) return raw.docs;
 		return [];
 	}, [editionsQuery.data]);
 
-	// landing normalized
-	const landingRaw = landingQuery.data;
-	const landingFest = useMemo(() => normalizeLanding(landingRaw), [landingRaw]);
+	const landingFest = useMemo(() => normalizeLanding(landingQuery.data), [landingQuery.data]);
 
-	// Default identifier behavior: prefer landing slug/year first
+	// default identifier - landing -> first edition
 	useEffect(() => {
 		if (identifier) return;
 		if (landingFest) {
@@ -108,14 +158,14 @@ const ArvantisPage = () => {
 				return;
 			}
 		}
-		if (editions.length > 0) {
+		if (editions && editions.length) {
 			const first = editions[0];
 			const id = first?.slug || String(first?.year || '');
 			if (id) setIdentifier(id);
 		}
 	}, [identifier, landingFest, editions]);
 
-	// Details for selected identifier
+	// details query for chosen edition
 	const detailsQuery = useQuery({
 		queryKey: ['arvantis', 'details', identifier],
 		queryFn: () => (identifier ? getFestDetails(identifier) : Promise.resolve(null)),
@@ -124,67 +174,36 @@ const ArvantisPage = () => {
 		retry: 1,
 	});
 
-	// Resolve which fest to display: detailsQuery -> landing fallback (landing first if requested)
+	// resolved fest: prefer details (explicit selection), else landingFest
 	const fest = useMemo(() => {
-		if (showLandingFirst && landingFest) {
-			const landingId = landingFest.slug || String(landingFest.year || '');
-			if (!identifier || landingId === identifier) return landingFest;
-		}
 		if (detailsQuery.data) return detailsQuery.data;
 		return landingFest ?? null;
-	}, [detailsQuery.data, landingFest, identifier, showLandingFirst]);
+	}, [detailsQuery.data, landingFest]);
 
-	// Stats for cards with defensive access
-	const stats = useMemo(() => {
-		const safeFest = fest || {};
-		return [
-			{ icon: Layers3, label: 'Edition', value: safeFest?.year ?? '—' },
-			{ icon: Users, label: 'Partners', value: safeFest?.partners?.length ?? 0 },
-			{ icon: Calendar, label: 'Events', value: safeFest?.events?.length ?? 0 },
-			{ icon: ImageIcon, label: 'Gallery', value: safeFest?.gallery?.length ?? 0 },
-		];
-	}, [fest]);
-
-	// Loading / error aggregates
-	const isLoadingOverall =
-		landingQuery.isLoading ||
-		(!identifier && editionsQuery.isLoading) ||
-		detailsQuery.isLoading;
-
-	const isErrorOverall = landingQuery.isError || detailsQuery.isError || editionsQuery.isError;
-	const errorMsg =
-		landingQuery.error?.message ||
-		detailsQuery.error?.message ||
-		editionsQuery.error?.message ||
-		'Unknown error occurred.';
-
-	/* -------------------------
-     Event selection and filtering
-     ------------------------- */
+	// derived collections
 	const events = useMemo(() => safeArray(fest?.events), [fest]);
-	const eventTypes = useMemo(() => {
-		const types = new Set(events.map((e) => e.type || 'general'));
-		return ['all', ...Array.from(types)];
-	}, [events]);
+	const partners = useMemo(() => safeArray(fest?.partners), [fest]);
+	const titleSponsor = useMemo(() => findTitleSponsor(partners), [partners]);
+	const partnersByTier = useMemo(
+		() => groupPartnersByTier(partners, titleSponsor),
+		[partners, titleSponsor]
+	);
 
+	// filtered events
 	const filteredEvents = useMemo(() => {
-		let out = events.slice();
+		let out = [...events];
 		if (eventType && eventType !== 'all')
 			out = out.filter((e) => (e.type || 'general') === eventType);
-		// sort
 		out.sort((a, b) => {
 			const ad = new Date(a.eventDate || a.date || 0).getTime();
 			const bd = new Date(b.eventDate || b.date || 0).getTime();
 			if (eventSort === 'date-asc') return ad - bd;
-			if (eventSort === 'date-desc') return bd - ad;
 			return bd - ad;
 		});
 		return out;
 	}, [events, eventType, eventSort]);
 
-	/* -------------------------
-     Previous editions subset (cards)
-     ------------------------- */
+	// other editions (excluding current)
 	const otherEditions = useMemo(() => {
 		if (!editions || editions.length === 0) return [];
 		const id = identifier;
@@ -194,254 +213,196 @@ const ArvantisPage = () => {
 		});
 	}, [editions, identifier]);
 
-	/* -------------------------
-     Partners handling & title sponsor
-     ------------------------- */
-	const partners = useMemo(() => (Array.isArray(fest?.partners) ? fest.partners : []), [fest]);
-	const titleSponsor = useMemo(() => findTitleSponsor(partners), [partners]);
-	const otherPartnersByTier = useMemo(() => {
-		const map = {};
-		(partners || []).forEach((p) => {
-			const tier = (p.tier || 'partner').toLowerCase();
-			if (titleSponsor && p.name === titleSponsor.name) return;
-			map[tier] = map[tier] || [];
-			map[tier].push(p);
-		});
-		return map;
-	}, [partners, titleSponsor]);
+	// stats
+	const stats = useMemo(() => {
+		const safe = fest || {};
+		return [
+			{ icon: Layers3, label: 'Edition', value: safe.year ?? '—' },
+			{ icon: Users, label: 'Partners', value: safe.partners?.length ?? 0 },
+			{ icon: Calendar, label: 'Events', value: safe.events?.length ?? 0 },
+			{ icon: ImageIcon, label: 'Gallery', value: safe.gallery?.length ?? 0 },
+		];
+	}, [fest]);
 
-	/* -------------------------
-     Handlers
-     ------------------------- */
-	const handleEventClick = useCallback((event) => {
-		const normalized = {
-			...event,
-			title: event.title ?? event.name ?? '',
-			eventDate: event.eventDate ?? event.date ?? null,
-			posters: Array.isArray(event.posters)
-				? event.posters
-				: event.posters
-				? [event.posters]
-				: [],
-		};
-		setSelectedEvent(normalized);
-	}, []);
+	// loading / error states
+	const isLoading = landingQuery.isLoading || editionsQuery.isLoading || detailsQuery.isLoading;
+	const isError = landingQuery.isError || editionsQuery.isError || detailsQuery.isError;
+	const errorMsg =
+		landingQuery.error?.message ||
+		detailsQuery.error?.message ||
+		editionsQuery.error?.message ||
+		'Failed to load data.';
 
-	const handleImageClick = useCallback((image) => setSelectedImage(image), []);
-	const closeModal = useCallback(() => {
-		setSelectedEvent(null);
-		setSelectedImage(null);
-	}, []);
-
-	// When user selects an edition from strip or cards: set identifier and scroll to top
+	// handlers
 	const handleSelectEdition = useCallback((id) => {
 		if (!id) return;
-		setShowLandingFirst(false);
 		setIdentifier(id);
 		window.scrollTo({ top: 0, behavior: 'smooth' });
 	}, []);
 
-	// Prefetch details for the identifiers in the editions list (optional: warms cache)
-	const prefetchRef = useRef(false);
-	useEffect(() => {
-		if (prefetchRef.current) return;
-		if (!editions || editions.length === 0) return;
-		try {
-			editions.slice(0, 6).forEach((f) => {
-				const id = f?.slug || String(f?.year || '');
-				if (id && id !== identifier) {
-					getFestDetails(id).catch(() => {});
-				}
-			});
-		} catch {}
-		prefetchRef.current = true;
-	}, [editions, identifier]);
+	const handleEventClick = useCallback((ev) => setSelectedEvent(ev), []);
+	const handleImageClick = useCallback((img) => setSelectedImage(img), []);
+	const toggleTier = useCallback(
+		(tier) => setExpandedTiers((s) => ({ ...s, [tier]: !s[tier] })),
+		[]
+	);
 
-	/* -------------------------
-     Render helpers
-     ------------------------- */
-	const renderPartnerLogo = (p, i, opts = {}) => {
-		const size = opts.size || 72;
-		const url = p?.logo?.url || null;
-		const name = p?.name || 'Partner';
+	// ticket CTA
+	const ticketUrl = fest?.registrationUrl || fest?.tickets?.url || null;
+
+	// accessibility: focus edition strip on mount
+	const stripRef = useRef(null);
+	useEffect(() => {
+		if (stripRef.current) stripRef.current.focus();
+	}, []);
+
+	// small presentational helpers
+	const renderPartnerItem = (p, key) => {
+		const logo = p?.logo?.url;
 		return (
 			<a
-				key={`${name}-${i}`}
+				key={key}
 				href={p.website || '#'}
 				target={p.website ? '_blank' : '_self'}
 				rel={p.website ? 'noopener noreferrer' : undefined}
 				className="partner-cell group flex items-center justify-center p-3 rounded-xl transition-transform duration-300"
-				title={name}
-				style={{
-					minHeight: size,
-					minWidth: size * 1.8,
-					background: 'var(--glass-bg)',
-					border: '1px solid var(--glass-border)',
-				}}
-				onClick={(e) => opts.onClick && opts.onClick(p, e)}
+				title={p.name}
+				style={{ background: 'var(--glass-bg)', border: '1px solid var(--glass-border)' }}
+				onClick={(e) => e.stopPropagation()}
 			>
-				{url ? (
-					<img
-						src={url}
-						alt={name}
-						loading="lazy"
-						style={{ maxHeight: size, objectFit: 'contain' }}
-						className="partner-logo"
-					/>
+				{logo ? (
+					<img src={logo} alt={p.name} className="partner-logo" loading="lazy" />
 				) : (
-					<div
-						style={{
-							height: size,
-							display: 'flex',
-							alignItems: 'center',
-							justifyContent: 'center',
-							padding: 8,
-						}}
-					>
-						<span
-							className="text-sm font-semibold"
-							style={{ color: 'var(--text-primary)' }}
-						>
-							{name}
-						</span>
+					<div className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>
+						{p.name}
 					</div>
 				)}
 			</a>
 		);
 	};
 
-	/* -------------------------
-     Render
-     ------------------------- */
-	const landingIdentifier = landingFest
-		? landingFest.slug || String(landingFest.year || '')
-		: null;
-
 	return (
-		<div className="min-h-screen arvantis-page" style={{ color: 'var(--text-primary)' }}>
+		<div className="min-h-screen arvantis-page" role="region" aria-labelledby="arvantis-title">
 			<div className="max-w-7xl mx-auto px-4 sm:px-8 lg:px-12 py-8 sm:py-12">
 				{/* Header */}
-				<header className="mb-4 flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
-					<div>
-						{/* Title + inline "powered by" for title sponsor */}
-						<div className="flex items-center gap-4">
+				<header className="mb-6">
+					<div className="flex items-start justify-between gap-4">
+						<div>
 							<h1
-								className="text-4xl md:text-5xl lg:text-6xl font-extrabold leading-tight"
-								style={{ fontFamily: 'Space Grotesk, system-ui' }}
+								id="arvantis-title"
+								className="text-4xl md:text-5xl lg:text-6xl font-extrabold"
 							>
 								<span>Arvantis</span>
 								{fest?.year ? (
 									<span className="ml-3 accent-neon">{fest.year}</span>
 								) : null}
-							</h1>
-
-							{titleSponsor && (
-								<div
-									className="ml-3 text-sm text-[var(--text-secondary)] flex items-center gap-3"
-									aria-hidden
-								>
-									<span className="uppercase text-xs">powered by</span>
-									{titleSponsor.logo?.url ? (
-										<a
-											href={titleSponsor.website || '#'}
-											target="_blank"
-											rel="noreferrer"
-											className="flex items-center gap-2"
-										>
+								{titleSponsor ? (
+									<span
+										className="ml-4 text-lg text-[var(--text-secondary)]"
+										aria-hidden
+									>
+										— powered by{' '}
+										{titleSponsor.logo?.url ? (
 											<img
 												src={titleSponsor.logo.url}
 												alt={titleSponsor.name}
-												style={{ height: 40, objectFit: 'contain' }}
+												style={{ height: 20, verticalAlign: 'middle' }}
 											/>
-										</a>
-									) : (
-										<a
-											href={titleSponsor.website || '#'}
-											target="_blank"
-											rel="noreferrer"
-											className="font-semibold"
-										>
-											{titleSponsor.name}
-										</a>
-									)}
+										) : (
+											<strong>{titleSponsor.name}</strong>
+										)}
+									</span>
+								) : null}
+							</h1>
+							<p className="mt-2 text-base md:text-lg text-[var(--text-secondary)] max-w-3xl">
+								{fest?.tagline ??
+									fest?.subtitle ??
+									'A celebration of tech, creativity and collaboration.'}
+							</p>
+
+							{/* quick meta */}
+							<div className="mt-3 flex flex-wrap gap-3 items-center text-sm text-[var(--text-secondary)]">
+								<div className="code-chip">{fest?.location || 'Location TBA'}</div>
+								<div className="code-chip">
+									{fest?.computed?.computedStatus ||
+										fest?.status ||
+										'Status unknown'}
 								</div>
-							)}
+								<div className="code-chip">
+									{fest?.durationDays
+										? `${fest.durationDays} day(s)`
+										: fest?.startDate
+										? `${fmtDate(fest.startDate)} — ${fmtDate(fest.endDate)}`
+										: 'Dates TBA'}
+								</div>
+							</div>
 						</div>
 
-						<p className="mt-2 text-base md:text-lg text-[var(--text-secondary)] max-w-2xl">
-							{fest?.tagline ||
-								'A celebration of tech, creativity and collaboration — by Syntax Club.'}
-						</p>
+						<div className="flex items-center gap-3">
+							<button
+								onClick={() => {
+									setShowPastEditions(false);
+									if (landingFest)
+										setIdentifier(
+											landingFest.slug || String(landingFest.year || '')
+										);
+								}}
+								className="btn-ghost"
+							>
+								Latest landing
+							</button>
+							<button
+								onClick={() => setShowPastEditions((s) => !s)}
+								className="btn-primary neon-btn"
+							>
+								{showPastEditions ? 'Hide editions' : 'Past editions'}
+							</button>
+						</div>
 					</div>
 
-					<div className="flex items-center gap-3">
-						<button
-							onClick={() => {
-								setShowLandingFirst(true);
-								if (landingIdentifier) setIdentifier(landingIdentifier);
-								window.scrollTo({ top: 0, behavior: 'smooth' });
-							}}
-							className="btn-primary neon-btn"
-							title="Show landing (latest) edition"
-						>
-							View Landing
-						</button>
-
-						<button
-							onClick={() => setShowPastEditions((s) => !s)}
-							className="btn-ghost"
-							title={
-								showPastEditions ? 'Collapse past editions' : 'Show past editions'
-							}
-						>
-							{showPastEditions ? 'Hide Past' : 'Past Editions'}
-						</button>
-					</div>
+					{/* Edition selector (top) */}
+					{editions.length > 0 && (
+						<div ref={stripRef} tabIndex={-1} className="mt-4">
+							<EditionsStrip
+								editions={editions}
+								currentIdentifier={identifier}
+								onSelect={handleSelectEdition}
+								landingIdentifier={
+									landingFest
+										? landingFest.slug || String(landingFest.year || '')
+										: null
+								}
+							/>
+						</div>
+					)}
 				</header>
 
-				{/* Edition selector moved to top for quick switching */}
-				{editions && editions.length > 0 && (
-					<div className="mb-6">
-						<EditionsStrip
-							editions={editions}
-							currentIdentifier={identifier}
-							onSelect={handleSelectEdition}
-							landingIdentifier={landingIdentifier}
-						/>
-					</div>
-				)}
-
-				{/* Main content */}
-				{isErrorOverall ? (
+				{/* Main */}
+				{isError ? (
 					<ErrorBlock
 						message={errorMsg}
 						onRetry={() => {
 							landingQuery.refetch();
 							editionsQuery.refetch();
-							if (identifier) detailsQuery.refetch();
+							detailsQuery.refetch();
 						}}
 					/>
-				) : isLoadingOverall && !fest ? (
-					<LoadingBlock />
+				) : isLoading && !fest ? (
+					<LoadingBlock label="Loading festival..." />
 				) : !fest ? (
-					<div className="py-20 text-center">
-						<h3 className="text-3xl font-bold mb-3">No Fest Data Available</h3>
-						<p className="text-lg text-[var(--text-secondary)]">
-							Please check back later for updates on Arvantis.
+					<div className="py-16 text-center">
+						<h2 className="text-2xl font-semibold">No festival data</h2>
+						<p className="mt-2 text-[var(--text-secondary)]">
+							We'll add content here soon.
 						</p>
 					</div>
 				) : (
-					<motion.div
-						initial={{ opacity: 0, y: 8 }}
-						animate={{ opacity: 1, y: 0 }}
-						transition={{ duration: 0.4 }}
-						className="space-y-8"
-					>
+					<>
 						{/* Hero */}
 						<PosterHero fest={fest} />
 
-						{/* Top quick stats + CTAs */}
-						<div className="grid grid-cols-1 lg:grid-cols-4 gap-6 items-start">
+						{/* Top area - stats + CTAs */}
+						<div className="grid grid-cols-1 lg:grid-cols-4 gap-6 mt-6">
 							<div className="lg:col-span-3 grid grid-cols-1 md:grid-cols-3 gap-4">
 								{stats.map((s, i) => (
 									<StatCard
@@ -454,56 +415,61 @@ const ArvantisPage = () => {
 								))}
 							</div>
 
-							<div className="lg:col-span-1">
-								<div className="glass-card p-4">
+							<div>
+								<div className="glass-card p-4 flex flex-col gap-3">
 									<div className="text-sm text-[var(--text-secondary)]">
 										Quick actions
 									</div>
-									<div className="mt-3 flex flex-col gap-3">
+									<div className="flex flex-col gap-2">
 										<a href="#events" className="btn-ghost">
 											Explore events
 										</a>
-										{fest?.registrationUrl || fest?.tickets?.url ? (
+										{ticketUrl ? (
 											<a
-												href={fest.registrationUrl || fest.tickets.url}
+												href={ticketUrl}
 												target="_blank"
 												rel="noreferrer"
 												className="btn-primary neon-btn"
 											>
-												Register / Tickets
+												<ExternalLink size={16} /> Tickets
 											</a>
 										) : (
-											<a href="#register" className="btn-primary neon-btn">
+											<button
+												className="btn-primary neon-btn"
+												onClick={() =>
+													window.scrollTo({
+														top: document.body.scrollHeight,
+														behavior: 'smooth',
+													})
+												}
+											>
 												Register
-											</a>
+											</button>
 										)}
 									</div>
 
-									<div className="mt-4 text-sm text-[var(--text-secondary)]">
-										Status:{' '}
-										<strong className="mono">
-											{fest?.computed?.computedStatus || fest?.status}
-										</strong>
+									<div className="mt-3 text-sm text-[var(--text-secondary)]">
+										Contact:{' '}
+										{fest.contactEmail ? (
+											<a href={`mailto:${fest.contactEmail}`}>
+												{fest.contactEmail}
+											</a>
+										) : (
+											fest.contactPhone || '—'
+										)}
 									</div>
 								</div>
 							</div>
 						</div>
 
-						{/* Events */}
-						<section
-							id="events"
-							className="rounded-3xl p-6"
-							style={{
-								background: 'transparent',
-								border: '1px solid var(--glass-border)',
-							}}
-						>
+						{/* Events section */}
+						<section id="events" className="mt-8">
 							<div className="flex items-center justify-between mb-4">
 								<div>
-									<h3 className="text-xl font-semibold">Events</h3>
-									<p className="text-sm mt-1 text-[var(--text-secondary)]">
-										Explore sessions, workshops and competitions from this
-										edition.
+									<h3 className="section-title">Events</h3>
+									<p className="muted">
+										Sessions, workshops and competitions — full details
+										available on click.
 									</p>
 								</div>
 
@@ -511,18 +477,21 @@ const ArvantisPage = () => {
 									<select
 										value={eventType}
 										onChange={(e) => setEventType(e.target.value)}
-										className="rounded-md border border-[var(--glass-border)] py-2 px-3 bg-[var(--input-bg)]"
+										className="rounded-md border py-2 px-3 bg-[var(--input-bg)]"
 									>
-										{eventTypes.map((t) => (
+										<option value="all">All types</option>
+										{Array.from(
+											new Set(events.map((ev) => ev.type || 'general'))
+										).map((t) => (
 											<option key={t} value={t}>
-												{t === 'all' ? 'All types' : t}
+												{t}
 											</option>
 										))}
 									</select>
 									<select
 										value={eventSort}
 										onChange={(e) => setEventSort(e.target.value)}
-										className="rounded-md border border-[var(--glass-border)] py-2 px-3 bg-[var(--input-bg)]"
+										className="rounded-md border py-2 px-3 bg-[var(--input-bg)]"
 									>
 										<option value="date-desc">Newest first</option>
 										<option value="date-asc">Oldest first</option>
@@ -533,198 +502,236 @@ const ArvantisPage = () => {
 							<EventsGrid events={filteredEvents} onEventClick={handleEventClick} />
 						</section>
 
-						{/* Partners - improved presentation */}
-						<section
-							className="rounded-3xl p-6"
-							style={{
-								background: 'transparent',
-								border: '1px solid var(--glass-border)',
-							}}
-						>
-							<div className="flex items-center justify-between mb-4">
-								<div>
-									<h3 className="text-xl font-semibold">Partners</h3>
-									<p className="text-sm mt-1 text-[var(--text-secondary)]">
-										Our partners power Arvantis — special thanks to the title
-										sponsor.
-									</p>
+						{/* Tracks & FAQs */}
+						<div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mt-8">
+							{/* Tracks */}
+							<div className="glass-card p-4">
+								<div className="flex items-center justify-between">
+									<div>
+										<div className="text-sm text-[var(--text-secondary)]">
+											Tracks
+										</div>
+										<div className="font-semibold">
+											{(fest.tracks || []).length} tracks
+										</div>
+									</div>
+									<button
+										onClick={() => setShowTracks((s) => !s)}
+										className="btn-ghost small"
+									>
+										{showTracks ? 'Hide' : 'View'}
+									</button>
 								</div>
-								<div className="text-sm text-[var(--text-secondary)]">
-									{partners.length} partners
-								</div>
+								{showTracks && (fest.tracks || []).length > 0 ? (
+									<ul className="mt-3 space-y-2">
+										{(fest.tracks || []).map((t) => (
+											<li key={t.key} className="detail-card p-3">
+												<div className="font-semibold">{t.title}</div>
+												{t.description && (
+													<div className="text-sm mt-1 muted">
+														{t.description}
+													</div>
+												)}
+											</li>
+										))}
+									</ul>
+								) : (
+									showTracks && (
+										<div className="mt-3 muted">No tracks defined.</div>
+									)
+								)}
 							</div>
 
-							{/* prominent title sponsor card (if present) */}
-							{titleSponsor && (
-								<div
-									className="mb-6 rounded-xl p-4 flex items-center gap-4"
-									style={{
-										background:
-											'linear-gradient(90deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01))',
-										border: '1px solid rgba(255,255,255,0.03)',
-									}}
-								>
+							{/* FAQs */}
+							<div className="glass-card p-4">
+								<div className="flex items-center justify-between">
+									<div>
+										<div className="text-sm text-[var(--text-secondary)]">
+											FAQ
+										</div>
+										<div className="font-semibold">
+											{(fest.faqs || []).length} items
+										</div>
+									</div>
+									<button
+										onClick={() => setShowFaqs((s) => !s)}
+										className="btn-ghost small"
+									>
+										{showFaqs ? 'Hide' : 'View'}
+									</button>
+								</div>
+								{showFaqs && (fest.faqs || []).length > 0 ? (
+									<div className="mt-3 space-y-2">
+										{(fest.faqs || []).map((f, i) => (
+											<details key={i} className="detail-card p-3">
+												<summary className="font-semibold">
+													{f.question}
+												</summary>
+												<div className="mt-2 text-sm muted">{f.answer}</div>
+											</details>
+										))}
+									</div>
+								) : (
+									showFaqs && <div className="mt-3 muted">No FAQs yet.</div>
+								)}
+							</div>
+
+							{/* Partners snapshot */}
+							<div className="glass-card p-4">
+								<div className="flex items-center justify-between">
+									<div>
+										<div className="text-sm text-[var(--text-secondary)]">
+											Partners
+										</div>
+										<div className="font-semibold">
+											{partners.length} partners
+										</div>
+									</div>
+									<button
+										onClick={() => setShowAllPartners((s) => !s)}
+										className="btn-ghost small"
+									>
+										{showAllPartners ? 'Collapse' : 'Expand'}
+									</button>
+								</div>
+
+								{titleSponsor && (
 									<div
+										className="mt-4 p-3 rounded-md border flex items-center gap-3"
 										style={{
-											width: 160,
-											height: 72,
-											display: 'flex',
-											alignItems: 'center',
-											justifyContent: 'center',
+											background:
+												'linear-gradient(90deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01))',
 										}}
 									>
-										{titleSponsor.logo?.url ? (
-											<img
-												src={titleSponsor.logo.url}
-												alt={titleSponsor.name}
-												style={{ maxHeight: 72, objectFit: 'contain' }}
-											/>
-										) : (
-											<div className="font-semibold">{titleSponsor.name}</div>
-										)}
-									</div>
-
-									<div className="flex-1">
-										<div className="text-sm text-[var(--text-secondary)]">
-											Title sponsor
-										</div>
 										<div
-											className="text-2xl font-bold"
-											style={{ color: 'var(--text-primary)' }}
+											style={{
+												width: 120,
+												height: 56,
+												display: 'flex',
+												alignItems: 'center',
+												justifyContent: 'center',
+											}}
 										>
-											{titleSponsor.name}
+											{titleSponsor.logo?.url ? (
+												<img
+													src={titleSponsor.logo.url}
+													alt={titleSponsor.name}
+													style={{ maxHeight: 56, objectFit: 'contain' }}
+												/>
+											) : (
+												<strong>{titleSponsor.name}</strong>
+											)}
 										</div>
-										{titleSponsor.description && (
-											<div className="text-sm mt-1 text-[var(--text-secondary)]">
-												{titleSponsor.description}
+										<div className="flex-1">
+											<div className="text-xs text-[var(--text-secondary)]">
+												Title Sponsor
 											</div>
-										)}
-									</div>
-
-									<div className="ml-auto flex flex-col gap-2 items-end">
+											<div className="font-semibold">{titleSponsor.name}</div>
+											{titleSponsor.description && (
+												<div className="text-sm muted">
+													{titleSponsor.description}
+												</div>
+											)}
+										</div>
 										{titleSponsor.website && (
 											<a
 												href={titleSponsor.website}
 												target="_blank"
 												rel="noreferrer"
-												className="btn-primary neon-btn"
+												className="btn-ghost small"
 											>
-												Visit
+												<ExternalLink size={14} />
 											</a>
 										)}
-										<button
-											onClick={() =>
-												window.open(titleSponsor.website || '#', '_blank')
-											}
-											className="btn-ghost"
-										>
-											Sponsor details
-										</button>
 									</div>
-								</div>
-							)}
+								)}
 
-							{/* grouped partner tiers with larger logos & optional "show all" */}
-							<div className="grid gap-6">
-								{Object.keys(otherPartnersByTier).length === 0 ? (
-									<div className="text-sm text-[var(--text-secondary)]">
-										No partners listed yet.
-									</div>
-								) : (
-									Object.entries(otherPartnersByTier).map(([tier, list]) => {
-										const visible = showAllPartners ? list : list.slice(0, 8);
+								{/* grouped tiers (preview or full) */}
+								<div className="mt-4 space-y-4">
+									{partnersByTier.map(([tier, list]) => {
+										const showAll = expandedTiers[tier] || showAllPartners;
 										return (
 											<div key={tier}>
-												<div className="flex items-center justify-between mb-3">
-													<div className="flex items-center gap-3">
-														<div
-															className="text-sm font-semibold"
-															style={{
-																color: 'var(--text-secondary)',
-															}}
-														>
-															{tier.toUpperCase()}
-														</div>
-														<div className="text-xs text-[var(--text-secondary)]">
-															{list.length} partners
-														</div>
+												<div className="flex items-center justify-between mb-2">
+													<div className="text-sm font-semibold">
+														{tier.toUpperCase()}
 													</div>
-													{list.length > 8 && (
+													<div className="text-xs muted">
+														{list.length}
+													</div>
+												</div>
+												<div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
+													{(showAll
+														? list
+														: list.slice(0, PARTNERS_PREVIEW)
+													).map((p, i) =>
+														renderPartnerItem(p, `${tier}-${i}`)
+													)}
+												</div>
+												{list.length > PARTNERS_PREVIEW && (
+													<div className="mt-2 text-right">
 														<button
-															onClick={() =>
-																setShowAllPartners((s) => !s)
-															}
-															className="text-sm btn-ghost"
+															onClick={() => toggleTier(tier)}
+															className="btn-ghost small"
 														>
-															{showAllPartners
-																? 'Show less'
-																: `Show all (${list.length})`}
+															{showAll ? (
+																<>
+																	<ChevronUp size={14} /> Show
+																	less
+																</>
+															) : (
+																<>
+																	<ChevronDown size={14} /> Show
+																	all
+																</>
+															)}
 														</button>
-													)}
-												</div>
-
-												{/* responsive horizontal grid of logos (larger) */}
-												<div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4">
-													{visible.map((p, i) =>
-														renderPartnerLogo(p, `${tier}-${i}`, {
-															size: 72,
-														})
-													)}
-												</div>
+													</div>
+												)}
 											</div>
 										);
-									})
-								)}
+									})}
+								</div>
 							</div>
-						</section>
+						</div>
 
 						{/* Gallery */}
-						<section
-							className="rounded-3xl p-6"
-							style={{
-								background: 'transparent',
-								border: '1px solid var(--glass-border)',
-							}}
-						>
-							<h3 className="text-xl font-semibold mb-4">Gallery</h3>
-							<GalleryGrid
-								gallery={Array.isArray(fest?.gallery) ? fest.gallery : []}
-								onImageClick={handleImageClick}
-							/>
-						</section>
+						{Array.isArray(fest.gallery) && fest.gallery.length > 0 && (
+							<section className="mt-8">
+								<h3 className="section-title">Gallery</h3>
+								<GalleryGrid
+									gallery={fest.gallery}
+									onImageClick={handleImageClick}
+								/>
+							</section>
+						)}
 
 						{/* Past editions */}
-						<section
-							className="rounded-3xl p-6"
-							style={{
-								background: 'transparent',
-								border: '1px solid var(--glass-border)',
-							}}
-						>
-							<div className="flex items-center justify-between gap-3 mb-4">
+						<section className="mt-8">
+							<div className="flex items-center justify-between mb-4">
 								<div>
-									<h3 className="text-xl font-semibold">Past Editions</h3>
-									<p className="text-sm mt-1 text-[var(--text-secondary)]">
-										Browse previous Arvantis editions and jump to the one you
-										want to explore.
+									<h3 className="section-title">Past editions</h3>
+									<p className="muted">
+										Browse and switch to previous Arvantis editions.
 									</p>
 								</div>
-
-								<div className="flex items-center gap-2">
+								<div>
 									<button
 										onClick={() => setShowPastEditions((s) => !s)}
-										className="inline-flex items-center gap-2 px-3 py-2 rounded-md bg-[var(--button-secondary-bg)] border border-[var(--button-secondary-border)]"
+										className="btn-ghost small"
 									>
-										<Filter size={14} />{' '}
-										{showPastEditions ? 'Collapse' : 'Expand'}
+										{showPastEditions ? 'Hide' : 'Expand'}
 									</button>
 									<button
 										onClick={() => {
+											if (landingFest)
+												setIdentifier(
+													landingFest.slug ||
+														String(landingFest.year || '')
+												);
 											window.scrollTo({ top: 0, behavior: 'smooth' });
-											setShowLandingFirst(true);
-											if (landingIdentifier) setIdentifier(landingIdentifier);
 										}}
-										className="btn-ghost"
+										className="btn-ghost small ml-2"
 									>
 										Back to landing
 									</button>
@@ -734,24 +741,20 @@ const ArvantisPage = () => {
 							{showPastEditions ? (
 								<div className="grid gap-4 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
 									{otherEditions.length === 0 ? (
-										<div className="text-sm text-[var(--text-secondary)]">
-											No previous editions found.
-										</div>
+										<div className="muted">No previous editions.</div>
 									) : (
 										otherEditions.slice(0, ITEMS_IN_PAST_SECTION).map((e) => {
 											const id = e?.slug || String(e?.year || '');
 											return (
 												<article
 													key={id}
-													className="rounded-xl overflow-hidden border border-[var(--glass-border)] bg-[var(--card-bg)] shadow-sm"
+													className="rounded-xl overflow-hidden border bg-[var(--card-bg)]"
+													role="article"
 												>
-													<div className="h-36 w-full overflow-hidden bg-gray-100">
+													<div className="h-36 overflow-hidden bg-gray-100">
 														<img
 															src={
-																e?.poster?.url ||
-																e?.cover ||
-																e?.hero?.url ||
-																''
+																e?.poster?.url || e?.hero?.url || ''
 															}
 															alt={e?.name || `Arvantis ${e?.year}`}
 															className="w-full h-full object-cover"
@@ -765,7 +768,7 @@ const ArvantisPage = () => {
 																	{e?.name ||
 																		`Arvantis ${e?.year}`}
 																</div>
-																<div className="text-xs text-[var(--text-muted)] mt-1">
+																<div className="text-xs muted mt-1">
 																	{e?.year}
 																</div>
 															</div>
@@ -773,16 +776,11 @@ const ArvantisPage = () => {
 																onClick={() =>
 																	handleSelectEdition(id)
 																}
-																className="text-sm px-3 py-1 rounded-md bg-[var(--button-primary-bg)] text-white"
+																className="btn-primary neon-btn small"
 															>
 																View
 															</button>
 														</div>
-														{e?.tagline && (
-															<p className="mt-2 text-sm text-[var(--text-secondary)] truncate">
-																{e.tagline}
-															</p>
-														)}
 													</div>
 												</article>
 											);
@@ -794,13 +792,33 @@ const ArvantisPage = () => {
 									editions={editions}
 									currentIdentifier={identifier}
 									onSelect={handleSelectEdition}
-									landingIdentifier={landingIdentifier}
+									landingIdentifier={
+										landingFest
+											? landingFest.slug || String(landingFest.year || '')
+											: null
+									}
 								/>
 							)}
 						</section>
-					</motion.div>
+					</>
 				)}
 			</div>
+
+			{/* Sticky ticket CTA */}
+			{ticketUrl && (
+				<a
+					href={ticketUrl}
+					target="_blank"
+					rel="noreferrer"
+					className="arv-sticky-cta"
+					title="Buy tickets"
+				>
+					<div className="cta-btn">
+						<TicketIcon /> Tickets
+					</div>
+					<div className="mini">Open</div>
+				</a>
+			)}
 
 			{/* Modals */}
 			<AnimatePresence>
@@ -808,13 +826,35 @@ const ArvantisPage = () => {
 					<EventDetailModal
 						event={selectedEvent}
 						isOpen={!!selectedEvent}
-						onClose={closeModal}
+						onClose={() => setSelectedEvent(null)}
 					/>
 				)}
-				{selectedImage && <ImageLightbox image={selectedImage} onClose={closeModal} />}
+				{selectedImage && (
+					<ImageLightbox image={selectedImage} onClose={() => setSelectedImage(null)} />
+				)}
 			</AnimatePresence>
 		</div>
 	);
 };
+
+/* Small inline icon for sticky CTA to avoid extra import when ticketUrl exists */
+const TicketIcon = () => (
+	<svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden>
+		<path
+			d="M3 7h18v10H3z"
+			stroke="currentColor"
+			strokeWidth="1.5"
+			strokeLinecap="round"
+			strokeLinejoin="round"
+		/>
+		<path
+			d="M8 12h.01"
+			stroke="currentColor"
+			strokeWidth="1.5"
+			strokeLinecap="round"
+			strokeLinejoin="round"
+		/>
+	</svg>
+);
 
 export default ArvantisPage;
