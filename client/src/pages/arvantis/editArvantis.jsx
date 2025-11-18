@@ -120,9 +120,6 @@ const EditArvantis = ({ setDashboardError = () => {} }) => {
 	// Fetch events for linking
 	const fetchEvents = useCallback(async (signal) => {
 		try {
-			// lightweight events fetch: reuse publicClient via arvantisServices isn't exposed;
-			// fallback: use public endpoint pattern used elsewhere (list events endpoint not included in attachments).
-			// To keep page functional, try to fetch via backend events endpoint if available:
 			const resp = await fetch(
 				`${
 					import.meta.env.VITE_BACKEND_URL || 'http://localhost:8000'
@@ -198,16 +195,29 @@ const EditArvantis = ({ setDashboardError = () => {} }) => {
 		setCreateLoading(true);
 		setLocalError('');
 		try {
-			const created = await createFest(createForm);
-			setToast({ type: 'success', message: 'Fest created' });
+			// basic validation
+			if (!createForm.year || !createForm.startDate || !createForm.endDate) {
+				setLocalError('Year, start and end dates are required');
+				return;
+			}
+			// include tagline in payload
+			const payload = {
+				...createForm,
+				year: Number(createForm.year),
+			};
+			const created = await createFestService(payload);
+			// refresh and open created fest
 			await fetchFests();
-			setCreateOpen(false);
-			// auto-open created
-			if (created?._id) await loadFestDetails(created._id);
+			if (created?._id) {
+				await loadFestDetails(created._id);
+				setCreateOpen(false);
+			} else {
+				setCreateOpen(false);
+			}
 		} catch (err) {
-			setLocalError(getErrMsg(err, 'Create failed'));
+			setLocalError(getErrMsg(err, 'Failed to create fest'));
 		} finally {
-			if (mountedRef.current) setCreateLoading(false);
+			setCreateLoading(false);
 		}
 	};
 
@@ -216,23 +226,16 @@ const EditArvantis = ({ setDashboardError = () => {} }) => {
 		if (!editForm || !editForm._id) return;
 		setActionBusy(true);
 		try {
-			// send only allowed fields (backend prevents critical changes already)
-			const payload = {
-				description: editForm.description,
-				location: editForm.location,
-				contactEmail: editForm.contactEmail,
-				startDate: editForm.startDate,
-				endDate: editForm.endDate,
-				status: editForm.status,
-			};
-			const updated = await updateFestDetails(editForm._id, payload);
-			setEditForm(normalizeFest(updated));
-			setToast({ type: 'success', message: 'Saved fest details' });
-			await fetchFests();
+			// send full editForm (server sanitizes protected fields)
+			const updated = await updateFestDetails(editForm._id, editForm);
+			await loadFestDetails(editForm._id);
+			setToast({ type: 'success', message: 'Fest updated' });
+			return updated;
 		} catch (err) {
-			setDashboardErrorRef.current(getErrMsg(err, 'Failed to save'));
+			setToast({ type: 'error', message: getErrMsg(err, 'Failed to save fest') });
+			throw err;
 		} finally {
-			if (mountedRef.current) setActionBusy(false);
+			setActionBusy(false);
 		}
 	};
 
