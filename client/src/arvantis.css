@@ -572,82 +572,161 @@
 	font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, 'Roboto Mono', monospace;
 	font-weight: 700;
 	font-size: 1rem;
+	/* ---------- Theme tweaks for stronger techy look (light + dark) ---------- */
+:root {
+    /* stronger neon accents and subtle tech background */
+    --tech-neon-1: #06b6d4;
+    --tech-neon-2: #7c3aed;
+    --accent-1: var(--tech-neon-1);
+    --accent-2: var(--tech-neon-2);
+    --neon-glow: 0 12px 40px rgba(6, 182, 212, 0.08), 0 8px 28px rgba(124, 58, 237, 0.05);
+
+    /* slightly more contrast on cards for bright mode */
+    --glass-bg: rgba(255,255,255,0.94);
+    --glass-border: rgba(6,22,28,0.06);
+    --card-bg: rgba(255,255,255,0.98);
+    --card-border: rgba(6,22,28,0.06);
 }
-.tier-badge {
-	font-size: 0.72rem;
-	padding: 0.25rem 0.5rem;
-	border-radius: 999px;
-	background: linear-gradient(
-		90deg,
-		color-mix(in srgb, var(--accent-1) 12%, transparent),
-		transparent
-	);
-	color: var(--accent-1);
-	border: 1px solid color-mix(in srgb, var(--accent-1) 16%, transparent);
-	text-transform: capitalize;
+
+/* subtle tech grid overlay for large screens */
+.arvantis-page::before {
+    content: "";
+    pointer-events: none;
+    position: fixed;
+    inset: 0;
+    background-image:
+        repeating-linear-gradient(90deg, rgba(0,0,0,0.01) 0 1px, transparent 1px 40px),
+        repeating-linear-gradient(0deg, rgba(0,0,0,0.01) 0 1px, transparent 1px 40px);
+    opacity: 0.02;
+    z-index: 0;
 }
+
+/* ---------- Partner cards: visibility, spacing, accessibility ---------- */
+/* ensure partner name wraps and is readable (no truncation) */
+.partner-card-tech-title {
+    /* allow wrapping across lines for long names */
+    white-space: normal;
+    word-break: break-word;
+    overflow-wrap: anywhere;
+    /* slightly larger and monospace to accent tech feel */
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, 'Roboto Mono', monospace;
+    font-size: 1.02rem;
+    letter-spacing: -0.01em;
+    line-height: 1.25;
+}
+
+/* increase min height for cards so names and description have space */
+.partner-card-tech {
+    min-height: 110px;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+}
+
+/* make whole card keyboard-focusable and visible */
+.partner-card-tech:focus,
+.partner-card-tech:focus-visible {
+    outline: 3px solid color-mix(in srgb, var(--accent-1) 20%, transparent);
+    outline-offset: 4px;
+    transform: translateY(-6px);
+    box-shadow: var(--neon-glow);
+}
+
+/* media area: allow larger logos, centered */
+.partner-card-tech-media {
+    flex: 0 0 96px;
+    width: 96px;
+    height: 96px;
+    border-radius: 8px;
+    overflow: hidden;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: linear-gradient(180deg, rgba(255,255,255,0.02), transparent);
+}
+.partner-card-logo {
+    max-height: 80px;
+    max-width: 100%;
+    object-fit: contain;
+}
+
+/* body: ensure description wraps, and make CTA easy to tap */
 .partner-card-tech-desc {
-	color: var(--text-secondary);
+    margin-top: 0.35rem;
+    color: var(--text-secondary);
+    font-size: 0.92rem;
 }
 
-/* partner website link style */
+/* tier badge: slightly more compact and readable */
+.tier-badge {
+    font-size: 0.7rem;
+    padding: 0.2rem 0.45rem;
+    border-radius: 999px;
+    font-weight: 700;
+    letter-spacing: 0.02em;
+    text-transform: none;
+}
+
+/* partner-website stronger hover in both themes */
 .partner-website {
-	padding: 0.4rem 0.6rem;
-	border-radius: 0.5rem;
-	background: rgba(0, 0, 0, 0.04);
-	border: 1px solid rgba(0, 0, 0, 0.04);
-	display: inline-flex;
-	align-items: center;
-	gap: 0.5rem;
-	transition: background 160ms ease, transform 160ms ease;
+    padding: 0.45rem 0.65rem;
+    border-radius: 0.6rem;
+    font-weight: 600;
 }
-.partner-website:hover {
-	background: linear-gradient(
-		90deg,
-		color-mix(in srgb, var(--accent-1) 10%, transparent),
-		color-mix(in srgb, var(--accent-2) 6%, transparent)
-	);
-	color: white;
-	transform: translateY(-2px);
+.partner-website:hover,
+.partner-card-tech:hover .partner-website {
+    background: linear-gradient(90deg, color-mix(in srgb, var(--accent-1) 14%, transparent), color-mix(in srgb, var(--accent-2) 8%, transparent));
+    color: #fff;
+    transform: translateY(-2px);
 }
 
-/* powered-by tech style */
-.tech-poweredby {
-	border: 1px dashed color-mix(in srgb, var(--accent-1) 25%, transparent);
-	padding: 0.4rem 0.75rem;
-	background: linear-gradient(90deg, rgba(0, 0, 0, 0.02), transparent);
-}
-.tech-poweredby img {
-	max-height: 32px;
+/* ensure partner-card group keeps proper stacking context for shadows */
+.partner-card-tech {
+    z-index: 1;
 }
 
-/* responsive */
+/* responsive: tighter layout on narrow screens */
 @media (max-width: 720px) {
-	.partner-card-tech-inner {
-		flex-direction: column;
-		align-items: center;
-		text-align: center;
-	}
-	.partner-card-tech-media {
-		flex: 0 0 auto;
-		margin-bottom: 0.5rem;
-	}
+    .partner-card-tech-inner {
+        flex-direction: column;
+        align-items: center;
+        text-align: center;
+    }
+    .partner-card-tech-media {
+        width: 84px;
+        height: 84px;
+        margin-bottom: 0.5rem;
+    }
+    .partner-card-tech-desc {
+        font-size: 0.95rem;
+    }
 }
 
-/* subtle neon accent under the partners section */
-#partners .glass-card::after {
-	content: '';
-	display: block;
-	height: 2px;
-	margin-top: 0.75rem;
-	border-radius: 2px;
-	background: linear-gradient(
-		90deg,
-		transparent,
-		color-mix(in srgb, var(--accent-1) 30%, transparent),
-		transparent
-	);
-	opacity: 0.9;
+/* force partners grid to fill width and keep consistent gaps on mobile */
+.partners-cards-grid {
+    grid-auto-rows: 1fr;
 }
 
-/* End ARVANTIS styles */
+/* improve contrast of glass card hover in both themes */
+.glass-card:hover {
+    box-shadow: 0 20px 60px rgba(2,6,23,0.08);
+    transform: translateY(-4px);
+    transition: transform 220ms ease, box-shadow 220ms ease;
+}
+
+/* make CTA buttons a little larger and accessible */
+.btn-primary, .btn-ghost {
+    min-height: 44px;
+    font-size: 0.95rem;
+    padding-left: 0.9rem;
+    padding-right: 0.9rem;
+}
+
+/* respect reduced motion */
+@media (prefers-reduced-motion: reduce) {
+    .partner-card-tech, .glass-card, .poster-main-img, .event-card {
+        transition: none !important;
+    }
+}
+
+/* ---------- End ARVANTIS styles ---------- */
