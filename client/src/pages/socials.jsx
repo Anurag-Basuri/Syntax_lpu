@@ -28,15 +28,7 @@ import { useAuth } from '../hooks/useAuth.js';
 import { createPost, deletePost } from '../services/socialsServices.js';
 import useSocials from '../hooks/useSocials.js';
 import toast from 'react-hot-toast';
-
-/**
- * Socials feed page
- *
- * - Only admins can create/delete posts (UI enforces this; backend already enforces).
- * - Viewers (non-admins) can view & share posts only.
- * - Admins see Create, Delete and additional actions.
- * - Added: client-side search, robust share (Web Share API + clipboard fallback), accessibility improvements.
- */
+import './socials.css';
 
 /* ----------------------
    Helpers & Transformers
@@ -164,7 +156,7 @@ const PostCard = React.memo(({ post, currentUser, onDelete }) => {
 			animate={{ opacity: 1, y: 0 }}
 			exit={{ opacity: 0, y: 8 }}
 			transition={{ duration: 0.28 }}
-			className="relative bg-[var(--card-bg)] backdrop-blur-lg rounded-2xl overflow-hidden border border-[var(--card-border)] shadow-[var(--shadow-md)] mb-6 sm:mb-8"
+			className="post-card relative bg-[var(--card-bg)] backdrop-blur-lg rounded-2xl overflow-hidden border border-[var(--card-border)] shadow-[var(--shadow-md)] mb-6 sm:mb-8"
 		>
 			{/* Header */}
 			<div className="p-4 sm:p-6">
@@ -176,9 +168,10 @@ const PostCard = React.memo(({ post, currentUser, onDelete }) => {
 								alt={`${post.user.name} avatar`}
 								className="w-12 h-12 rounded-full object-cover"
 								loading="lazy"
+								decoding="async"
 							/>
 						) : (
-							<div className="w-12 h-12 rounded-full bg-gradient-to-br from-[var(--accent-1)] to-[var(--accent-2)] flex items-center justify-center text-white font-semibold">
+							<div className="w-12 h-12 rounded-full admin-avatar flex items-center justify-center text-white font-semibold">
 								{initials}
 							</div>
 						)}
@@ -260,31 +253,33 @@ const PostCard = React.memo(({ post, currentUser, onDelete }) => {
 			{/* Media */}
 			{post.media && post.media.length > 0 && (
 				<div className="px-4 sm:px-6 pb-3">
+					{/* Single media: show large; multiple: responsive mosaic */}
 					{post.media.length === 1 ? (
-						<div className="rounded-xl overflow-hidden border border-[var(--glass-border)]">
+						<div className="rounded-xl overflow-hidden border border-[var(--glass-border)] media-single">
 							{post.media[0].type === 'image' ? (
 								<img
 									src={post.media[0].url}
 									alt="post image"
-									className="w-full h-auto max-h-[600px] object-cover"
+									className="w-full h-auto max-h-[520px] object-cover"
 									loading="lazy"
+									decoding="async"
 									onClick={() => setExpandedMedia(post.media[0])}
 								/>
 							) : (
-								<div className="relative">
+								<div className="relative media-video-hero">
 									<video
 										ref={(el) => (videoRefs.current[post.media[0].id] = el)}
 										src={post.media[0].url}
-										className="w-full h-auto max-h-[600px] object-cover"
+										className="w-full h-auto max-h-[520px] object-cover"
 										muted
 										loop
 										playsInline
 										preload="metadata"
 									/>
-									<div className="absolute inset-0 flex items-center justify-center">
+									<div className="video-overlay">
 										<button
 											onClick={() => toggleVideo(post.media[0].id)}
-											className="p-3 bg-black/60 text-white rounded-full"
+											className="play-button"
 											aria-label="Play/Pause video"
 										>
 											{videoRefs.current[post.media[0].id] &&
@@ -299,45 +294,54 @@ const PostCard = React.memo(({ post, currentUser, onDelete }) => {
 							)}
 						</div>
 					) : (
-						<div className="grid gap-2 rounded-xl overflow-hidden border border-[var(--glass-border)] grid-cols-2">
-							{post.media.slice(0, 4).map((m) => (
-								<div key={m.id} className="relative cursor-pointer">
+						<div className="grid gap-2 rounded-xl overflow-hidden border border-[var(--glass-border)] media-mosaic">
+							{post.media.slice(0, 8).map((m, idx) => (
+								<div
+									key={m.id}
+									className="relative media-cell"
+									onClick={() => setExpandedMedia(m)}
+								>
 									{m.type === 'image' ? (
 										<img
 											src={m.url}
 											alt="media"
-											className="w-full h-48 sm:h-56 object-cover"
+											className="w-full h-full object-cover"
 											loading="lazy"
-											onClick={() => setExpandedMedia(m)}
+											decoding="async"
 										/>
 									) : (
-										<div className="relative">
+										<div className="relative h-full">
 											<video
 												ref={(el) => (videoRefs.current[m.id] = el)}
 												src={m.url}
-												className="w-full h-48 sm:h-56 object-cover"
+												className="w-full h-full object-cover"
 												muted
 												loop
 												playsInline
 												preload="metadata"
 											/>
-											<button
-												onClick={() => toggleVideo(m.id)}
-												className="absolute inset-0 m-auto w-10 h-10 rounded-full bg-black/50 flex items-center justify-center text-white"
-												aria-label="Play/Pause video"
-											>
-												{videoRefs.current[m.id] &&
-												!videoRefs.current[m.id].paused ? (
-													<Pause />
-												) : (
-													<Play />
-												)}
-											</button>
+											<div className="video-overlay">
+												<button
+													onClick={(e) => {
+														e.stopPropagation();
+														toggleVideo(m.id);
+													}}
+													className="play-button small"
+													aria-label="Play/Pause video"
+												>
+													{videoRefs.current[m.id] &&
+													!videoRefs.current[m.id].paused ? (
+														<Pause />
+													) : (
+														<Play />
+													)}
+												</button>
+											</div>
 										</div>
 									)}
-									{post.media.length > 4 && m === post.media[3] && (
-										<div className="absolute inset-0 bg-black/60 flex items-center justify-center text-white text-lg">
-											+{post.media.length - 4}
+									{post.media.length > 8 && idx === 7 && (
+										<div className="absolute inset-0 overlay-count">
+											+{post.media.length - 8}
 										</div>
 									)}
 								</div>
@@ -703,7 +707,6 @@ const SocialsFeedPage = () => {
 	const { socials, loading, error, refetch } = useSocials();
 	const [showCreateModal, setShowCreateModal] = useState(false);
 	const [showScrollTop, setShowScrollTop] = useState(false);
-	const [searchQuery, setSearchQuery] = useState('');
 
 	const posts = useMemo(
 		() => (Array.isArray(socials) ? socials.map(transformPost) : []),
@@ -749,7 +752,7 @@ const SocialsFeedPage = () => {
 	const filteredPosts = posts;
 
 	return (
-		<div className="relative min-h-screen bg-transparent overflow-x-hidden">
+		<div className="socials-page relative min-h-screen bg-transparent overflow-x-hidden">
 			{/* Sticky header */}
 			<div className="sticky top-0 z-40 bg-[var(--nav-bg)] backdrop-blur-lg border-b border-[var(--nav-border)]">
 				<div className="page-container">
