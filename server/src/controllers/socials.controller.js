@@ -10,26 +10,32 @@ const createPost = asyncHandler(async (req, res) => {
 	const { title, content, status } = req.body;
 	const authorId = req.user._id; // From 'protect' middleware
 
-	if (!req.files || req.files.length === 0) {
-		throw ApiError.BadRequest('At least one image or video file is required.');
+	// Accept posts with media OR text OR both.
+	// If no files were uploaded and no title/content present, reject.
+	if ((!req.files || req.files.length === 0) && !title && !content) {
+		throw ApiError.BadRequest('Provide title/content or at least one image/video.');
 	}
 
-	// Upload all files to Cloudinary
-	const uploadPromises = req.files.map((file) => uploadFile(file, { folder: 'posts' }));
-	const uploadedFiles = await Promise.all(uploadPromises);
+	let media = [];
+	if (req.files && req.files.length > 0) {
+		// Upload all files to Cloudinary
+		const uploadPromises = req.files.map((file) => uploadFile(file, { folder: 'posts' }));
+		const uploadedFiles = await Promise.all(uploadPromises);
 
-	// Map to the media schema structure
-	const media = uploadedFiles.map((file) => ({
-		url: file.url,
-		publicId: file.public_id,
-		resource_type: file.resource_type, // 'image' or 'video'
-	}));
+		// Map to the media schema structure (safe mapping)
+		media = uploadedFiles.map((file) => ({
+			url: file.url,
+			publicId: file.public_id || file.publicId || '',
+			resource_type:
+				file.resource_type || (file.format && file.format === 'mp4' ? 'video' : 'image'),
+		}));
+	}
 
 	const post = await Post.create({
 		author: authorId,
 		title,
 		content,
-		status,
+		status: status || 'published',
 		media,
 	});
 

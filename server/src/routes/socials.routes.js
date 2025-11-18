@@ -30,8 +30,19 @@ router.post(
 	authorize('admin'),
 	uploadFile('media'), // Expects a field named 'media'
 	validate([
-		body('title').notEmpty().trim().withMessage('Title is required'),
-		body('content').notEmpty().trim().withMessage('Content is required'),
+		// Title/content are optional here (controller enforces at least one of title/content/files).
+		body('title')
+			.optional()
+			.isString()
+			.trim()
+			.isLength({ min: 1, max: 200 })
+			.withMessage('Title must be 1-200 characters'),
+		body('content')
+			.optional()
+			.isString()
+			.trim()
+			.isLength({ min: 1, max: 5000 })
+			.withMessage('Content must be 1-5000 characters'),
 		body('status').optional().isIn(['published', 'draft']),
 	]),
 	createPost
