@@ -22,6 +22,7 @@ const AdminDashboard = lazy(() => import('../pages/adminDash.jsx'));
 const MemberDashboard = lazy(() => import('../pages/member.jsx'));
 const ArvantisPage = lazy(() => import('../pages/arvantis/arvantis.jsx'));
 const EventPage = lazy(() => import('../pages/event.jsx'));
+const EventDetailPage = lazy(() => import('../pages/EventDetailPage.jsx'));
 const TeamPage = lazy(() => import('../pages/team.jsx'));
 const ContactPage = lazy(() => import('../pages/contact.jsx'));
 const ShowPage = lazy(() => import('../pages/show.jsx'));
@@ -40,6 +41,8 @@ const AppRoutes = () => {
 				<Route path="/" element={<Home />} />
 				<Route path="/arvantis" element={<ArvantisPage />} />
 				<Route path="/event" element={<EventPage />} />
+				<Route path="/events" element={<EventPage />} />
+				<Route path="/events/:id" element={<EventDetailPage />} />
 				<Route path="/team" element={<TeamPage />} />
 				<Route path="/contact" element={<ContactPage />} />
 				<Route path="/socials" element={<SocialsPage />} />
@@ -65,7 +68,7 @@ const AppRoutes = () => {
 				<Route element={<AdminRoute />}>
 					<Route path="/admin/dashboard" element={<AdminDashboard />} />
 					<Route path="/appliesandcontacts/show" element={<ShowPage />} />
-					<Route path="/edit/arvantis" element={<EditArvantisPage/>}/>
+					<Route path="/edit/arvantis" element={<EditArvantisPage />} />
 				</Route>
 
 				{/* 404 fallback */}
