@@ -16,6 +16,7 @@ import {
 	Linkedin,
 	Phone,
 } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 
 // SocialIcon helper component
 const SocialIcon = ({ keyName, url }) => {
@@ -54,8 +55,7 @@ import {
 } from '../../services/arvantisServices.js';
 import '../../arvantis.css';
 
-// --- lazy loaded heavy UI (modal / lightbox) to improve initial bundle & perceived perf
-const EventDetailModal = React.lazy(() => import('../EventDetailModal.jsx'));
+// --- lazy loaded heavy UI (lightbox) to improve initial bundle & perceived perf
 const ImageLightbox = React.lazy(() => import('../../components/Arvantis/ImageLightbox.jsx'));
 
 /* ---------- Utilities ---------- */
@@ -378,7 +378,7 @@ const ArvantisPage = () => {
 	// page state
 	const [identifier, setIdentifier] = useState(null);
 	const [selectedImage, setSelectedImage] = useState(null);
-	const [selectedEvent, setSelectedEvent] = useState(null);
+	const navigate = useNavigate();
 
 	// data fetchers
 	const landingQuery = useQuery({
@@ -472,8 +472,14 @@ const ArvantisPage = () => {
 	}, []);
 
 	const handleImageClick = useCallback((img) => setSelectedImage(img), []);
-	const handleEventClick = useCallback((ev) => setSelectedEvent(ev), []);
-	const closeEventModal = useCallback(() => setSelectedEvent(null), []);
+	const handleEventClick = useCallback(
+		(ev) => {
+			if (!ev) return;
+			const id = ev?._id || ev?.id;
+			if (id) navigate(`/events/${id}`);
+		},
+		[navigate]
+	);
 
 	// expose raw copy of fest for debugging / admin share
 	const copyFestJSON = useCallback(async () => {
@@ -868,16 +874,6 @@ const ArvantisPage = () => {
 			{selectedImage && (
 				<Suspense fallback={<LoadingBlock label="Opening image..." />}>
 					<ImageLightbox image={selectedImage} onClose={() => setSelectedImage(null)} />
-				</Suspense>
-			)}
-
-			{selectedEvent && (
-				<Suspense fallback={<LoadingBlock label="Loading event..." />}>
-					<EventDetailModal
-						event={selectedEvent}
-						isOpen={!!selectedEvent}
-						onClose={closeEventModal}
-					/>
 				</Suspense>
 			)}
 		</div>
