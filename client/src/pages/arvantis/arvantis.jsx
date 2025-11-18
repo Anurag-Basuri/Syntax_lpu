@@ -217,81 +217,89 @@ const PartnersShowcase = ({ partners = [], titleSponsor = null }) => {
 				{/* Grid of partner cards */}
 				<div className="partners-cards-grid mt-6 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
 					{normalized.map((p, idx) => {
-						const isAnchor = !!p.website;
-						const props = isAnchor
+						const Key = p.website ? 'a' : 'div';
+						const props = p.website
 							? {
 									href: p.website,
 									target: '_blank',
 									rel: 'noopener noreferrer',
 									onClick: (e) => e.stopPropagation(),
 							  }
-							: {
-									tabIndex: 0,
-							  };
-						return React.createElement(
-							isAnchor ? 'a' : 'div',
-							{
-								key: `${p.name}-${idx}`,
-								className: 'partner-card-tech group',
-								title: p.name,
-								...props,
-							},
-							<div className="partner-card-tech-inner">
-								<div className="partner-card-tech-media">
-									{p.logo ? (
-										<img
-											src={p.logo}
-											alt={p.name}
-											className="partner-card-logo"
-											loading="lazy"
-										/>
-									) : (
-										<div className="partner-card-logo-fallback mono">
-											{(p.name || '?').slice(0, 2).toUpperCase()}
-										</div>
-									)}
-								</div>
-
-								<div className="partner-card-tech-body">
-									<div className="flex items-center gap-3">
-										<h3
-											className="partner-card-tech-title"
-											style={{ color: 'var(--text-primary)' }}
-											aria-label={p.name}
-										>
-											{p.name}
-										</h3>
-										{p.tier && <span className="tier-badge">{p.tier}</span>}
-									</div>
-									{p.description ? (
-										<p className="partner-card-tech-desc text-sm muted mt-2">
-											{p.description}
-										</p>
-									) : (
-										<div className="text-xs muted mt-2">
-											No description provided.
-										</div>
-									)}
-
-									<div className="mt-4 flex items-center gap-3">
-										{p.website ? (
-											<a
-												className="partner-website inline-flex items-center gap-2"
-												href={p.website}
-												target="_blank"
-												rel="noreferrer"
-												onClick={(e) => e.stopPropagation()}
-												aria-label={`Visit ${p.name}`}
-											>
-												<ExternalLink size={14} />{' '}
-												<span className="text-sm">Visit</span>
-											</a>
+							: {};
+						return (
+							<Key
+								key={`${p.name}-${idx}`}
+								{...props}
+								className="partner-card-tech group"
+								title={p.name}
+								// make cards keyboard-focusable when not anchors
+								tabIndex={p.website ? undefined : 0}
+							>
+								<div className="partner-card-tech-inner">
+									<div className="partner-card-tech-media">
+										{p.logo ? (
+											<img
+												src={p.logo}
+												alt={p.name}
+												className="partner-card-logo"
+												loading="lazy"
+											/>
 										) : (
-											<span className="text-xs mono muted">No website</span>
+											<div className="partner-card-logo-fallback mono">
+												{(p.name || '?').slice(0, 2).toUpperCase()}
+											</div>
 										)}
 									</div>
+
+									<div className="partner-card-tech-body">
+										<div className="flex items-center gap-3">
+											<h3
+												className="partner-card-tech-title truncate"
+												style={{ color: 'var(--text-primary)' }}
+											>
+												{p.name}
+											</h3>
+											<h3
+												className="partner-card-tech-title"
+												style={{ color: 'var(--text-primary)' }}
+												aria-label={p.name}
+											>
+												{p.name}
+											</h3>
+											{p.tier && <span className="tier-badge">{p.tier}</span>}
+										</div>
+										{p.description ? (
+											<p className="partner-card-tech-desc text-sm muted mt-2">
+												{p.description}
+											</p>
+										) : (
+											<div className="text-xs muted mt-2">
+												No description provided.
+											</div>
+										)}
+
+										<div className="mt-4 flex items-center gap-3">
+											{p.website ? (
+												<a
+													className="partner-website inline-flex items-center gap-2"
+													href={p.website}
+													target="_blank"
+													rel="noreferrer"
+													onClick={(e) => e.stopPropagation()}
+													aria-label={`Visit ${p.name}`}
+												>
+													<ExternalLink size={14} />{' '}
+													<span className="text-sm">Visit</span>
+												</a>
+											) : (
+												<span className="text-xs mono muted">
+													No website
+												</span>
+											)}
+										</div>
+									</div>
 								</div>
-							</div>
+							</Key>
 						);
 					})}
 				</div>
