@@ -949,4 +949,98 @@
 	overflow: hidden;
 }
 
+/* Theme variables — ensure good contrast in bright (light) mode */
+:root {
+	/* text */
+	--text-primary: #0f172a; /* heading / primary text (dark) */
+	--text-secondary: #475569; /* body text */
+	--muted: #6b7280; /* muted / helper text */
+
+	/* accents */
+	--accent-1: #7c3aed; /* primary accent (purple) */
+	--accent-2: #06b6d4; /* secondary accent (cyan) */
+
+	/* glass / cards */
+	--glass-bg: rgba(255, 255, 255, 0.7);
+	--glass-border: rgba(15, 23, 42, 0.06);
+	--card-border: rgba(15, 23, 42, 0.08);
+
+	/* background base */
+	--bg-base: #ffffff;
+}
+
+/* Dark-mode overrides (your existing .dark class remains respected) */
+.dark :root,
+.dark {
+	--text-primary: #e6eef8;
+	--text-secondary: #9fb1c8;
+	--muted: #94a3b8;
+	--glass-bg: rgba(6, 8, 15, 0.36);
+	--glass-border: rgba(255, 255, 255, 0.04);
+	--card-border: rgba(255, 255, 255, 0.04);
+	--bg-base: #061126;
+}
+
+/* Improve glass-card contrast in light mode (so content is readable) */
+.glass-card {
+	background: linear-gradient(
+		180deg,
+		var(--glass-bg),
+		color-mix(in srgb, var(--glass-bg) 90%, transparent)
+	);
+	border: 1px solid var(--glass-border);
+	color: var(--text-secondary);
+}
+
+/* Ensure headings and important labels use primary text color */
+.section-title,
+.partner-card-tech-title,
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
+	color: var(--text-primary) !important;
+}
+
+/* Partner card tweaks for bright mode */
+.partner-card-tech {
+	background: transparent;
+	border-radius: 0.75rem;
+}
+.partner-card-tech .partner-card-tech-inner {
+	padding: 1rem;
+}
+.partner-card-tech .partner-card-tech-title {
+	color: var(--text-primary);
+}
+
+/* Buttons: ensure sufficient contrast on light background */
+.btn-primary.neon-btn,
+.btn-primary {
+	color: white;
+}
+
+/* Links & small controls */
+a.btn-ghost.small,
+.btn-ghost.small {
+	color: var(--text-primary);
+	border-radius: 0.5rem;
+}
+
+/* Poster fallback border for light mode */
+.poster-placeholder,
+.poster-plain {
+	border: 1px solid var(--card-border);
+	border-radius: 0.75rem;
+	overflow: hidden;
+}
+
+/* Accessibility: increase contrast for muted text on very bright backgrounds */
+.muted,
+.text-muted {
+	color: color-mix(in srgb, var(--muted) 85%, black 15%) !important;
+}
+
 /* ---------- End ARVANTIS styles ---------- */
