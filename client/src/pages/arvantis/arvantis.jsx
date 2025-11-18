@@ -43,7 +43,6 @@ const SocialIcon = ({ keyName, url }) => {
 import PosterHero from '../../components/Arvantis/PosterHero.jsx';
 import StatCard from '../../components/Arvantis/StatCard.jsx';
 import EventsGrid from '../../components/Arvantis/EventsGrid.jsx';
-import PartnersGrid from '../../components/Arvantis/PartnersGrid.jsx';
 import GalleryGrid from '../../components/Arvantis/GalleryGrid.jsx';
 import LoadingBlock from '../../components/Arvantis/LoadingBlock.jsx';
 import ErrorBlock from '../../components/Arvantis/ErrorBlock.jsx';
