@@ -1,8 +1,20 @@
-import React, { useEffect, useMemo } from 'react';
+import React, { useEffect, useMemo, useState, useCallback } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { motion } from 'framer-motion';
-import { Calendar, Clock, MapPin, Home, Users, Tag, FileText, CheckCircle } from 'lucide-react';
+import {
+	Calendar,
+	Clock,
+	MapPin,
+	Home,
+	Users,
+	Tag,
+	FileText,
+	CheckCircle,
+	Share2,
+	Copy,
+	Globe,
+} from 'lucide-react';
 import { getEventById } from '../services/eventServices.js';
 import LoadingBlock from '../components/Arvantis/LoadingBlock.jsx';
 import '../arvantis.css';
@@ -15,7 +27,7 @@ const prettyDate = (d) => {
 };
 const prettyTime = (t) => (t ? String(t) : 'TBD');
 
-const InfoRow = ({ icon: Icon, label, value }) => (
+const DetailRow = ({ Icon, label, value }) => (
 	<div className="flex items-start gap-3">
 		<div className="text-indigo-500 mt-1">
 			<Icon size={18} />
@@ -30,6 +42,7 @@ const InfoRow = ({ icon: Icon, label, value }) => (
 const EventDetailPage = () => {
 	const { id } = useParams();
 	const navigate = useNavigate();
+	const [showRaw, setShowRaw] = useState(false);
 
 	const {
 		data: payload,
@@ -44,8 +57,16 @@ const EventDetailPage = () => {
 		retry: 1,
 	});
 
-	// stable derived values before returns
+	// stable derived values
 	const event = useMemo(() => payload || {}, [payload]);
+	const rawJson = useMemo(() => {
+		try {
+			return JSON.stringify(event, null, 2);
+		} catch {
+			return String(event);
+		}
+	}, [event]);
+
 	const title = event.title || 'Untitled Event';
 	const poster = event.posters?.[0]?.url || event.posters?.[0]?.secure_url || null;
 	const dateLabel = event.eventDate ? prettyDate(event.eventDate) : 'TBD';
@@ -68,10 +89,42 @@ const EventDetailPage = () => {
 			? `₹${new Intl.NumberFormat().format(event.ticketPrice)}`
 			: event.ticketPrice ?? 'TBD';
 	const status = event.status || 'upcoming';
+	const registrationInfo = useMemo(() => {
+		return event.registrationInfo ||
+			event.registration ||
+			{ mode: 'none', isOpen: false, actionUrl: null, actionLabel: null };
+	}, [event.registrationInfo, event.registration]);
 
 	useEffect(() => {
 		if (!id) navigate(-1);
 	}, [id, navigate]);
+
+	const handleRegister = useCallback(() => {
+		if (!registrationInfo) return;
+		if (registrationInfo.actionUrl) {
+			window.open(registrationInfo.actionUrl, '_blank', 'noopener,noreferrer');
+			return;
+		}
+		if (registrationInfo.mode === 'internal') navigate(`/events/${id}/register`);
+	}, [registrationInfo, navigate, id]);
+
+	const handleShare = useCallback(async () => {
+		const url = window.location.href;
+		if (navigator.share) {
+			try {
+				await navigator.share({ title, url });
+				return;
+			} catch {
+				// fallthrough
+			}
+		}
+		try {
+			await navigator.clipboard.writeText(url);
+			window.dispatchEvent(new CustomEvent('toast', { detail: { message: 'Link copied' } }));
+		} catch {
+			/* ignore */
+		}
+	}, [title]);
 
 	if (isLoading) return <LoadingBlock label="Loading event..." />;
 	if (isError)
@@ -84,43 +137,86 @@ const EventDetailPage = () => {
 			className="min-h-screen py-8"
 		>
 			<div className="max-w-6xl mx-auto px-4">
-				<nav className="flex items-center gap-3 text-sm mb-4">
-					<button onClick={() => navigate(-1)} className="btn-ghost small">
-						← Back
-					</button>
-					<Link to="/events" className="text-xs muted">
-						All events
-					</Link>
-					<span className="text-xs muted">/</span>
-					<span className="font-medium">{title}</span>
-				</nav>
+				{/* Header - title & quick nav */}
+				<div className="mb-6">
+					<nav className="flex items-center gap-3 text-sm mb-3">
+						<button onClick={() => navigate(-1)} className="btn-ghost small">
+							← Back
+						</button>
+						<Link to="/events" className="text-xs muted">
+							All events
+						</Link>
+						<span className="text-xs muted">/</span>
+						<span className="font-medium">{title}</span>
+					</nav>
 
-				{/* Header */}
-				<header className="grid grid-cols-1 md:grid-cols-3 gap-6 items-start mb-6">
-					<div className="md:col-span-2 rounded-xl overflow-hidden relative bg-slate-100 dark:bg-slate-900">
+					<h1
+						className="text-3xl md:text-4xl font-extrabold mb-2"
+						style={{ color: 'var(--text-primary)' }}
+					>
+						{title}
+					</h1>
+					<div className="flex items-center gap-3 flex-wrap">
+						<div className="text-sm mono-tech text-[var(--text-secondary)]">
+							{dateLabel} • {timeLabel}
+						</div>
+						<div className="text-sm mono-tech text-[var(--text-secondary)]">
+							{venue}
+							{room ? ` · ${room}` : ''}
+						</div>
+						<div className="ml-auto flex items-center gap-2">
+							<button
+								onClick={handleShare}
+								className="btn-ghost small inline-flex items-center gap-2"
+							>
+								<Share2 size={14} /> Share
+							</button>
+							<button
+								onClick={() => {
+									navigator.clipboard?.writeText(rawJson);
+									window.dispatchEvent(
+										new CustomEvent('toast', {
+											detail: { message: 'Event JSON copied' },
+										})
+									);
+								}}
+								className="btn-ghost small inline-flex items-center gap-2"
+							>
+								<Copy size={14} /> JSON
+							</button>
+							{event.website && (
+								<a
+									href={event.website}
+									target="_blank"
+									rel="noreferrer"
+									className="btn-ghost small inline-flex items-center gap-2"
+								>
+									<Globe size={14} /> Website
+								</a>
+							)}
+						</div>
+					</div>
+				</div>
+
+				{/* Responsive grid: poster / details */}
+				<section className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
+					{/* Poster (plain image only) */}
+					<div className="lg:col-span-2 rounded-xl overflow-hidden bg-slate-100 dark:bg-slate-900">
 						{poster ? (
 							<img
 								src={poster}
 								alt={title}
-								className="w-full h-64 md:h-96 object-cover block"
+								className="w-full h-auto poster-plain"
 								loading="lazy"
 							/>
 						) : (
-							<div className="w-full h-64 md:h-96 flex items-center justify-center bg-gradient-to-br from-indigo-600 to-purple-600 text-white">
-								<div className="text-6xl">🎭</div>
+							<div className="w-full h-56 flex items-center justify-center bg-gradient-to-br from-indigo-600 to-purple-600 text-white">
+								<div className="text-5xl">🎭</div>
 							</div>
 						)}
-						<div className="absolute left-6 bottom-6 z-20 text-white">
-							<h1 className="text-2xl md:text-4xl font-extrabold neon-text leading-tight">
-								{title}
-							</h1>
-							<div className="mt-1 mono-tech text-sm">
-								{venue} • {dateLabel}
-							</div>
-						</div>
 					</div>
 
-					{/* Right column: compact info card */}
+					{/* Right column: compact details card */}
 					<aside className="space-y-4">
 						<div className="glass-card p-4 tech">
 							<div className="flex items-center justify-between">
@@ -129,50 +225,63 @@ const EventDetailPage = () => {
 										Status
 									</div>
 									<div className="font-semibold flex items-center gap-2">
-										{status === 'upcoming' ? (
-											<span className="text-cyan-400">
-												{status.toUpperCase()}
-											</span>
-										) : (
-											<span className="text-[var(--text-secondary)]">
-												{status}
-											</span>
-										)}
+										<span
+											className={status === 'upcoming' ? 'text-cyan-400' : ''}
+										>
+											{status.toUpperCase()}
+										</span>
 										{status === 'upcoming' && (
 											<CheckCircle size={16} className="text-cyan-400" />
 										)}
 									</div>
 								</div>
+
 								<div>
 									<div className="text-xs text-[var(--text-secondary)]">
-										Price
+										Ticket price
 									</div>
 									<div className="font-medium">{ticketPrice}</div>
 								</div>
 							</div>
 
 							<div className="mt-4 space-y-3">
-								<InfoRow icon={Calendar} label="Date" value={dateLabel} />
-								<InfoRow icon={Clock} label="Time" value={timeLabel} />
-								<InfoRow icon={MapPin} label="Venue" value={venue} />
-								{room && <InfoRow icon={Home} label="Room" value={room} />}
-								<InfoRow icon={Users} label="Organizer" value={organizer} />
+								<DetailRow Icon={Calendar} label="Date" value={dateLabel} />
+								<DetailRow Icon={Clock} label="Time" value={timeLabel} />
+								<DetailRow Icon={MapPin} label="Venue" value={venue} />
+								{room && <DetailRow Icon={Home} label="Room" value={room} />}
+								<DetailRow Icon={Users} label="Organizer" value={organizer} />
 								{coOrganizers.length > 0 && (
-									<InfoRow
-										icon={Users}
+									<DetailRow
+										Icon={Users}
 										label="Co-organizers"
 										value={coOrganizers.join(', ')}
 									/>
 								)}
-								<InfoRow
-									icon={Tag}
+								<DetailRow
+									Icon={Tag}
 									label="Category"
 									value={`${category}${subcategory ? ` · ${subcategory}` : ''}`}
 								/>
 							</div>
+
+							{/* Register CTA if configured */}
+							{registrationInfo?.actionUrl || registrationInfo?.isOpen ? (
+								<div className="mt-4">
+									<button
+										onClick={handleRegister}
+										className="btn-primary neon-btn w-full"
+									>
+										{registrationInfo?.actionLabel || 'Register'}
+									</button>
+								</div>
+							) : (
+								<div className="mt-4 text-sm text-[var(--text-secondary)]">
+									{registrationInfo?.message || 'Registration not available'}
+								</div>
+							)}
 						</div>
 
-						{/* Resources (if any) */}
+						{/* Resources */}
 						{resources.length > 0 && (
 							<div className="glass-card p-3">
 								<div className="text-xs text-[var(--text-secondary)]">
@@ -195,10 +304,10 @@ const EventDetailPage = () => {
 							</div>
 						)}
 					</aside>
-				</header>
+				</section>
 
-				{/* Main area: description, speakers, partners */}
-				<section className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+				{/* Main details area */}
+				<section className="grid grid-cols-1 lg:grid-cols-3 gap-6 mt-6">
 					<main className="lg:col-span-2 space-y-6">
 						{/* Description */}
 						<div className="glass-card p-6">
@@ -209,7 +318,7 @@ const EventDetailPage = () => {
 								About the event
 							</h2>
 							<p className="mt-3 text-[var(--text-secondary)] whitespace-pre-wrap leading-relaxed">
-								{event.description || 'No description available.'}
+								{event.description || 'No description provided.'}
 							</p>
 						</div>
 
@@ -283,7 +392,7 @@ const EventDetailPage = () => {
 						)}
 					</main>
 
-					{/* Right quick links / CTA placeholder to keep layout balanced */}
+					{/* Right column: utilities / links */}
 					<aside className="space-y-6">
 						<div className="glass-card p-4">
 							<div className="text-xs text-[var(--text-secondary)]">Quick links</div>
@@ -301,8 +410,20 @@ const EventDetailPage = () => {
 								<Link to="/events" className="btn-ghost w-full text-center">
 									All events
 								</Link>
+								<button
+									onClick={() => setShowRaw((s) => !s)}
+									className="btn-ghost w-full"
+								>
+									{showRaw ? 'Hide raw' : 'Show raw'}
+								</button>
 							</div>
 						</div>
+
+						{showRaw && (
+							<div className="glass-card p-3">
+								<pre className="text-xs overflow-auto max-h-48">{rawJson}</pre>
+							</div>
+						)}
 					</aside>
 				</section>
 			</div>
