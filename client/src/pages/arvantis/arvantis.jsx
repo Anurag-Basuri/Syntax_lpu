@@ -98,30 +98,9 @@ const findTitleSponsor = (partners = []) => {
 	);
 };
 
-/* ---------- Partners showcase (prominent) ---------- */
+/* ---------- Partners showcase (flat list, no grouping) ---------- */
 const PartnersShowcase = ({ partners = [], titleSponsor = null }) => {
 	if (!partners || partners.length === 0) return null;
-
-	// group partners by tier for clearer presentation (title, platinum, gold, sponsor, partner, other)
-	const tierOrder = [
-		'title',
-		'presenting',
-		'platinum',
-		'gold',
-		'sponsor',
-		'collaborator',
-		'partner',
-		'other',
-	];
-	const normalized = partners.map((p) => ({
-		...p,
-		_tierKey: (p.tier || p.role || 'other').toString().toLowerCase(),
-	}));
-	const grouped = normalized.reduce((acc, p) => {
-		const key = tierOrder.includes(p._tierKey) ? p._tierKey : 'other';
-		(acc[key] = acc[key] || []).push(p);
-		return acc;
-	}, {});
 
 	const total = partners.length;
 
@@ -131,8 +110,8 @@ const PartnersShowcase = ({ partners = [], titleSponsor = null }) => {
 			className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mt-8"
 			aria-labelledby="partners-heading"
 		>
-			<div className="glass-card p-6" role="region" aria-roledescription="partners showcase">
-				<div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-6">
+			<div className="glass-card p-6" role="region" aria-roledescription="partners list">
+				<div className="flex items-start justify-between gap-6">
 					<div className="min-w-0">
 						<h2
 							id="partners-heading"
@@ -142,114 +121,113 @@ const PartnersShowcase = ({ partners = [], titleSponsor = null }) => {
 							Our Partners
 						</h2>
 						<p className="mt-2 muted">
-							Collaborating organizations across tiers — from title sponsors to
-							community partners.{' '}
-							<span className="font-medium">{total} partners</span>
-							{titleSponsor ? ` · Proudly presented by ${titleSponsor.name}.` : ''}
+							Supporting organizations and sponsors — logos, tier and short
+							description. <span className="font-medium">{total} partners</span>
 						</p>
 					</div>
 
-					<div className="flex items-center gap-3">
-						{titleSponsor && (
+					{/* Title sponsor compact preview (kept as CTA) */}
+					{titleSponsor && (
+						<div className="flex items-center gap-3">
 							<a
 								href={titleSponsor.website || '#'}
 								target={titleSponsor.website ? '_blank' : '_self'}
 								rel={titleSponsor.website ? 'noopener noreferrer' : undefined}
-								className="btn-ghost small"
+								className="inline-flex items-center gap-3 p-2 rounded-md partner-poweredby"
 								onClick={(e) => e.stopPropagation()}
-								aria-label={`Title sponsor ${titleSponsor.name}`}
+								aria-label={`Powered by ${titleSponsor.name}`}
 							>
 								{titleSponsor.logo?.url ? (
 									<img
 										src={titleSponsor.logo.url}
 										alt={titleSponsor.name}
-										className="h-6 object-contain"
+										className="partner-logo h-8"
 										loading="lazy"
 									/>
 								) : (
-									<span>{titleSponsor.name}</span>
+									<span className="mono">{titleSponsor.name}</span>
 								)}
+								<span className="text-sm muted">Powered by</span>
 							</a>
-						)}
-						<a
-							href="#partners"
-							className="btn-primary small"
-							onClick={(e) => e.preventDefault()}
-							aria-label="View all partners"
-						>
-							View all partners
-						</a>
-					</div>
+						</div>
+					)}
 				</div>
 
-				{/* Prominent tier-first grid: show title/presenting first then others */}
-				<div className="mt-6 space-y-6">
-					{['title', 'presenting'].map((k) =>
-						(grouped[k] || []).length ? (
-							<div key={k}>
-								<div className="text-sm text-[var(--text-secondary)] font-semibold mb-3">
-									{k === 'title' ? 'Title Sponsor' : 'Presenting Partners'}
+				{/* Flat list, line-wise rows */}
+				<div className="mt-6 divide-y" role="list">
+					{partners.map((p, i) => {
+						const key = `${p.name || 'partner'}-${i}`;
+						const hasLink = !!p.website;
+						const RowWrapper = hasLink ? 'a' : 'div';
+						const rowProps = hasLink
+							? {
+									href: p.website,
+									target: '_blank',
+									rel: 'noopener noreferrer',
+									onClick: (e) => e.stopPropagation(),
+							  }
+							: {};
+						return (
+							<RowWrapper
+								key={key}
+								{...rowProps}
+								className="partner-row flex items-center gap-4 py-4"
+								role="listitem"
+								title={p.name}
+							>
+								{/* logo */}
+								<div className="w-16 flex-shrink-0 flex items-center justify-center">
+									{p.logo?.url ? (
+										<img
+											src={p.logo.url}
+											alt={p.name}
+											className="partner-logo rounded-md"
+											loading="lazy"
+										/>
+									) : (
+										<div className="h-10 w-10 rounded-md bg-[var(--glass-bg)] flex items-center justify-center text-sm mono text-[var(--text-secondary)]">
+											{(p.name || '?').slice(0, 2).toUpperCase()}
+										</div>
+									)}
 								</div>
-								<div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
-									{grouped[k].map((p, i) => (
-										<a
-											key={`${p.name}-${i}`}
-											href={p.website || '#'}
-											target={p.website ? '_blank' : '_self'}
-											rel={p.website ? 'noopener noreferrer' : undefined}
-											className="flex items-center gap-4 p-4 rounded-lg transition-transform transform hover:-translate-y-1 hover:shadow-xl"
-											style={{
-												background: 'var(--glass-bg)',
-												border: '1px solid var(--glass-border)',
-											}}
-											onClick={(e) => e.stopPropagation()}
-										>
-											<div className="w-20 h-12 flex items-center justify-center">
-												{p.logo?.url ? (
-													<img
-														src={p.logo.url}
-														alt={p.name}
-														className="max-h-10 object-contain"
-														loading="lazy"
-													/>
-												) : (
-													<div className="text-sm mono">{p.name}</div>
-												)}
-											</div>
-											<div className="min-w-0">
-												<div
-													className="font-medium"
-													style={{ color: 'var(--text-primary)' }}
-												>
-													{p.name}
-												</div>
-												{p.description && (
-													<div className="text-sm muted truncate">
-														{p.description}
-													</div>
-												)}
-											</div>
-										</a>
-									))}
-								</div>
-							</div>
-						) : null
-					)}
 
-					{/* Remaining tiers in a compact grid */}
-					{['platinum', 'gold', 'sponsor', 'collaborator', 'partner', 'other'].map((k) =>
-						(grouped[k] || []).length ? (
-							<div key={k}>
-								<div className="text-sm text-[var(--text-secondary)] font-semibold mb-3">
-									{String(k).charAt(0).toUpperCase() + String(k).slice(1)}
+								{/* name + tier + desc */}
+								<div className="min-w-0">
+									<div className="flex items-center gap-3">
+										{/* name (clickable if link) */}
+										<span
+											className={`text-sm font-semibold truncate ${
+												hasLink
+													? 'text-[var(--accent-1)] underline-offset-2 hover:underline'
+													: ''
+											}`}
+											style={{
+												color: hasLink
+													? 'var(--accent-1)'
+													: 'var(--text-primary)',
+											}}
+										>
+											{p.name}
+										</span>
+
+										{/* tier badge */}
+										{p.tier && (
+											<span className="text-xs px-2 py-0.5 rounded-full bg-[var(--glass-bg)] text-[var(--text-secondary)] border border-[var(--card-border)]">
+												{p.tier}
+											</span>
+										)}
+									</div>
+
+									{/* description */}
+									{p.description && (
+										<div className="text-sm mt-1 text-[var(--text-secondary)] truncate">
+											{p.description}
+										</div>
+									)}
 								</div>
-								<PartnersGrid
-									partners={grouped[k].slice(0, 24)}
-									className="grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6"
-								/>
-							</div>
-						) : null
-					)}
+							</RowWrapper>
+						);
+					})}
 				</div>
 			</div>
 		</section>
@@ -667,38 +645,34 @@ const ArvantisPage = () => {
 								{fest?.name || 'Arvantis'} {fest?.year ? `· ${fest.year}` : ''}
 							</h1>
 
-							{/* status chip */}
-							<div
-								className="px-2 py-1 rounded-md text-xs font-semibold"
-								style={{
-									background:
-										computedStatus === 'ongoing'
-											? 'rgba(34,197,94,0.12)'
-											: 'rgba(14,165,233,0.08)',
-									color:
-										computedStatus === 'ongoing'
-											? '#16a34a'
-											: 'var(--accent-1)',
-								}}
-							>
-								{(computedStatus || 'upcoming').toUpperCase()}
-							</div>
-
-							{/* visibility */}
-							<div
-								className="px-2 py-1 rounded-md text-xs font-medium muted"
-								style={{ border: '1px solid var(--card-border)' }}
-							>
-								{visibility}
-							</div>
-
-							{/* total / upcoming quick */}
-							<div
-								className="px-2 py-1 rounded-md text-xs mono muted"
-								title="Upcoming events"
-							>
-								{upcomingCount} upcoming
-							</div>
+							{/* powered-by inline label (if present) */}
+							{titleSponsor && (
+								<div className="ml-2 flex items-center gap-3">
+									<span className="text-sm muted">powered by</span>
+									<a
+										href={titleSponsor.website || '#'}
+										target={titleSponsor.website ? '_blank' : '_self'}
+										rel={
+											titleSponsor.website ? 'noopener noreferrer' : undefined
+										}
+										className="inline-flex items-center gap-2"
+										onClick={(e) => e.stopPropagation()}
+									>
+										{titleSponsor.logo?.url ? (
+											<img
+												src={titleSponsor.logo.url}
+												alt={titleSponsor.name}
+												className="h-6 object-contain rounded-sm"
+												loading="lazy"
+											/>
+										) : (
+											<span className="mono text-sm">
+												{titleSponsor.name}
+											</span>
+										)}
+									</a>
+								</div>
+							)}
 						</div>
 
 						{/* Tagline & social */}
