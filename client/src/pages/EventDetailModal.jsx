@@ -2,8 +2,8 @@ import React, { useEffect, useState, useMemo, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useQuery } from '@tanstack/react-query';
 import { X, Calendar, MapPin, Tag, Globe, Copy, CreditCard } from 'lucide-react';
-import { getEventById } from '../../services/eventServices.js';
-import { useTheme } from '../../hooks/useTheme.js';
+import { getEventById } from '../services/eventServices.js';
+import { useTheme } from '../hooks/useTheme.js';
 
 /*
   EventDetailModal — refreshed premium UI

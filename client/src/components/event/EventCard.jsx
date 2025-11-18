@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import EventDetailModal from './EventDetailModal.jsx';
+import { useNavigate } from 'react-router-dom';
 
 // Handles invalid or missing dates gracefully
 const safeFormatDate = (dateInput) => {
@@ -20,7 +20,7 @@ const safeFormatDate = (dateInput) => {
 
 const EventCard = ({ event }) => {
 	const [imageError, setImageError] = useState(false);
-	const [showModal, setShowModal] = useState(false);
+	const navigate = useNavigate();
 
 	if (!event) return null; // Render nothing if event data is missing
 
@@ -38,7 +38,7 @@ const EventCard = ({ event }) => {
 			<article
 				className="rounded-2xl overflow-hidden hover-lift transition-all duration-300 group relative cursor-pointer border border-white/10 hover:border-white/20
 					backdrop-blur-md bg-white/5 dark:bg-slate-900/30 backdrop-saturate-150"
-				onClick={() => setShowModal(true)}
+				onClick={() => navigate(`/events/${event._id || event.id}`)}
 				aria-labelledby={`event-${event._id}-title`}
 				role="button"
 			>
@@ -140,11 +140,7 @@ const EventCard = ({ event }) => {
 				</div>
 			</article>
 
-			<EventDetailModal
-				event={event}
-				isOpen={showModal}
-				onClose={() => setShowModal(false)}
-			/>
+			{/* navigation opens the full event page now */}
 		</>
 	);
 };
