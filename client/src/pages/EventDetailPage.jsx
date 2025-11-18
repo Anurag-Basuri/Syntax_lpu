@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState, useCallback } from 'react';
+import React, { useEffect, useMemo, useCallback } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { motion } from 'framer-motion';
@@ -9,10 +9,8 @@ import {
 	Home,
 	Users,
 	Tag,
-	FileText,
 	CheckCircle,
 	Share2,
-	Copy,
 	Globe,
 } from 'lucide-react';
 import { getEventById } from '../services/eventServices.js';
@@ -42,7 +40,6 @@ const DetailRow = ({ Icon, label, value }) => (
 const EventDetailPage = () => {
 	const { id } = useParams();
 	const navigate = useNavigate();
-	const [showRaw, setShowRaw] = useState(false);
 
 	const {
 		data: payload,
@@ -57,15 +54,8 @@ const EventDetailPage = () => {
 		retry: 1,
 	});
 
-	// stable derived values
+	// derived stable values
 	const event = useMemo(() => payload || {}, [payload]);
-	const rawJson = useMemo(() => {
-		try {
-			return JSON.stringify(event, null, 2);
-		} catch {
-			return String(event);
-		}
-	}, [event]);
 
 	const title = event.title || 'Untitled Event';
 	const poster = event.posters?.[0]?.url || event.posters?.[0]?.secure_url || null;
@@ -84,15 +74,18 @@ const EventDetailPage = () => {
 	const partners = Array.isArray(event.partners) ? event.partners : [];
 	const speakers = Array.isArray(event.speakers) ? event.speakers : [];
 	const resources = Array.isArray(event.resources) ? event.resources : [];
-	const ticketPrice =
-		typeof event.ticketPrice === 'number'
-			? `₹${new Intl.NumberFormat().format(event.ticketPrice)}`
-			: event.ticketPrice ?? 'TBD';
+	const ticketPriceRaw =
+		typeof event.ticketPrice === 'number' ? event.ticketPrice : event.ticketPrice ?? null;
+	const ticketPriceLabel =
+		ticketPriceRaw === 0
+			? 'Free'
+			: typeof ticketPriceRaw === 'number'
+			? `₹${new Intl.NumberFormat().format(ticketPriceRaw)}`
+			: ticketPriceRaw ?? 'TBD';
 	const status = event.status || 'upcoming';
 	const registrationInfo = useMemo(() => {
 		return event.registrationInfo ||
-			event.registration ||
-			{ mode: 'none', isOpen: false, actionUrl: null, actionLabel: null };
+			event.registration || { mode: 'none', isOpen: false, actionUrl: null, actionLabel: null };
 	}, [event.registrationInfo, event.registration]);
 
 	useEffect(() => {
@@ -115,7 +108,7 @@ const EventDetailPage = () => {
 				await navigator.share({ title, url });
 				return;
 			} catch {
-				// fallthrough
+				/* fall through */
 			}
 		}
 		try {
@@ -137,7 +130,7 @@ const EventDetailPage = () => {
 			className="min-h-screen py-8"
 		>
 			<div className="max-w-6xl mx-auto px-4">
-				{/* Header - title & quick nav */}
+				{/* Header */}
 				<div className="mb-6">
 					<nav className="flex items-center gap-3 text-sm mb-3">
 						<button onClick={() => navigate(-1)} className="btn-ghost small">
@@ -171,19 +164,6 @@ const EventDetailPage = () => {
 							>
 								<Share2 size={14} /> Share
 							</button>
-							<button
-								onClick={() => {
-									navigator.clipboard?.writeText(rawJson);
-									window.dispatchEvent(
-										new CustomEvent('toast', {
-											detail: { message: 'Event JSON copied' },
-										})
-									);
-								}}
-								className="btn-ghost small inline-flex items-center gap-2"
-							>
-								<Copy size={14} /> JSON
-							</button>
 							{event.website && (
 								<a
 									href={event.website}
@@ -198,9 +178,8 @@ const EventDetailPage = () => {
 					</div>
 				</div>
 
-				{/* Responsive grid: poster / details */}
+				{/* Poster / details */}
 				<section className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
-					{/* Poster (plain image only) */}
 					<div className="lg:col-span-2 rounded-xl overflow-hidden bg-slate-100 dark:bg-slate-900">
 						{poster ? (
 							<img
@@ -216,7 +195,6 @@ const EventDetailPage = () => {
 						)}
 					</div>
 
-					{/* Right column: compact details card */}
 					<aside className="space-y-4">
 						<div className="glass-card p-4 tech">
 							<div className="flex items-center justify-between">
@@ -240,7 +218,7 @@ const EventDetailPage = () => {
 									<div className="text-xs text-[var(--text-secondary)]">
 										Ticket price
 									</div>
-									<div className="font-medium">{ticketPrice}</div>
+									<div className="font-medium">{ticketPriceLabel}</div>
 								</div>
 							</div>
 
@@ -264,7 +242,6 @@ const EventDetailPage = () => {
 								/>
 							</div>
 
-							{/* Register CTA if configured */}
 							{registrationInfo?.actionUrl || registrationInfo?.isOpen ? (
 								<div className="mt-4">
 									<button
@@ -281,7 +258,6 @@ const EventDetailPage = () => {
 							)}
 						</div>
 
-						{/* Resources */}
 						{resources.length > 0 && (
 							<div className="glass-card p-3">
 								<div className="text-xs text-[var(--text-secondary)]">
@@ -306,10 +282,9 @@ const EventDetailPage = () => {
 					</aside>
 				</section>
 
-				{/* Main details area */}
+				{/* Main details */}
 				<section className="grid grid-cols-1 lg:grid-cols-3 gap-6 mt-6">
 					<main className="lg:col-span-2 space-y-6">
-						{/* Description */}
 						<div className="glass-card p-6">
 							<h2
 								className="text-lg font-semibold"
@@ -322,7 +297,6 @@ const EventDetailPage = () => {
 							</p>
 						</div>
 
-						{/* Speakers */}
 						{speakers.length > 0 && (
 							<div className="glass-card p-6">
 								<h3 className="text-lg font-semibold mb-4">Speakers</h3>
@@ -360,7 +334,6 @@ const EventDetailPage = () => {
 							</div>
 						)}
 
-						{/* Partners */}
 						{partners.length > 0 && (
 							<div className="glass-card p-6">
 								<h3 className="text-lg font-semibold mb-4">Partners</h3>
@@ -392,7 +365,6 @@ const EventDetailPage = () => {
 						)}
 					</main>
 
-					{/* Right column: utilities / links */}
 					<aside className="space-y-6">
 						<div className="glass-card p-4">
 							<div className="text-xs text-[var(--text-secondary)]">Quick links</div>
@@ -410,20 +382,8 @@ const EventDetailPage = () => {
 								<Link to="/events" className="btn-ghost w-full text-center">
 									All events
 								</Link>
-								<button
-									onClick={() => setShowRaw((s) => !s)}
-									className="btn-ghost w-full"
-								>
-									{showRaw ? 'Hide raw' : 'Show raw'}
-								</button>
 							</div>
 						</div>
-
-						{showRaw && (
-							<div className="glass-card p-3">
-								<pre className="text-xs overflow-auto max-h-48">{rawJson}</pre>
-							</div>
-						)}
 					</aside>
 				</section>
 			</div>
