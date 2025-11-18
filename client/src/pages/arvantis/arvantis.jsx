@@ -1,10 +1,6 @@
 import React, { useState, useEffect, useMemo, useCallback, Suspense } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import {
-	HelpCircle,
-	ChevronDown,
-	ChevronUp,
-	Copy,
 	ExternalLink,
 	Layers3,
 	Calendar,
@@ -15,6 +11,7 @@ import {
 	Facebook,
 	Linkedin,
 	Phone,
+	ChevronDown,
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
@@ -481,19 +478,6 @@ const ArvantisPage = () => {
 		[navigate]
 	);
 
-	// expose raw copy of fest for debugging / admin share
-	const copyFestJSON = useCallback(async () => {
-		if (!fest) return;
-		try {
-			await navigator.clipboard.writeText(JSON.stringify(fest, null, 2));
-			window.dispatchEvent(
-				new CustomEvent('toast', { detail: { message: 'Fest JSON copied' } })
-			);
-		} catch {
-			/* ignore */
-		}
-	}, [fest]);
-
 	// set page title & meta for SEO
 	useEffect(() => {
 		const title = fest?.name
@@ -664,15 +648,6 @@ const ArvantisPage = () => {
 									</div>
 								)}
 							</div>
-
-							{/* copy raw json */}
-							<button
-								onClick={copyFestJSON}
-								className="btn-ghost small"
-								aria-label="Copy fest data"
-							>
-								<Copy size={14} /> Raw
-							</button>
 						</div>
 					</div>
 
