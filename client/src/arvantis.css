@@ -830,60 +830,60 @@
 	}
 }
 
-/* Event detail improvements: typography, spacing and responsiveness */
+/* EventDetail: improved responsiveness and plain poster handling */
 .poster-plain {
 	width: 100%;
-	height: auto;
+	height: 100%;
+	max-height: 720px;
 	object-fit: cover;
+	display: block;
 	border-radius: 0.75rem;
 }
 
-/* Make event detail layout more fluid on narrow screens */
+/* Make poster container adapt to viewport and keep aspect on small screens */
 @media (max-width: 1024px) {
-	/* stack poster above details */
-	.grid.grid-cols-1.lg\\:grid-cols-3 {
+	.poster-plain {
+		max-height: 420px;
+	}
+	/* stack sidebar below main content earlier for better mobile flow */
+	.grid.grid-cols-1.lg\:grid-cols-3 {
 		grid-template-columns: 1fr !important;
 	}
-	/* make aside flow under main sections */
-	aside.space-y-4 {
+	aside.space-y-4,
+	aside.space-y-6 {
 		order: 2;
 	}
-	/* tighten spacing */
+}
+
+/* Tighter spacing on small screens */
+@media (max-width: 640px) {
+	.btn-primary,
+	.btn-ghost {
+		padding: 0.5rem 0.75rem;
+	}
 	.glass-card {
-		padding: 0.85rem;
+		padding: 0.75rem;
+		border-radius: 0.6rem;
+	}
+	.poster-plain {
+		max-height: 320px;
+	}
+	.text-3xl {
+		font-size: 1.6rem;
 	}
 }
 
-/* Improve readable line lengths on wide viewports */
+/* Improve layout at very wide viewports */
 @media (min-width: 1280px) {
 	.max-w-6xl.mx-auto.px-4 {
-		max-width: 1100px;
+		max-width: 1200px;
 	}
 }
 
-/* Buttons and controls scaled for touch */
-.btn-primary,
-.btn-ghost {
-	min-height: 40px;
-	padding-left: 0.75rem;
-	padding-right: 0.75rem;
-}
-
-/* Subtle card backgrounds for clearer separation on mobile */
-@media (max-width: 640px) {
-	.glass-card {
-		background: color-mix(in srgb, var(--glass-bg) 92%, transparent);
-	}
-}
-
-/* Improve partner & speaker card anchoring on very small screens */
-@media (max-width: 420px) {
-	.partner-card,
-	.partner-card-tech,
-	.glass-card p,
-	.glass-card li {
-		font-size: 13px;
-	}
+/* Ensure description and lists have comfortable line length */
+.glass-card p,
+.glass-card li {
+	line-height: 1.6;
 }
 
 /* ---------- End ARVANTIS styles ---------- */
