@@ -513,4 +513,141 @@
 	}
 }
 
+/* ---------- Partner tech card styles ---------- */
+.partner-card-tech {
+	display: block;
+	background: linear-gradient(
+		180deg,
+		color-mix(in srgb, var(--glass-bg) 96%, transparent),
+		transparent
+	);
+	border: 1px solid rgba(0, 0, 0, 0.06);
+	padding: 1rem;
+	border-radius: 0.75rem;
+	transition: transform 220ms var(--t-fast), box-shadow 220ms var(--t-fast),
+		border-color 220ms var(--t-fast);
+	text-decoration: none;
+}
+.partner-card-tech:hover,
+.partner-card-tech:focus {
+	transform: translateY(-6px);
+	box-shadow: 0 18px 50px rgba(14, 165, 164, 0.06);
+	border-color: color-mix(in srgb, var(--accent-1) 20%, transparent);
+	outline: none;
+}
+.partner-card-tech-inner {
+	display: flex;
+	gap: 1rem;
+	align-items: flex-start;
+}
+.partner-card-tech-media {
+	flex: 0 0 84px;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+}
+.partner-card-logo {
+	max-width: 100%;
+	max-height: 64px;
+	object-fit: contain;
+	border-radius: 8px;
+	background: transparent;
+}
+.partner-card-logo-fallback {
+	width: 64px;
+	height: 64px;
+	border-radius: 8px;
+	background: linear-gradient(180deg, rgba(0, 0, 0, 0.04), rgba(0, 0, 0, 0.02));
+	display: flex;
+	justify-content: center;
+	align-items: center;
+	color: var(--text-secondary);
+	font-weight: 700;
+}
+.partner-card-tech-body {
+	flex: 1 1 auto;
+	min-width: 0;
+}
+.partner-card-tech-title {
+	font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, 'Roboto Mono', monospace;
+	font-weight: 700;
+	font-size: 1rem;
+}
+.tier-badge {
+	font-size: 0.72rem;
+	padding: 0.25rem 0.5rem;
+	border-radius: 999px;
+	background: linear-gradient(
+		90deg,
+		color-mix(in srgb, var(--accent-1) 12%, transparent),
+		transparent
+	);
+	color: var(--accent-1);
+	border: 1px solid color-mix(in srgb, var(--accent-1) 16%, transparent);
+	text-transform: capitalize;
+}
+.partner-card-tech-desc {
+	color: var(--text-secondary);
+}
+
+/* partner website link style */
+.partner-website {
+	padding: 0.4rem 0.6rem;
+	border-radius: 0.5rem;
+	background: rgba(0, 0, 0, 0.04);
+	border: 1px solid rgba(0, 0, 0, 0.04);
+	display: inline-flex;
+	align-items: center;
+	gap: 0.5rem;
+	transition: background 160ms ease, transform 160ms ease;
+}
+.partner-website:hover {
+	background: linear-gradient(
+		90deg,
+		color-mix(in srgb, var(--accent-1) 10%, transparent),
+		color-mix(in srgb, var(--accent-2) 6%, transparent)
+	);
+	color: white;
+	transform: translateY(-2px);
+}
+
+/* powered-by tech style */
+.tech-poweredby {
+	border: 1px dashed color-mix(in srgb, var(--accent-1) 25%, transparent);
+	padding: 0.4rem 0.75rem;
+	background: linear-gradient(90deg, rgba(0, 0, 0, 0.02), transparent);
+}
+.tech-poweredby img {
+	max-height: 32px;
+}
+
+/* responsive */
+@media (max-width: 720px) {
+	.partner-card-tech-inner {
+		flex-direction: column;
+		align-items: center;
+		text-align: center;
+	}
+	.partner-card-tech-media {
+		flex: 0 0 auto;
+		margin-bottom: 0.5rem;
+	}
+}
+
+/* subtle neon accent under the partners section */
+#partners .glass-card::after {
+	content: '';
+	display: block;
+	height: 2px;
+	margin-top: 0.75rem;
+	border-radius: 2px;
+	background: linear-gradient(
+		90deg,
+		transparent,
+		color-mix(in srgb, var(--accent-1) 30%, transparent),
+		transparent
+	);
+	opacity: 0.9;
+}
+
 /* End ARVANTIS styles */
