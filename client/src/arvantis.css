@@ -6,6 +6,9 @@
 	color: var(--text-primary);
 	/* small entrance animation */
 	animation: arv-fade-in 240ms ease both;
+	/* ensure content doesn't touch bottom of viewport */
+	padding-bottom: 4.5rem;
+	transition: background-color 240ms ease, color 240ms ease;
 }
 @keyframes arv-fade-in {
 	from {
@@ -123,6 +126,8 @@
 	border: 1px solid rgba(0, 0, 0, 0.06);
 	box-shadow: 0 6px 20px rgba(2, 6, 23, 0.08);
 	z-index: 20;
+	transition: transform 180ms ease, box-shadow 180ms ease, opacity 180ms ease;
+	opacity: 0.95;
 }
 .poster-nav-btn.left {
 	left: 12px;
@@ -132,6 +137,10 @@
 }
 .poster-nav-btn svg {
 	color: var(--accent-2);
+}
+.poster-nav-btn:hover {
+	transform: translateY(-2px);
+	box-shadow: 0 10px 30px rgba(2, 6, 23, 0.08);
 }
 
 /* Thumbs */
@@ -151,7 +160,7 @@
 	flex: 0 0 auto;
 }
 .thumb-btn.active {
-	box-shadow: 0 6px 20px rgba(2, 6, 23, 0.06);
+	box-shadow: 0 10px 30px rgba(14, 165, 164, 0.06);
 	transform: translateY(-4px);
 }
 
@@ -478,6 +487,16 @@
 @media (max-width: 640px) {
 	.partners-grid {
 		grid-template-columns: repeat(2, 1fr);
+	}
+}
+@media (max-width: 980px) {
+	.partners-cards-grid {
+		grid-template-columns: repeat(2, 1fr);
+	}
+}
+@media (max-width: 640px) {
+	.partners-cards-grid {
+		grid-template-columns: repeat(1, 1fr);
 	}
 }
 
@@ -1097,3 +1116,106 @@ a.btn-ghost.small,
 }
 
 /* ---------- End ARVANTIS styles ---------- */
+
+/* --- Additional UX / responsiveness / smoothness tweaks --- */
+.arvantis-page {
+	/* ensure content doesn't touch bottom of viewport */
+	padding-bottom: 4.5rem;
+	transition: background-color 240ms ease, color 240ms ease;
+}
+
+/* slightly larger vertical rhythm between major sections */
+.arvantis-page > header,
+.arvantis-page > section,
+.arvantis-page > div.max-w-7xl {
+	margin-bottom: 1.25rem;
+}
+
+/* Poster nav buttons: subtler, theme-aware and accessible */
+.poster-nav-btn {
+	background: color-mix(in srgb, var(--glass-bg) 92%, rgba(255, 255, 255, 0.9));
+	border: 1px solid var(--glass-border);
+	transition: transform 180ms ease, box-shadow 180ms ease, opacity 180ms ease;
+	opacity: 0.95;
+}
+.poster-nav-btn:hover {
+	transform: translateY(-2px);
+	box-shadow: 0 10px 30px rgba(2, 6, 23, 0.08);
+}
+
+/* Thumbnails: smoother transform and focus */
+.thumb-img {
+	transition: transform 280ms cubic-bezier(0.2, 0.9, 0.2, 1), filter 220ms ease;
+}
+.thumb-btn:focus,
+.thumb-btn:hover {
+	transform: translateY(-6px);
+	filter: saturate(1.08);
+}
+
+/* Improve poster responsiveness on narrow screens */
+@media (max-width: 900px) {
+	.arvantis-hero .poster-main {
+		height: clamp(220px, 40vw, 380px);
+	}
+	.poster-thumbs {
+		padding-bottom: 0.5rem;
+	}
+	/* make CTA stack on small hero */
+	.arvantis-hero .flex.items-center.gap-3 > .btn-primary,
+	.arvantis-hero .flex.items-center.gap-3 > .btn-ghost {
+		width: 100%;
+	}
+}
+
+/* Events grid: ensure 1 column on very small screens, 2 on small devices */
+@media (max-width: 520px) {
+	.grid.grid-cols-1.sm\\:grid-cols-2 {
+		grid-template-columns: 1fr !important;
+	}
+}
+
+/* Partners grid: more balanced columns at intermediate widths */
+@media (max-width: 980px) {
+	.partners-cards-grid {
+		grid-template-columns: repeat(2, 1fr);
+	}
+}
+@media (max-width: 640px) {
+	.partners-cards-grid {
+		grid-template-columns: repeat(1, 1fr);
+	}
+}
+
+/* Stat cards: make them wrap on small screens */
+@media (max-width: 560px) {
+	.glass-card .grid.grid-cols-2 {
+		grid-template-columns: 1fr 1fr;
+		gap: 0.5rem;
+	}
+	.glass-card .grid.grid-cols-2 > * {
+		min-width: 0;
+	}
+}
+
+/* Reduce motion if user prefers reduced motion */
+@media (prefers-reduced-motion: reduce) {
+	.poster-nav-btn,
+	.thumb-img,
+	.poster-main-img,
+	.event-card img,
+	.partner-card {
+		transition: none !important;
+	}
+}
+
+/* small visual polish for footer spacing when page content short */
+html,
+body,
+#root {
+	min-height: 100%;
+}
+body {
+	/* ensure the page bg uses --bg-base for consistent/contrasting background */
+	background-color: var(--bg-base, #fff);
+}
