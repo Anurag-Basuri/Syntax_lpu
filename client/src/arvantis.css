@@ -925,13 +925,13 @@
 }
 
 /* ensure headings/metadata have good contrast in both themes */
-.event-card .text-[var(--text-primary)] {
+.event-card .text-primary {
 	color: var(--text-primary);
 }
-.event-card .text-[var(--text-secondary)] {
+.event-card .text-secondary {
 	color: var(--text-secondary);
 }
-.event-card .text-[var(--muted)] {
+.event-card .text-muted {
 	color: var(--muted);
 }
 
@@ -965,23 +965,38 @@
 	--glass-border: rgba(15, 23, 42, 0.06);
 	--card-border: rgba(15, 23, 42, 0.08);
 
+	/* UI tokens */
+	--button-primary-bg: linear-gradient(90deg, var(--accent-1), var(--accent-2));
+	--button-secondary-bg: transparent;
+	--button-secondary-border: rgba(15, 23, 42, 0.06);
+	--focus-ring: rgba(124, 58, 237, 0.16);
+
 	/* background base */
 	--bg-base: #ffffff;
 }
 
-/* Dark-mode overrides (your existing .dark class remains respected) */
-.dark :root,
-.dark {
-	--text-primary: #e6eef8;
-	--text-secondary: #9fb1c8;
-	--muted: #94a3b8;
-	--glass-bg: rgba(6, 8, 15, 0.36);
-	--glass-border: rgba(255, 255, 255, 0.04);
-	--card-border: rgba(255, 255, 255, 0.04);
-	--bg-base: #061126;
+/* Stronger explicit light-theme overrides to avoid very pale values */
+:root[data-theme='light'] {
+	--text-primary: #04263a; /* darker heading for high contrast */
+	--text-secondary: #36454f; /* stronger body color */
+	--muted: #55606a; /* readable muted color */
+	--accent-1: #6d28d9;
+	--accent-2: #0ea5a4;
+
+	/* glass / cards: slightly more opaque so text stands out */
+	--glass-bg: rgba(255, 255, 255, 0.92);
+	--glass-border: rgba(6, 22, 28, 0.06);
+	--card-border: rgba(6, 22, 28, 0.08);
+
+	--button-primary-bg: linear-gradient(90deg, var(--accent-1), var(--accent-2));
+	--button-secondary-bg: rgba(0, 0, 0, 0.02);
+	--button-secondary-border: rgba(6, 22, 28, 0.06);
+	--focus-ring: rgba(13, 110, 253, 0.14);
+
+	--bg-base: #ffffff;
 }
 
-/* Improve glass-card contrast in light mode (so content is readable) */
+/* Ensure glass cards use readable text on light backgrounds */
 .glass-card {
 	background: linear-gradient(
 		180deg,
@@ -992,9 +1007,58 @@
 	color: var(--text-secondary);
 }
 
-/* Ensure headings and important labels use primary text color */
+/* Buttons: make ghost buttons readable in light mode */
+.btn-ghost {
+	background: var(--button-secondary-bg);
+	color: var(--text-primary);
+	border: 1px solid var(--button-secondary-border);
+	padding: 0.55rem 0.9rem;
+	border-radius: 0.75rem;
+}
+
+/* Poster nav: lighter background + darker icons in light mode */
+.poster-nav-btn {
+	position: absolute;
+	top: 50%;
+	transform: translateY(-50%);
+	width: 40px;
+	height: 40px;
+	border-radius: 999px;
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	background: color-mix(in srgb, var(--glass-bg) 85%, white 15%);
+	border: 1px solid var(--glass-border);
+	box-shadow: 0 6px 20px rgba(2, 6, 23, 0.06);
+	z-index: 20;
+}
+.poster-nav-btn svg {
+	color: var(--text-primary);
+}
+
+/* Make muted text more readable on bright backgrounds */
+.muted,
+.text-muted {
+	color: var(--muted) !important;
+}
+
+/* Poster placeholder / poster image border (light mode) */
+.poster-placeholder,
+.poster-plain {
+	border: 1px solid var(--card-border);
+	border-radius: 0.75rem;
+	overflow: hidden;
+}
+
+/* Thumb active state: use accent color that's visible on white */
+.thumb-btn.active {
+	box-shadow: 0 10px 30px rgba(14, 165, 164, 0.06);
+	transform: translateY(-4px);
+	border-color: color-mix(in srgb, var(--accent-1) 18%, var(--card-border));
+}
+
+/* Stat card & headings must use primary text on light mode */
 .section-title,
-.partner-card-tech-title,
 h1,
 h2,
 h3,
@@ -1004,43 +1068,32 @@ h6 {
 	color: var(--text-primary) !important;
 }
 
-/* Partner card tweaks for bright mode */
-.partner-card-tech {
-	background: transparent;
-	border-radius: 0.75rem;
+/* small improvements: event-card overlay for light backgrounds */
+.event-card-overlay {
+	pointer-events: none;
+	/* light mode: use a gentler white -> transparent gradient for readability */
+	background: linear-gradient(
+		to top,
+		rgba(255, 255, 255, 0.9),
+		rgba(255, 255, 255, 0.6) 30%,
+		transparent 60%
+	);
+	transition: background 240ms ease;
 }
-.partner-card-tech .partner-card-tech-inner {
-	padding: 1rem;
-}
-.partner-card-tech .partner-card-tech-title {
-	color: var(--text-primary);
+.dark .event-card-overlay {
+	background: linear-gradient(
+		to top,
+		rgba(0, 0, 0, 0.6),
+		rgba(0, 0, 0, 0.25) 30%,
+		transparent 60%
+	);
 }
 
-/* Buttons: ensure sufficient contrast on light background */
-.btn-primary.neon-btn,
-.btn-primary {
-	color: white;
-}
-
-/* Links & small controls */
+/* Ensure small controls (links, tiny buttons) have readable color */
 a.btn-ghost.small,
 .btn-ghost.small {
 	color: var(--text-primary);
 	border-radius: 0.5rem;
-}
-
-/* Poster fallback border for light mode */
-.poster-placeholder,
-.poster-plain {
-	border: 1px solid var(--card-border);
-	border-radius: 0.75rem;
-	overflow: hidden;
-}
-
-/* Accessibility: increase contrast for muted text on very bright backgrounds */
-.muted,
-.text-muted {
-	color: color-mix(in srgb, var(--muted) 85%, black 15%) !important;
 }
 
 /* ---------- End ARVANTIS styles ---------- */
