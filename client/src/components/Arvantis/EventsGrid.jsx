@@ -50,15 +50,13 @@ const EventCard = ({ ev, index, onEventClick, fallbackImage = null }) => {
 	const immediatePoster = getEventPoster(ev);
 
 	// fetch full event only when no immediate poster and we have an id
-	const { data: fetchedEvent } = useQuery(
-		['event-brief', idKey],
-		() => (idKey ? getEventById(idKey) : Promise.resolve(null)),
-		{
-			enabled: !immediatePoster && !!idKey,
-			staleTime: 60_000,
-			retry: 0,
-		}
-	);
+	const { data: fetchedEvent } = useQuery({
+		queryKey: ['event-brief', idKey],
+		queryFn: ({ signal }) => (idKey ? getEventById(idKey, { signal }) : Promise.resolve(null)),
+		enabled: !immediatePoster && !!idKey,
+		staleTime: 60_000,
+		retry: 0,
+	});
 
 	// resolve poster from fetched data if needed
 	const poster =
