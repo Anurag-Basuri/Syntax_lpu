@@ -78,6 +78,7 @@ router.post(
 	validate([
 		body('year').isInt({ min: 2000 }).withMessage('A valid year is required'),
 		body('description').notEmpty().trim().withMessage('Description is required'),
+		body('tagline').optional().trim(),
 		body('startDate').isISO8601().withMessage('Valid start date is required'),
 		body('endDate').isISO8601().withMessage('Valid end date is required'),
 		body('status')
@@ -92,6 +93,7 @@ router.patch(
 	validate([
 		param('identifier').notEmpty().withMessage('Fest identifier is required'),
 		body('description').optional().notEmpty().trim(),
+		body('tagline').optional().trim(),
 		body('startDate').optional().isISO8601(),
 		body('endDate').optional().isISO8601(),
 		body('status')

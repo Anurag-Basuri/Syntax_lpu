@@ -127,7 +127,7 @@ const getLatestFest = asyncHandler(async (req, res) => {
 /* --- Existing CRUD controllers (create/get/update/delete etc) --- */
 /* Create a new fest */
 const createFest = asyncHandler(async (req, res) => {
-	const { year, description, startDate, endDate, status, name, location } = req.body;
+	const { year, description, startDate, endDate, status, name, location, tagline } = req.body;
 
 	if (!year || !startDate || !endDate) {
 		throw new ApiError.BadRequest('year, startDate and endDate are required');
@@ -144,6 +144,8 @@ const createFest = asyncHandler(async (req, res) => {
 		name: name || 'Arvantis',
 		year: y,
 		description,
+		description,
+		tagline: tagline || undefined,
 		startDate,
 		endDate,
 		status,
