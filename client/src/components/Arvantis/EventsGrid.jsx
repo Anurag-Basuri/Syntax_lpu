@@ -84,7 +84,7 @@ const EventCard = ({ ev, index, onEventClick, fallbackImage = null }) => {
 			initial={{ opacity: 0, y: 18 }}
 			animate={{ opacity: 1, y: 0 }}
 			transition={{ delay: 0.04 * index, duration: 0.45 }}
-			className="event-card rounded-2xl overflow-hidden"
+			className="event-card tech rounded-2xl overflow-hidden"
 			role="article"
 			aria-labelledby={`ev-${idKey || index}`}
 			style={{

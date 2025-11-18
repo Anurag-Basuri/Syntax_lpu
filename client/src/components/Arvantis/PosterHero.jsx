@@ -175,7 +175,7 @@ const PosterHero = ({ fest = {}, onImageOpen }) => {
 				initial={{ opacity: 0, y: 10 }}
 				animate={{ opacity: 1, y: 0 }}
 				transition={{ duration: 0.6 }}
-				className="arvantis-hero relative overflow-hidden rounded-3xl min-h-[420px] md:min-h-[520px] flex items-stretch text-white"
+				className="arvantis-hero tech relative overflow-hidden rounded-3xl min-h-[420px] md:min-h-[520px] flex items-stretch text-white"
 				aria-label={`${fest?.name || 'Arvantis'} hero`}
 				style={{ background: 'transparent' }}
 			>
@@ -270,20 +270,21 @@ const PosterHero = ({ fest = {}, onImageOpen }) => {
 										/>
 									</div>
 									<div>
-										<div
-											className="text-base font-semibold"
-											style={{ color: 'var(--text-primary)' }}
-										>
+										<div className="hero-title neon-text text-lg md:text-xl">
 											{fest?.name || 'Arvantis'}{' '}
-											<span className="accent-neon ml-1">
-												{fest?.year
-													? `’${String(fest.year).slice(-2)}`
-													: ''}
+											<span
+												className="mono-tech"
+												style={{
+													color: 'rgba(255,255,255,0.9)',
+													marginLeft: 8,
+												}}
+											>
+												{fest?.year ? `· ${fest.year}` : ''}
 											</span>
 										</div>
 										<div
-											className="text-sm mono"
-											style={{ color: 'var(--text-secondary)' }}
+											className="text-sm mono-tech muted"
+											style={{ marginTop: 6 }}
 										>
 											{fest?.tagline || 'Tech • Hack • Build'}
 										</div>
