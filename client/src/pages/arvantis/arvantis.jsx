@@ -73,6 +73,7 @@ const normalizeLanding = (raw) => {
 	}
 	return raw;
 };
+
 const findTitleSponsor = (partners = []) => {
 	if (!partners || partners.length === 0) return null;
 	const byTier = partners.find(
@@ -85,6 +86,68 @@ const findTitleSponsor = (partners = []) => {
 		partners.find((p) =>
 			/title sponsor|powered by|presented by/i.test(`${p.name} ${p.description || ''}`)
 		) || null
+	);
+};
+
+// ---------- FAQ List (collapsible) ----------
+const FAQList = ({ faqs = [] }) => {
+	const [openIndex, setOpenIndex] = useState(null);
+
+	if (!faqs || faqs.length === 0) return null;
+
+	const handleToggle = (idx) => {
+		setOpenIndex(openIndex === idx ? null : idx);
+	};
+
+	return (
+		<section
+			aria-labelledby="arvantis-faq"
+			className="mt-12 max-w-3xl mx-auto px-4 sm:px-6 lg:px-8"
+		>
+			<h3 id="arvantis-faq" className="section-title mb-6 text-2xl font-bold">
+				Frequently Asked Questions
+			</h3>
+			<div className="space-y-3">
+				{faqs.map((faq, i) => {
+					const isOpen = openIndex === i;
+					return (
+						<div
+							key={`faq-${i}`}
+							className={`faq-item glass-card p-4 rounded-md transition-all ${
+								isOpen ? 'border-l-4 border-[var(--accent-1)] bg-white/10' : ''
+							}`}
+						>
+							<button
+								className="w-full flex items-center justify-between gap-2 text-left focus:outline-none"
+								aria-expanded={isOpen}
+								aria-controls={`faq-panel-${i}`}
+								onClick={() => handleToggle(i)}
+								style={{ background: 'none', border: 'none', padding: 0 }}
+							>
+								<span
+									className="font-semibold text-base"
+									style={{ color: 'var(--text-primary)' }}
+								>
+									{faq.question || 'Question'}
+								</span>
+								<span className="ml-2">
+									{isOpen ? <ChevronUp size={18} /> : <ChevronDown size={18} />}
+								</span>
+							</button>
+							{isOpen && (
+								<div
+									id={`faq-panel-${i}`}
+									className="mt-3 text-sm leading-relaxed"
+									style={{ color: 'var(--text-secondary)' }}
+								>
+									{faq.answer || 'Answer'}
+								</div>
+							)}
+						</div>
+					);
+				})}
+			</div>
+		</section>
 	);
 };
 
@@ -275,101 +338,6 @@ const ContactCard = ({ email, phone, socialLinks = {} }) => {
 						{SocialIcon({ keyName: 'linkedin', url: socialLinks.linkedin })}
 					</div>
 				)}
-			</div>
-		</div>
-	);
-};
-
-/* ---------- Countdown component (high-precision, shows seconds) ---------- */
-const CountdownClock = ({ target }) => {
-	const targetMs = useMemo(() => {
-		if (!target) return null;
-		const d = new Date(target);
-		return isNaN(d.getTime()) ? null : d.getTime();
-	}, [target]);
-
-	const [now, setNow] = useState(() => Date.now());
-
-	// update with requestAnimationFrame for smooth second transitions (low cost)
-	useEffect(() => {
-		if (!targetMs) return;
-		let mounted = true;
-		let rafId = 0;
-		const tick = () => {
-			if (!mounted) return;
-			setNow(Date.now());
-			rafId = requestAnimationFrame(tick);
-		};
-		rafId = requestAnimationFrame(tick);
-		return () => {
-			mounted = false;
-			cancelAnimationFrame(rafId);
-		};
-	}, [targetMs]);
-
-	if (!targetMs) return null;
-
-	const diff = Math.max(0, targetMs - now);
-	if (diff === 0) {
-		return (
-			<div
-				role="status"
-				aria-live="polite"
-				className="mt-4 text-sm font-medium text-green-500"
-			>
-				Ongoing
-			</div>
-		);
-	}
-
-	const totalSeconds = Math.floor(diff / 1000);
-	const days = Math.floor(totalSeconds / 86400);
-	const hours = Math.floor((totalSeconds % 86400) / 3600);
-	const minutes = Math.floor((totalSeconds % 3600) / 60);
-	const seconds = totalSeconds % 60;
-	const two = (n) => String(n).padStart(2, '0');
-
-	return (
-		<div
-			className="mt-4 inline-flex items-center gap-3"
-			role="timer"
-			aria-live="polite"
-			aria-atomic="true"
-			aria-label={`Countdown to event start: ${days} days ${hours} hours ${minutes} minutes ${seconds} seconds`}
-		>
-			{/* compact, premium segments */}
-			<div className="flex items-baseline gap-2">
-				<div className="px-3 py-2 rounded-lg glass-card text-center">
-					<div
-						className="text-lg font-extrabold mono"
-						style={{ color: 'var(--text-primary)' }}
-					>
-						{days}
-					</div>
-					<div className="text-xs muted">Days</div>
-				</div>
-				<div className="px-3 py-2 rounded-lg glass-card text-center">
-					<div
-						className="text-lg font-extrabold mono"
-						style={{ color: 'var(--text-primary)' }}
-					>
-						{two(hours)}
-					</div>
-					<div className="text-xs muted">Hours</div>
-				</div>
-				<div className="px-3 py-2 rounded-lg glass-card text-center">
-					<div
-						className="text-lg font-extrabold mono"
-						style={{ color: 'var(--text-primary)' }}
-					>
-						{two(minutes)}
-					</div>
-					<div className="text-xs muted">Minutes</div>
-				</div>
-				<div className="px-3 py-2 rounded-lg glass-card text-center">
-					<div className="text-lg font-extrabold mono accent-neon">{two(seconds)}</div>
-					<div className="text-xs muted">Seconds</div>
-				</div>
 			</div>
 		</div>
 	);
