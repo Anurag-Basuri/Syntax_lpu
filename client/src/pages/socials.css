@@ -217,4 +217,80 @@ textarea:focus {
 	outline-offset: 2px;
 }
 
-/* keep previous styles intact below (don't remove) */
+/* --- Button color tokens to ensure contrast in light & dark modes --- */
+
+/* sensible defaults (works for both light & dark) */
+:root {
+	--button-primary-bg: linear-gradient(90deg, #7c3aed, #06b6d4);
+	--button-primary-foreground: #ffffff;
+	--button-primary-border: rgba(0, 0, 0, 0.08);
+
+	/* fallback card/button colors (keeps high contrast on bright theme) */
+	--card-bg: #ffffff;
+	--card-border: rgba(2, 6, 23, 0.06);
+}
+
+/* stronger light-theme override if you use data-theme='light' */
+:root[data-theme='light'],
+[data-theme='light'] {
+	--button-primary-bg: linear-gradient(90deg, #5b21b6, #0891b2);
+	--button-primary-foreground: #ffffff;
+	--card-bg: #ffffff;
+	--card-border: rgba(2, 6, 23, 0.06);
+}
+
+/* dark mode override (if you use .dark class) */
+.dark,
+:root[data-theme='dark'] {
+	--button-primary-bg: linear-gradient(90deg, #7c3aed, #06b6d4);
+	--button-primary-foreground: #ffffff;
+	--card-bg: rgba(6, 8, 15, 0.6);
+	--card-border: rgba(255, 255, 255, 0.04);
+}
+
+/* Reusable primary button */
+.btn-primary,
+.btn-primary:disabled {
+	background: var(--button-primary-bg);
+	color: var(--button-primary-foreground);
+	border: 1px solid var(--button-primary-border);
+	box-shadow: 0 8px 30px rgba(2, 6, 23, 0.06);
+	padding: 0.5rem 0.85rem;
+	border-radius: 0.65rem;
+	display: inline-flex;
+	align-items: center;
+	gap: 0.5rem;
+	transition: transform 120ms ease, box-shadow 120ms ease, opacity 120ms ease;
+}
+.btn-primary:hover:not(:disabled) {
+	transform: translateY(-2px);
+	box-shadow: 0 12px 40px rgba(2, 6, 23, 0.1);
+}
+.btn-primary:disabled {
+	opacity: 0.6;
+	cursor: not-allowed;
+}
+
+/* Ensure any inline uses of bg-[var(--button-primary-bg)] with text-white get safe fallback */
+/* Force post modal primary button color to be visible */
+.motion-form .btn-primary,
+.relative .btn-primary {
+	color: var(--button-primary-foreground) !important;
+}
+
+/* Minor: ensure quick composer round button uses same token */
+.quick-composer .btn-primary {
+	padding: 0.5rem;
+	min-width: 44px;
+	min-height: 44px;
+	border-radius: 999px;
+}
+
+/* Ensure modal buttons use correct contrast even if theme tokens are missing */
+motion.form .btn-primary,
+.m-4 .btn-primary {
+	color: var(--button-primary-foreground);
+	background: var(--button-primary-bg);
+}
+
+/* Keep rest of socials.css intact below */
