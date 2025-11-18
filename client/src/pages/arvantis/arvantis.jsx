@@ -515,12 +515,6 @@ const ArvantisPage = () => {
 	if (isError) return <ErrorBlock message={errorMsg} onRetry={() => window.location.reload()} />;
 
 	// computed helpers for UI
-	const computedStatus = fest?.computedStatus || fest?.computed?.computedStatus || fest?.status;
-	const visibility = fest?.visibility ?? 'public';
-	const upcomingCount =
-		typeof fest?.upcomingEventsCount === 'number'
-			? fest.upcomingEventsCount
-			: events.filter((e) => e?.eventDate && new Date(e.eventDate) >= new Date()).length;
 	const tracks = Array.isArray(fest?.tracks) ? fest.tracks : [];
 
 	return (
@@ -619,26 +613,14 @@ const ArvantisPage = () => {
 
 							{/* Social links */}
 							<div className="flex items-center gap-2">
-								{SocialIcon({
-									keyName: 'website',
-									url: fest?.socialLinks?.website,
-								})}
-								{SocialIcon({
-									keyName: 'twitter',
-									url: fest?.socialLinks?.twitter,
-								})}
-								{SocialIcon({
-									keyName: 'instagram',
-									url: fest?.socialLinks?.instagram,
-								})}
-								{SocialIcon({
-									keyName: 'facebook',
-									url: fest?.socialLinks?.facebook,
-								})}
-								{SocialIcon({
-									keyName: 'linkedin',
-									url: fest?.socialLinks?.linkedin,
-								})}
+								<SocialIcon keyName="website" url={fest?.socialLinks?.website} />
+								<SocialIcon keyName="twitter" url={fest?.socialLinks?.twitter} />
+								<SocialIcon
+									keyName="instagram"
+									url={fest?.socialLinks?.instagram}
+								/>
+								<SocialIcon keyName="facebook" url={fest?.socialLinks?.facebook} />
+								<SocialIcon keyName="linkedin" url={fest?.socialLinks?.linkedin} />
 								{fest?.contactPhone && (
 									<div className="inline-flex items-center gap-2 text-sm muted">
 										<Phone size={14} />{' '}
@@ -677,9 +659,11 @@ const ArvantisPage = () => {
 				</div>
 			</header>
 
-			{/* Poster / Hero */}
-			<div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mt-6">
-				<PosterHero fest={fest} onImageOpen={handleImageClick} />
+			{/* Poster / Hero — full-bleed on small screens, centered on large */}
+			<div className="w-full mt-6">
+				<div className="max-w-7xl mx-auto sm:px-6 lg:px-8 px-4">
+					<PosterHero fest={fest} onImageOpen={handleImageClick} />
+				</div>
 			</div>
 
 			{/* Description, quick details, tracks and prominent partners */}
