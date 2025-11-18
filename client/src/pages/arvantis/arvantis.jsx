@@ -15,7 +15,7 @@ import {
 	Facebook,
 	Linkedin,
 	Phone,
-} from 'lucide-react';
+} from 'lucide-react;
 
 // SocialIcon helper component
 const SocialIcon = ({ keyName, url }) => {
@@ -154,165 +154,169 @@ const FAQList = ({ faqs = [] }) => {
 	);
 };
 
-/* ---------- Partners showcase — card grid (techy feel) ---------- */
+/* ---------- Partners showcase — stacked cards: logo / name / tier / description ---------- */
 const PartnersShowcase = ({ partners = [], titleSponsor = null }) => {
-	if (!partners || partners.length === 0) return null;
+    if (!partners || partners.length === 0) return null;
 
-	// normalize fields and accept common media shapes
-	const normalized = partners.map((p) => ({
-		name: p.name || 'Partner',
-		website: p.website || null,
-		logo:
-			p.logo && (p.logo.url || p.logo.secure_url || p.logo.publicUrl)
-				? p.logo.url || p.logo.secure_url || p.logo.publicUrl
-				: null,
-		tier: p.tier || 'Partner',
-		description: p.description || '',
-	}));
+    // normalize fields and accept common media shapes
+    const normalized = partners.map((p) => ({
+        name: p.name || 'Partner',
+        website: p.website || null,
+        logo:
+            p.logo && (p.logo.url || p.logo.secure_url || p.logo.publicUrl)
+                ? p.logo.url || p.logo.secure_url || p.logo.publicUrl
+                : null,
+        tier: p.tier || 'Partner',
+        description: p.description || '',
+    }));
 
-	return (
-		<section
-			id="partners"
-			className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mt-8"
-			aria-labelledby="partners-heading"
-		>
-			<div className="glass-card p-6" role="region" aria-roledescription="partners">
-				<div className="flex items-center justify-between gap-4">
-					<div>
-						<h2
-							id="partners-heading"
-							className="text-xl font-extrabold"
-							style={{ color: 'var(--text-primary)' }}
-						>
-							Our Partners
-						</h2>
-						<p className="mt-1 muted">
-							Supporting organisations — logos, tier and short description.
-						</p>
-					</div>
+    return (
+        <section
+            id="partners"
+            className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mt-8"
+            aria-labelledby="partners-heading"
+        >
+            <div className="glass-card p-6" role="region" aria-roledescription="partners">
+                <div className="flex items-center justify-between gap-4">
+                    <div>
+                        <h2
+                            id="partners-heading"
+                            className="text-xl font-extrabold"
+                            style={{ color: 'var(--text-primary)' }}
+                        >
+                            Our Partners
+                        </h2>
+                        <p className="mt-1 muted">
+                            Supporting organisations — logos, tier and short description.
+                        </p>
+                    </div>
 
-					{/* Prominent powered-by block for title sponsor */}
-					{titleSponsor && (
-						<div className="partner-poweredby-compact ml-auto">
-							<a
-								href={titleSponsor.website || '#'}
-								target={titleSponsor.website ? '_blank' : '_self'}
-								rel="noreferrer"
-								className="inline-flex items-center gap-3 p-2 rounded-md tech-poweredby"
-								onClick={(e) => e.stopPropagation()}
-							>
-								{titleSponsor.logo?.url ? (
-									<img
-										src={titleSponsor.logo.url}
-										alt={titleSponsor.name}
-										className="partner-logo h-9"
-										loading="lazy"
-									/>
-								) : (
-									<span className="mono">{titleSponsor.name}</span>
-								)}
-								<span className="text-xs muted">Powered by</span>
-							</a>
-						</div>
-					)}
-				</div>
+                    {/* Prominent powered-by block for title sponsor */}
+                    {titleSponsor && (
+                        <div className="partner-poweredby-compact ml-auto">
+                            <a
+                                href={titleSponsor.website || '#'}
+                                target={titleSponsor.website ? '_blank' : '_self'}
+                                rel="noreferrer"
+                                className="inline-flex items-center gap-3 p-2 rounded-md tech-poweredby"
+                                onClick={(e) => e.stopPropagation()}
+                            >
+                                {titleSponsor.logo?.url ? (
+                                    <img
+                                        src={titleSponsor.logo.url}
+                                        alt={titleSponsor.name}
+                                        className="partner-logo h-9"
+                                        loading="lazy"
+                                    />
+                                ) : (
+                                    <span className="mono">{titleSponsor.name}</span>
+                                )}
+                                <span className="text-xs muted">Powered by</span>
+                            </a>
+                        </div>
+                    )}
+                </div>
 
-				{/* Grid of partner cards */}
-				<div className="partners-cards-grid mt-6 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
-					{normalized.map((p, idx) => {
-						const Key = p.website ? 'a' : 'div';
-						const props = p.website
-							? {
-									href: p.website,
-									target: '_blank',
-									rel: 'noopener noreferrer',
-									onClick: (e) => e.stopPropagation(),
-							  }
-							: {};
-						const handleKeyDown = (e) => {
-							// If card is not an anchor and has website, allow Enter/Space to open it
-							if (
-								p.website &&
-								!p.website.startsWith('#') &&
-								(e.key === 'Enter' || e.key === ' ')
-							) {
-								window.open(p.website, '_blank', 'noopener,noreferrer');
-							}
-						};
-						return (
-							<Key
-								key={`${p.name}-${idx}`}
-								{...props}
-								className="partner-card-tech group"
-								title={p.name}
-								// make cards keyboard-focusable when not anchors
-								tabIndex={p.website ? undefined : 0}
-								onKeyDown={p.website ? undefined : handleKeyDown}
-							>
-								<div className="partner-card-tech-inner">
-									<div className="partner-card-tech-media">
-										{p.logo ? (
-											<img
-												src={p.logo}
-												alt={p.name}
-												className="partner-card-logo"
-												loading="lazy"
-											/>
-										) : (
-											<div className="partner-card-logo-fallback mono">
-												{(p.name || '?').slice(0, 2).toUpperCase()}
-											</div>
-										)}
-									</div>
+                {/* Grid of partner cards — stacked layout */}
+                <div className="partners-cards-grid mt-6 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
+                    {normalized.map((p, idx) => {
+                        const isAnchor = Boolean(p.website);
+                        const Key = isAnchor ? 'a' : 'div';
+                        const props = isAnchor
+                            ? {
+                                    href: p.website,
+                                    target: '_blank',
+                                    rel: 'noopener noreferrer',
+                                    onClick: (e) => e.stopPropagation(),
+                              }
+                            : {};
+                        const handleKeyDown = (e) => {
+                            // make non-anchor cards open link on Enter/Space if website exists
+                            if (p.website && (e.key === 'Enter' || e.key === ' ')) {
+                                window.open(p.website, '_blank', 'noopener,noreferrer');
+                            }
+                        };
 
-									<div className="partner-card-tech-body">
-										<div className="flex items-center gap-3">
-											<h3
-												className="partner-card-tech-title"
-												style={{ color: 'var(--text-primary)' }}
-												aria-label={p.name}
-											>
-												{p.name}
-											</h3>
-											{p.tier && <span className="tier-badge">{p.tier}</span>}
-										</div>
-										{p.description ? (
-											<p className="partner-card-tech-desc text-sm muted mt-2">
-												{p.description}
-											</p>
-										) : (
-											<div className="text-xs muted mt-2">
-												No description provided.
-											</div>
-										)}
+                        return (
+                            <Key
+                                key={`${p.name}-${idx}`}
+                                {...props}
+                                className="partner-card-tech group text-center"
+                                title={p.name}
+                                tabIndex={isAnchor ? undefined : 0}
+                                onKeyDown={isAnchor ? undefined : handleKeyDown}
+                            >
+                                <div className="partner-card-tech-inner items-center justify-center">
+                                    {/* logo */}
+                                    <div className="partner-card-tech-media" aria-hidden>
+                                        {p.logo ? (
+                                            <img
+                                                src={p.logo}
+                                                alt={p.name}
+                                                className="partner-card-logo"
+                                                loading="lazy"
+                                            />
+                                        ) : (
+                                            <div className="partner-card-logo-fallback mono">
+                                                {(p.name || '?').slice(0, 2).toUpperCase()}
+                                            </div>
+                                        )}
+                                    </div>
 
-										<div className="mt-4 flex items-center gap-3">
-											{p.website ? (
-												<a
-													className="partner-website inline-flex items-center gap-2"
-													href={p.website}
-													target="_blank"
-													rel="noreferrer"
-													onClick={(e) => e.stopPropagation()}
-													aria-label={`Visit ${p.name}`}
-												>
-													<ExternalLink size={14} />{' '}
-													<span className="text-sm">Visit</span>
-												</a>
-											) : (
-												<span className="text-xs mono muted">
-													No website
-												</span>
-											)}
-										</div>
-									</div>
-								</div>
-							</Key>
-						);
-					})}
-				</div>
-			</div>
-		</section>
+                                    {/* body: name -> tier -> description */}
+                                    <div className="partner-card-tech-body mt-3">
+                                        <h3
+                                            className="partner-card-tech-title"
+                                            style={{ color: 'var(--text-primary)' }}
+                                        >
+                                            {p.name}
+                                        </h3>
+
+                                        {p.tier && (
+                                            <div className="mt-2 flex items-center justify-center">
+                                                <span className="tier-badge">{p.tier}</span>
+                                            </div>
+                                        )}
+
+                                        {p.description ? (
+                                            <p className="partner-card-tech-desc text-sm muted mt-3">
+                                                {p.description}
+                                            </p>
+                                        ) : (
+                                            <p className="partner-card-tech-desc text-sm muted mt-3">
+                                                No description provided.
+                                            </p>
+                                        )}
+
+                                        {/* CTA: show Visit only when card is not already an anchor to avoid nested anchors */}
+                                        <div className="mt-4 flex items-center justify-center">
+                                            {isAnchor ? (
+                                                <span className="partner-website inline-flex items-center gap-2" aria-hidden>
+                                                    <ExternalLink size={14} /> <span className="text-sm">Visit</span>
+                                                </span>
+                                            ) : p.website ? (
+                                                <a
+                                                    className="partner-website inline-flex items-center gap-2"
+                                                    href={p.website}
+                                                    target="_blank"
+                                                    rel="noreferrer"
+                                                    onClick={(e) => e.stopPropagation()}
+                                                    aria-label={`Visit ${p.name}`}
+                                                >
+                                                    <ExternalLink size={14} /> <span className="text-sm">Visit</span>
+                                                </a>
+                                            ) : (
+                                                <span className="text-xs mono muted">No website</span>
+                                            )}
+                                        </div>
+                                    </div>
+                                </div>
+                            </Key>
+                        );
+                    })}
+                </div>
+            </div>
+        </section>
 	);
 };
 

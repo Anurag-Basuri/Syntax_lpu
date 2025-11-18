@@ -546,14 +546,17 @@
 
 .partner-card-tech-inner {
 	display: flex;
-	gap: 1rem;
-	align-items: flex-start;
+	flex-direction: column;
+	align-items: center;
+	justify-content: flex-start;
+	gap: 0.5rem;
+	text-align: center;
 }
 .partner-card-tech-media {
-	flex: 0 0 96px;
+	flex: 0 0 auto;
 	width: 96px;
 	height: 96px;
-	border-radius: 8px;
+	border-radius: 12px;
 	overflow: hidden;
 	display: flex;
 	align-items: center;
@@ -588,17 +591,15 @@
 	white-space: normal;
 	word-break: break-word;
 	overflow-wrap: anywhere;
-	font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, 'Roboto Mono', monospace;
-	font-weight: 700;
-	font-size: 1.02rem;
-	letter-spacing: -0.01em;
-	line-height: 1.25;
+	font-size: 1.03rem;
+	line-height: 1.2;
 	margin: 0;
 }
 
 /* description + meta */
 .partner-card-tech-desc {
-	margin-top: 0.35rem;
+	margin: 0;
+	padding: 0 0.25rem;
 	color: var(--text-secondary);
 	font-size: 0.92rem;
 }
@@ -621,7 +622,10 @@
 
 /* Visit link */
 .partner-website {
-	padding: 0.45rem 0.65rem;
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	padding: 0.5rem 0.75rem;
 	border-radius: 0.6rem;
 	font-weight: 600;
 	transition: background 160ms ease, transform 160ms ease;
@@ -651,6 +655,9 @@
 	}
 	.partner-card-tech-desc {
 		font-size: 0.95rem;
+	}
+	.partners-cards-grid {
+		grid-template-columns: repeat(2, 1fr);
 	}
 }
 
