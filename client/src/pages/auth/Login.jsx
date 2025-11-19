@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useAuth } from '../../hooks/useAuth.js';
 import { useNavigate } from 'react-router-dom';
 import { User, Lock, Eye, EyeOff, ArrowRight, XCircle } from 'lucide-react';
+import { useTheme } from '../../hooks/useTheme.js';
 import './login.css'; // new stylesheet for improved theme & responsiveness
 
 // Reusable, lightweight form components
@@ -58,6 +59,7 @@ const GradientButton = ({ children, isLoading, ...props }) => (
 const LoginPage = () => {
 	const navigate = useNavigate();
 	const { loginMember } = useAuth();
+	const { theme } = useTheme(); // use app theme (expects 'light'|'dark' or similar)
 	const [loginData, setLoginData] = useState({
 		identifier: '',
 		password: '',
@@ -100,24 +102,33 @@ const LoginPage = () => {
 	};
 
 	return (
-		<div className="auth-page">
+		/* apply current app theme so login page follows global theme */
+		<div className="auth-page" data-theme={theme}>
 			<div className="auth-shell">
-				<aside className="auth-brand">
-					<div className="logo" aria-hidden>
-						SC
-					</div>
+				<aside className="auth-brand" aria-hidden>
+					<div className="logo">SC</div>
 					<div className="brand-text">
-						<h1>Welcome Back</h1>
-						<p className="muted">Sign in to access the admin dashboard</p>
+						<h1>Member Login</h1>
+						<p className="muted">Only club members may sign in. Not a member yet?</p>
+						{/* prominent join CTA for non-members */}
+						<button
+							className="link-cta"
+							onClick={() => navigate('/join')}
+							aria-label="Join the club"
+						>
+							Join the Club
+						</button>
 					</div>
 				</aside>
 
 				<main className="auth-card" role="main" aria-labelledby="login-heading">
 					<header className="card-header">
 						<h2 id="login-heading" className="card-title">
-							Log in to your account
+							Log in to your member account
 						</h2>
-						<p className="card-sub">Enter credentials to continue</p>
+						<p className="card-sub">
+							Enter your club LPU ID or registered email and password.
+						</p>
 					</header>
 
 					{serverError && (
@@ -175,12 +186,12 @@ const LoginPage = () => {
 								Forgot Password?
 							</button>
 
-							<GradientButton isLoading={loading}>Login</GradientButton>
+							<GradientButton isLoading={loading}>Member Login</GradientButton>
 						</div>
 					</form>
 
 					<footer className="auth-footer">
-						Don't have an account?{' '}
+						Not a member yet?{' '}
 						<button onClick={() => navigate('/join')} className="link-cta">
 							Join the Club
 						</button>
