@@ -1,18 +1,18 @@
 import React from 'react';
 import { motion } from 'framer-motion';
-import { Github, Linkedin, Instagram, Mail, MapPin } from 'lucide-react';
+import { Linkedin, Instagram, Mail, MapPin } from 'lucide-react';
 import { Link } from 'react-router-dom';
 
 const Footer = () => {
 	const socialLinks = [
 		{
 			name: 'LinkedIn',
-			icon: <Linkedin className="w-5 h-5" />,
+			icon: <Linkedin className="w-4 h-4" />,
 			url: 'https://www.linkedin.com/company/syntax-club/',
 		},
 		{
 			name: 'Instagram',
-			icon: <Instagram className="w-5 h-5" />,
+			icon: <Instagram className="w-4 h-4" />,
 			url: 'https://www.instagram.com/syntax.club/',
 		},
 	];
@@ -25,28 +25,36 @@ const Footer = () => {
 		{ name: 'Socials', to: '/socials' },
 	];
 
+	const policiesLinks = [
+		{ name: 'Privacy Policy', to: '/policies/privacy' },
+		{ name: 'Terms of Service', to: '/policies/terms' },
+		{ name: 'Refund Policy', to: '/policies/refund' },
+	];
+
 	return (
-		<footer className="pt-24 pb-12 px-4 relative z-10 overflow-hidden bg-transparent">
+		<footer className="py-10 px-6 bg-transparent">
 			<div className="max-w-7xl mx-auto">
-				<div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-10 mb-16">
-					<div className="lg:col-span-2">
-						<div className="flex items-center gap-3 mb-6">
-							<h3 className="font-bold text-2xl brand-text">Syntax Club</h3>
+				<div className="grid grid-cols-1 md:grid-cols-3 gap-8 items-start">
+					{/* Brand */}
+					<div className="flex flex-col gap-4">
+						<div className="flex items-center gap-3">
+							<h3 className="font-bold text-xl brand-text">Syntax Club</h3>
 						</div>
-						<p className="text-secondary mb-8 max-w-md leading-relaxed">
-							Empowering the next generation of innovators through hands-on projects,
-							workshops, and community building.
+						<p className="text-secondary text-sm max-w-sm leading-relaxed">
+							Hands-on projects, workshops and a supportive community for students
+							building real technical skills.
 						</p>
-						<div className="flex gap-4">
-							{socialLinks.map((social, index) => (
+
+						{/* Social icons: compact */}
+						<div className="flex gap-3 mt-1">
+							{socialLinks.map((social, i) => (
 								<motion.a
-									key={index}
+									key={i}
 									href={social.url}
 									target="_blank"
 									rel="noopener noreferrer"
-									whileHover={{ scale: 1.1, y: -2 }}
-									whileTap={{ scale: 0.95 }}
-									className="w-10 h-10 rounded-full bg-white/10 backdrop-blur-sm border border-white/20 flex items-center justify-center text-accent hover:text-white hover:bg-white/20 transition-all duration-300"
+									whileHover={{ scale: 1.05 }}
+									className="w-8 h-8 rounded-full bg-white/6 border border-white/6 flex items-center justify-center text-accent hover:bg-white/12 transition-colors"
 									aria-label={social.name}
 								>
 									{social.icon}
@@ -55,80 +63,77 @@ const Footer = () => {
 						</div>
 					</div>
 
-					<div>
-						<h4 className="text-primary font-semibold mb-6 text-lg relative inline-block">
-							Quick Links
-							<div
-								className="absolute bottom-0 left-0 w-full h-0.5"
-								style={{
-									background:
-										'linear-gradient(90deg, var(--accent-1), var(--accent-2))',
-								}}
-							></div>
-						</h4>
-						<ul className="space-y-4 text-secondary">
-							{quickLinks.map((link) => (
-								<li key={link.name}>
-									<Link
-										to={link.to}
-										className="hover:text-accent transition-colors"
-									>
-										{link.name}
-									</Link>
-								</li>
-							))}
-						</ul>
+					{/* Links: quick links + policies grouped for compactness */}
+					<div className="flex flex-col md:flex-row gap-6 md:gap-12">
+						<div>
+							<h4 className="text-sm font-semibold mb-3">Quick Links</h4>
+							<ul className="space-y-2 text-sm text-secondary">
+								{quickLinks.map((link) => (
+									<li key={link.to}>
+										<Link
+											to={link.to}
+											className="hover:text-accent transition-colors"
+										>
+											{link.name}
+										</Link>
+									</li>
+								))}
+							</ul>
+						</div>
+
+						<div>
+							<h4 className="text-sm font-semibold mb-3">Policies</h4>
+							<ul className="space-y-2 text-sm text-secondary">
+								{policiesLinks.map((p) => (
+									<li key={p.to}>
+										<Link
+											to={p.to}
+											className="hover:text-accent transition-colors"
+										>
+											{p.name}
+										</Link>
+									</li>
+								))}
+							</ul>
+						</div>
 					</div>
 
+					{/* Contact */}
 					<div>
-						<h4 className="text-primary font-semibold mb-6 text-lg relative inline-block">
-							Contact Us
-							<div
-								className="absolute bottom-0 left-0 w-full h-0.5"
-								style={{
-									background:
-										'linear-gradient(90deg, var(--accent-1), var(--accent-2))',
-								}}
-							></div>
-						</h4>
-						<ul className="space-y-4 text-secondary">
-							<li className="flex items-start gap-3">
+						<h4 className="text-sm font-semibold mb-3">Contact</h4>
+						<ul className="space-y-3 text-sm text-secondary">
+							<li>
 								<a
 									href="mailto:syntax.studorg@gmail.com"
-									className="flex items-start gap-3 hover:text-accent transition-colors"
+									className="flex items-center gap-3 hover:text-accent transition-colors"
 								>
-									<div className="w-8 h-8 rounded-full bg-white/10 backdrop-blur-sm border border-white/10 flex items-center justify-center flex-shrink-0">
-										<Mail className="h-4 w-4 text-accent" />
-									</div>
-									<span className="text-sm">syntax.studorg@gmail.com</span>
+									<span className="w-8 h-8 rounded-full bg-white/6 border border-white/8 flex items-center justify-center">
+										<Mail className="w-4 h-4 text-accent" />
+									</span>
+									<span>syntax.studorg@gmail.com</span>
 								</a>
 							</li>
-							<li className="flex items-start gap-3">
+							<li>
 								<a
 									href="https://maps.google.com/?q=Lovely+Professional+University"
 									target="_blank"
 									rel="noopener noreferrer"
-									className="flex items-start gap-3 hover:text-accent transition-colors"
+									className="flex items-center gap-3 hover:text-accent transition-colors"
 								>
-									<div className="w-8 h-8 rounded-full bg-white/10 backdrop-blur-sm border border-white/10 flex items-center justify-center flex-shrink-0">
-										<MapPin className="h-4 w-4 text-accent" />
-									</div>
-									<span className="text-sm">
-										Lovely Professional University, Punjab
+									<span className="w-8 h-8 rounded-full bg-white/6 border border-white/8 flex items-center justify-center">
+										<MapPin className="w-4 h-4 text-accent" />
 									</span>
+									<span>Lovely Professional University, Punjab</span>
 								</a>
 							</li>
 						</ul>
 					</div>
 				</div>
 
-				<div className="pt-8 border-t border-white/10 flex flex-col md:flex-row justify-between items-center gap-4">
-					<p className="text-secondary text-center md:text-left text-sm">
-						© {new Date().getFullYear()} Syntax Club. All rights reserved.
-					</p>
-					<p className="text-xs text-secondary/50 text-center md:text-right">
-						Developed with ❤️ by the Syntax Dev Team
-					</p>
+				{/* Bottom legal row: compact */}
+				<div className="mt-8 pt-6 border-t border-white/6 flex flex-col sm:flex-row justify-between items-center gap-3 text-sm text-secondary">
+					<p>© {new Date().getFullYear()} Syntax Club. All rights reserved.</p>
+					<p className="text-xs text-secondary/60">Developed by the Syntax Dev Team</p>
 				</div>
 			</div>
 		</footer>
