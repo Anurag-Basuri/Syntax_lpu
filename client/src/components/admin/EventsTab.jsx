@@ -228,7 +228,7 @@ const EventsTab = ({
 			fields.description.trim().length < 10
 		)
 			return 'Description must be at least 10 characters.';
-		if (fields.description.trim().length > 2000)
+		if (fields.description.trim().length > 5000)
 			return 'Description cannot exceed 2000 characters.';
 
 		// Numeric constraints (totalSpots)
