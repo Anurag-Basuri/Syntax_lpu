@@ -72,19 +72,6 @@ const Footer = () => {
 									</motion.a>
 								))}
 							</div>
-
-							{/* contact compact for mobile */}
-							<div className="mt-2 text-xs text-secondary">
-								<a
-									href="mailto:syntax.studorg@gmail.com"
-									className="hover:text-accent"
-								>
-									syntax.studorg@gmail.com
-								</a>
-								<div className="mt-1 hidden sm:block">
-									Lovely Professional University, Punjab
-								</div>
-							</div>
 						</div>
 
 						{/* Links area: use collapsible groups on small screens */}
