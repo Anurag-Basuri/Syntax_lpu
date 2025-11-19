@@ -1,12 +1,16 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { submitApplication } from '../../services/applyServices.js';
 import { useNavigate } from 'react-router-dom';
 import { User, Mail, Phone, BookOpen, Users, CheckCircle, XCircle, ArrowRight } from 'lucide-react';
 import { useTheme } from '../../hooks/useTheme.js';
 import './join.css';
 
-/* --- Enhanced presentational components --- */
+/* Small accessibility helper: keyboard toggle for domain chips */
+const isToggleKey = (e) => e.key === ' ' || e.key === 'Enter' || e.code === 'Space';
+
 const InputField = ({
+	id,
+	label,
 	icon,
 	type = 'text',
 	name,
@@ -17,10 +21,21 @@ const InputField = ({
 	ariaLabel,
 	inputMode,
 	maxLength,
+	autoFocus = false,
+	inputRef = null,
 }) => (
 	<div className="relative w-full group">
-		{icon && <div className="icon-left">{icon}</div>}
+		{icon && (
+			<div className="icon-left" aria-hidden>
+				{icon}
+			</div>
+		)}
+		<label htmlFor={id} className="sr-only">
+			{label}
+		</label>
 		<input
+			id={id}
+			ref={inputRef}
 			aria-label={ariaLabel || name}
 			type={type}
 			name={name}
@@ -30,6 +45,7 @@ const InputField = ({
 			inputMode={inputMode}
 			maxLength={maxLength}
 			className={`form-input ${error ? 'input-error' : ''}`}
+			autoFocus={autoFocus}
 		/>
 		{error && (
 			<p className="field-error" role="alert">
@@ -39,9 +55,13 @@ const InputField = ({
 	</div>
 );
 
-const TextAreaField = ({ name, placeholder, value, onChange, error, maxLength, remaining }) => (
+const TextAreaField = ({ id, name, placeholder, value, onChange, error, maxLength, remaining }) => (
 	<div className="w-full group">
+		<label htmlFor={id} className="sr-only">
+			About you
+		</label>
 		<textarea
+			id={id}
 			aria-label={name}
 			name={name}
 			placeholder={placeholder}
@@ -125,6 +145,7 @@ const DOMAIN_OPTIONS = [
 const JoinPage = () => {
 	const navigate = useNavigate();
 	const hostelRef = useRef(null);
+	const nameRef = useRef(null);
 	const { theme } = useTheme();
 	const [formData, setFormData] = useState({
 		fullName: '',
@@ -145,6 +166,13 @@ const JoinPage = () => {
 	const [serverMessage, setServerMessage] = useState({ type: '', text: '' });
 	const [successCountdown, setSuccessCountdown] = useState(0);
 
+	// autofocus first field for convenience
+	useEffect(() => {
+		try {
+			nameRef.current?.focus();
+		} catch (e) {}
+	}, []);
+
 	useEffect(() => {
 		let t;
 		if (successCountdown > 0) {
@@ -164,30 +192,39 @@ const JoinPage = () => {
 	const BIO_MAX = 500;
 	const bioRemaining = BIO_MAX - (formData.bio?.length || 0);
 
-	const validate = () => {
+	// pure validator that returns errors object (doesn't set state)
+	const validateNoSet = (data) => {
 		const newErrors = {};
-		if (!formData.fullName.trim()) newErrors.fullName = 'Full name is required.';
-		if (!/^\d{8}$/.test(formData.LpuId.trim()))
+		if (!data.fullName.trim()) newErrors.fullName = 'Full name is required.';
+		if (!/^\d{8}$/.test(data.LpuId.trim()))
 			newErrors.LpuId = 'LPU ID must be exactly 8 digits.';
-		if (!/\S+@\S+\.\S+/.test(formData.email)) newErrors.email = 'A valid email is required.';
-		if (!formData.phone.trim()) newErrors.phone = 'Phone number is required.';
-		if (!formData.course.trim()) newErrors.course = 'Your course is required.';
-		if (!formData.gender) newErrors.gender = 'Please select a gender.';
-		if (!Array.isArray(formData.domains) || formData.domains.length === 0)
+		if (!/\S+@\S+\.\S+/.test(data.email)) newErrors.email = 'A valid email is required.';
+		if (!data.phone.trim()) newErrors.phone = 'Phone number is required.';
+		if (!data.course.trim()) newErrors.course = 'Your course is required.';
+		if (!data.gender) newErrors.gender = 'Please select a gender.';
+		if (!Array.isArray(data.domains) || data.domains.length === 0)
 			newErrors.domains = 'Select at least one domain.';
-		if (Array.isArray(formData.domains) && formData.domains.length > 2)
+		if (Array.isArray(data.domains) && data.domains.length > 2)
 			newErrors.domains = 'You can select up to 2 domains.';
-		if (!formData.accommodation) newErrors.accommodation = 'Select accommodation preference.';
-		if (formData.accommodation === 'hostler' && !formData.hostelName.trim())
+		if (!data.accommodation) newErrors.accommodation = 'Select accommodation preference.';
+		if (data.accommodation === 'hostler' && !data.hostelName.trim())
 			newErrors.hostelName = 'Hostel name required for hostlers.';
-		if (!formData.bio.trim()) newErrors.bio = 'A short bio is required.';
-		setErrors(newErrors);
-		return Object.keys(newErrors).length === 0;
+		if (!data.bio.trim()) newErrors.bio = 'A short bio is required.';
+		return newErrors;
 	};
+
+	const isFormValid = useMemo(() => {
+		const errs = validateNoSet(formData);
+		return Object.keys(errs).length === 0;
+	}, [formData]);
 
 	const parseServerError = (err) => {
 		const resp = err?.response?.data;
 		if (!resp) return err?.message || 'Unknown error';
+		// If server returns field-level errors as object { field: msg }
+		if (resp.errors && typeof resp.errors === 'object') {
+			return resp;
+		}
 		if (Array.isArray(resp.details) && resp.details.length) {
 			return [resp.message, ...resp.details].join(' — ');
 		}
@@ -239,9 +276,36 @@ const JoinPage = () => {
 		if (serverMessage.text) setServerMessage({ type: '', text: '' });
 	};
 
+	// toggle domain by key (used for keyboard accessible chips)
+	const toggleDomain = (key) => {
+		setFormData((prev) => {
+			const next = new Set(prev.domains || []);
+			if (next.has(key)) next.delete(key);
+			else {
+				if (next.size >= 2) {
+					setErrors((p) => ({ ...p, domains: 'You can select up to 2 domains only.' }));
+					return prev;
+				}
+				next.add(key);
+			}
+			setErrors((p) => ({ ...p, domains: '' }));
+			return { ...prev, domains: Array.from(next) };
+		});
+	};
+
 	const handleSubmit = async (e) => {
 		e.preventDefault();
-		if (!validate()) return;
+		// evaluate and set errors if any
+		const newErrors = validateNoSet(formData);
+		if (Object.keys(newErrors).length > 0) {
+			setErrors(newErrors);
+			// focus first error field
+			const first = Object.keys(newErrors)[0];
+			const el = document.querySelector(`[name="${first}"]`);
+			if (el) el.focus();
+			return;
+		}
+
 		setLoading(true);
 		setServerMessage({ type: '', text: '' });
 
@@ -283,7 +347,19 @@ const JoinPage = () => {
 			});
 			setErrors({});
 		} catch (err) {
-			setServerMessage({ type: 'error', text: parseServerError(err) });
+			const parsed = parseServerError(err);
+			// If server returned field-level errors object, apply them
+			if (parsed && parsed.errors && typeof parsed.errors === 'object') {
+				setErrors((prev) => ({ ...prev, ...parsed.errors }));
+				setServerMessage({
+					type: 'error',
+					text: parsed.message || 'Please fix the highlighted fields.',
+				});
+			} else if (typeof parsed === 'string') {
+				setServerMessage({ type: 'error', text: parsed });
+			} else {
+				setServerMessage({ type: 'error', text: 'Submission failed. Try again.' });
+			}
 		} finally {
 			setLoading(false);
 		}
@@ -301,7 +377,7 @@ const JoinPage = () => {
 						Apply to join our club — pick up to 2 domains and tell us about you.
 					</p>
 
-					<ul className="benefits">
+					<ul className="benefits" aria-hidden>
 						<li>Hands-on workshops & hackathons</li>
 						<li>Mentorship, projects & internships</li>
 						<li>Priority tickets & resource access</li>
@@ -342,14 +418,20 @@ const JoinPage = () => {
 							<StepIndicator step={1} totalSteps={4} title="Personal Information" />
 							<div className="grid cols-2">
 								<InputField
+									id="fullName"
+									label="Full name"
 									icon={<User size={18} />}
 									name="fullName"
 									placeholder="Full name"
 									value={formData.fullName}
 									onChange={handleChange}
 									error={errors.fullName}
+									inputRef={nameRef}
+									autoFocus
 								/>
 								<InputField
+									id="email"
+									label="Email"
 									icon={<Mail size={18} />}
 									type="email"
 									name="email"
@@ -366,6 +448,8 @@ const JoinPage = () => {
 							<StepIndicator step={2} totalSteps={4} title="Academic Details" />
 							<div className="grid cols-2">
 								<InputField
+									id="LpuId"
+									label="LPU ID"
 									icon={<User size={18} />}
 									name="LpuId"
 									placeholder="LPU ID (8 digits)"
@@ -376,6 +460,8 @@ const JoinPage = () => {
 									inputMode="numeric"
 								/>
 								<InputField
+									id="course"
+									label="Course"
 									icon={<BookOpen size={18} />}
 									name="course"
 									placeholder="Course (e.g., B.Tech CSE)"
@@ -384,6 +470,8 @@ const JoinPage = () => {
 									error={errors.course}
 								/>
 								<InputField
+									id="phone"
+									label="Phone"
 									icon={<Phone size={18} />}
 									type="tel"
 									name="phone"
@@ -393,10 +481,14 @@ const JoinPage = () => {
 									error={errors.phone}
 								/>
 								<div className="relative w-full">
-									<div className="icon-left">
+									<label htmlFor="gender" className="sr-only">
+										Gender
+									</label>
+									<div className="icon-left" aria-hidden>
 										<Users size={18} />
 									</div>
 									<select
+										id="gender"
 										aria-label="gender"
 										name="gender"
 										value={formData.gender}
@@ -429,27 +521,42 @@ const JoinPage = () => {
 										Select domains{' '}
 										<span className="muted">({domainsSelectedCount}/2)</span>
 									</label>
-									<div className="domains-grid">
+									<div
+										className="domains-grid"
+										role="group"
+										aria-label="Preferred domains"
+									>
 										{DOMAIN_OPTIONS.map((opt) => {
 											const checked = formData.domains.includes(opt.key);
 											const disabled = !checked && disableMoreDomains;
 											return (
-												<label
+												<button
 													key={opt.key}
+													type="button"
+													role="checkbox"
+													aria-checked={checked}
 													className={`domain-chip ${
 														checked ? 'checked' : ''
 													} ${disabled ? 'disabled' : ''}`}
+													onClick={() => toggleDomain(opt.key)}
+													onKeyDown={(e) => {
+														if (isToggleKey(e)) {
+															e.preventDefault();
+															toggleDomain(opt.key);
+														}
+													}}
+													disabled={disabled}
 												>
 													<input
 														type="checkbox"
 														name="domains"
 														value={opt.key}
 														checked={checked}
-														onChange={handleChange}
-														disabled={disabled}
+														readOnly
+														tabIndex={-1}
 													/>
 													<span>{opt.label}</span>
-												</label>
+												</button>
 											);
 										})}
 									</div>
@@ -485,6 +592,7 @@ const JoinPage = () => {
 									{formData.accommodation === 'hostler' && (
 										<div>
 											<input
+												id="hostelName"
 												name="hostelName"
 												ref={hostelRef}
 												placeholder="Hostel name"
@@ -530,6 +638,7 @@ const JoinPage = () => {
 						<div className="section">
 							<StepIndicator step={4} totalSteps={4} title="About You" />
 							<TextAreaField
+								id="bio"
 								name="bio"
 								placeholder="A short bio about your interests and skills"
 								value={formData.bio}
@@ -544,7 +653,10 @@ const JoinPage = () => {
 						</div>
 
 						<div className="form-actions">
-							<GradientButton isLoading={loading}>Submit Application</GradientButton>
+							{/* disable submit if invalid or loading; show review-first option on mobile if preferred */}
+							<GradientButton isLoading={loading} disabled={loading || !isFormValid}>
+								Submit Application
+							</GradientButton>
 						</div>
 					</form>
 
