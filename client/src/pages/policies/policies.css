@@ -1,5 +1,167 @@
 :root {
-	/* dark-mode defaults (safe fallbacks if global tokens missing) */
+	--card-font: system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial;
+	--heading-weight: 700;
+	--body-weight: 400;
+	--toc-width: 220px;
+	--anchor-color: rgba(124, 58, 237, 0.08);
+}
+
+/* base readability */
+.policy-card {
+	font-family: var(--card-font);
+	font-weight: var(--body-weight);
+	line-height: 1.6;
+	letter-spacing: 0.1px;
+}
+
+/* Table of contents */
+.policy-toc {
+	display: flex;
+	gap: 12px;
+	align-items: center;
+	justify-content: flex-start;
+	padding: 10px;
+	border-radius: 10px;
+	background: linear-gradient(180deg, rgba(0, 0, 0, 0.01), transparent);
+	border: 1px solid rgba(0, 0, 0, 0.02);
+	margin-bottom: 12px;
+	flex-wrap: wrap;
+}
+.policy-toc .toc-links {
+	display: flex;
+	gap: 10px;
+	flex-wrap: wrap;
+}
+.policy-toc a {
+	color: var(--text-secondary);
+	font-size: 0.95rem;
+	padding: 6px 10px;
+	border-radius: 8px;
+	text-decoration: none;
+	transition: background 0.12s ease, color 0.12s ease, transform 0.08s ease;
+}
+.policy-toc a:hover,
+.policy-toc a:focus {
+	background: var(--anchor-color);
+	color: var(--text);
+	transform: translateY(-2px);
+	outline: none;
+}
+
+/* sticky TOC on wider screens */
+@media (min-width: 1100px) {
+	.policy-layout {
+		display: grid;
+		grid-template-columns: var(--toc-width) 1fr;
+		gap: 28px;
+		align-items: start;
+	}
+	.policy-toc {
+		position: sticky;
+		top: 96px;
+		height: fit-content;
+		flex-direction: column;
+		align-items: flex-start;
+		padding: 12px;
+		width: var(--toc-width);
+	}
+	.policy-toc .toc-links {
+		flex-direction: column;
+		gap: 8px;
+	}
+	.policy-card {
+		margin-top: 0;
+	}
+}
+
+/* anchor link on headings (for deep link discoverability) */
+.policy-card h2,
+.policy-card h3 {
+	position: relative;
+}
+.policy-card .section-anchor {
+	position: absolute;
+	left: -28px;
+	top: 50%;
+	transform: translateY(-50%);
+	width: 20px;
+	height: 20px;
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	opacity: 0;
+	transition: opacity 0.12s ease, transform 0.12s ease;
+	color: var(--text-secondary);
+}
+.policy-card h2:hover .section-anchor,
+.policy-card h3:hover .section-anchor,
+.policy-card h2:focus-within .section-anchor {
+	opacity: 1;
+	transform: translateY(-50%) translateX(0);
+}
+
+/* compact mobile TOC (toggle) */
+.toc-toggle {
+	display: none;
+	gap: 8px;
+	align-items: center;
+	background: transparent;
+	border: 1px solid var(--glass-border);
+	padding: 8px 10px;
+	border-radius: 8px;
+	color: var(--text-secondary);
+	cursor: pointer;
+}
+@media (max-width: 900px) {
+	.toc-toggle {
+		display: inline-flex;
+	}
+	.policy-toc {
+		display: none;
+	}
+	.policy-toc.open {
+		display: flex;
+		position: relative;
+		width: 100%;
+	}
+}
+
+/* print styles */
+@media print {
+	.policy-card {
+		box-shadow: none;
+		border: none;
+		background: #fff;
+		color: #000;
+	}
+	.policy-nav,
+	.policy-toc,
+	.toc-toggle {
+		display: none;
+	}
+}
+
+/* focus / accessibility */
+.policy-toc a:focus {
+	outline: 3px solid rgba(91, 33, 182, 0.12);
+	outline-offset: 2px;
+}
+
+/* subtle section highlight for scanning */
+.policy-card section[data-highlight='true'] {
+	background: linear-gradient(180deg, rgba(124, 58, 237, 0.02), transparent);
+	border-radius: 8px;
+	padding: 12px;
+}
+
+/* ensure clear contrast in light mode for muted text */
+:root[data-theme='light'] .policy-card p,
+:root[data-theme='light'] .policy-card li {
+	color: var(--text-secondary);
+}
+
+/* dark-mode defaults (safe fallbacks if global tokens missing) */
+:root {
 	--card-bg: rgba(255, 255, 255, 0.03);
 	--glass-border: rgba(255, 255, 255, 0.06);
 	--text: #e6eef8;
