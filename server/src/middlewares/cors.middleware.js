@@ -5,6 +5,7 @@ const allowedOrigins = [
 	'http://localhost:5173',
 	'https://orgsyntax.xyz',
 	'https://www.orgsyntax.xyz',
+	'https://api.orgsyntax.xyz'
 ];
 
 const corsOptions = {
