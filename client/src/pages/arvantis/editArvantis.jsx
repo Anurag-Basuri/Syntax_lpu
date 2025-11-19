@@ -35,7 +35,6 @@ import {
 	bulkDeleteMedia as svcBulkDeleteMedia,
 } from '../../services/arvantisServices.js';
 import { Download, Trash2, ArrowUp, ArrowDown } from 'lucide-react';
-import GlassCard from '../../components/arvantis/GlassCard';
 import EmptyState from '../../components/arvantis/EmptyState';
 import LoadingSpinner from '../../components/arvantis/LoadingSpinner';
 import Badge from '../../components/arvantis/Badge';
@@ -46,6 +45,16 @@ const MAX_FILE_SIZE = 10 * 1024 * 1024;
 const FILE_TYPES_IMAGES = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp'];
 
 const safeFilename = (s = '') => String(s).replace(/[:]/g, '-').replace(/\s+/g, '-');
+
+const GlassCard = ({ children, className = '', hover = false, gradient = false }) => (
+	<div
+		className={`glass-card ${className}`}
+		data-hover={hover ? '1' : '0'}
+		data-gradient={gradient ? '1' : '0'}
+	>
+		{children}
+	</div>
+);
 
 const EditArvantis = ({ setDashboardError = () => {} }) => {
 	const [fests, setFests] = useState([]);
