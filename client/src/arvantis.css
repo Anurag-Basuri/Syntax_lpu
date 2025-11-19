@@ -1219,3 +1219,25 @@ body {
 	/* ensure the page bg uses --bg-base for consistent/contrasting background */
 	background-color: var(--bg-base, #fff);
 }
+
+/* make powered-by compact block and sponsor logos slightly larger and responsive */
+.partner-poweredby-compact .partner-logo {
+	height: 40px; /* was h-9 (~36px), increase slightly */
+	max-height: 48px;
+	object-fit: contain;
+}
+
+/* sidebar Title Sponsor tile increased size */
+@media (min-width: 768px) {
+	/* ensure the larger sidebar tile stays balanced */
+	.glass-card .w-20.h-20 {
+		width: 80px;
+		height: 80px;
+	}
+}
+@media (max-width: 767px) {
+	.glass-card .w-20.h-20 {
+		width: 64px;
+		height: 64px;
+	}
+}

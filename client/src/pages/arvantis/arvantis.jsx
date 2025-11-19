@@ -595,7 +595,7 @@ const ArvantisPage = () => {
 
 							{/* powered-by inline label (if present) */}
 							{titleSponsor && (
-								<div className="ml-2 flex items-center gap-3">
+								<div className="ml-5 flex items-center gap-3">
 									<span className="text-sm muted">powered by</span>
 									<a
 										href={titleSponsor.website || '#'}
@@ -608,9 +608,10 @@ const ArvantisPage = () => {
 									>
 										{titleSponsor.logo?.url ? (
 											<img
+												/* increase header sponsor size (responsive) */
 												src={titleSponsor.logo.url}
 												alt={titleSponsor.name}
-												className="h-6 object-contain rounded-sm"
+												className="h-10 md:h-12 object-contain rounded-sm"
 												loading="lazy"
 											/>
 										) : (
@@ -809,7 +810,8 @@ const ArvantisPage = () => {
 							</div>
 							<div className="mt-3 flex items-center gap-3">
 								<div
-									className="w-14 h-14 rounded-md overflow-hidden bg-white/5 flex items-center justify-center"
+									/* increase sidebar sponsor tile for better visibility */
+									className="w-20 h-20 rounded-md overflow-hidden bg-white/5 flex items-center justify-center"
 									style={{ border: '1px solid var(--glass-border)' }}
 								>
 									{titleSponsor.logo?.url ? (
