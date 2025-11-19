@@ -6,10 +6,12 @@ import { motion, AnimatePresence } from 'framer-motion';
 import AppRoutes from './routes/AppRoutes.jsx';
 import Navbar from './components/Navbar.jsx';
 import Background3D from './components/Background3D.jsx';
+import { useTheme } from './hooks/useTheme.js'; // NEW
 import './App.css';
 
 function App() {
 	const location = useLocation();
+	const { theme } = useTheme(); // NEW: global theme from context/hook
 	const [scrollProgress, setScrollProgress] = useState(0);
 	const [isNavbarVisible, setIsNavbarVisible] = useState(true);
 	const lastScrollY = useRef(0);
@@ -65,6 +67,19 @@ function App() {
 		setIsNavbarVisible(true);
 		lastScrollY.current = window.scrollY || 0;
 	}, [location.pathname]);
+
+	// Ensure the chosen theme is applied globally so :root[data-theme='light'] works
+	useEffect(() => {
+		try {
+			if (theme) {
+				document.documentElement.setAttribute('data-theme', theme);
+			} else {
+				document.documentElement.removeAttribute('data-theme');
+			}
+		} catch (e) {
+			// non-fatal
+		}
+	}, [theme]);
 
 	const pageVariants = {
 		initial: { opacity: 0, y: 15 },
