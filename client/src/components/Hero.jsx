@@ -32,13 +32,18 @@ const Hero = () => {
 	];
 
 	return (
-		<section className="relative overflow-hidden bg-transparent min-h-screen flex items-center">
+		<section className="relative overflow-hidden bg-transparent min-h-[72vh] flex items-center py-10">
 			<div className="page-container">
-				<div className="grid grid-cols-1 lg:grid-cols-12 gap-y-12 lg:gap-x-12 items-center">
-					{/* Left: Narrative */}
-					<div className="order-2 lg:order-1 lg:col-span-7 text-center lg:text-left">
-						<motion.div {...fadeUp(0)} className="mb-5 inline-flex">
-							<div className="hero-badge">
+				{/* Use a single-column flow on small screens so narrative appears first,
+                    and two-column layout on large screens for balanced composition */}
+				<div className="grid grid-cols-1 lg:grid-cols-12 gap-y-8 lg:gap-x-12 items-center">
+					{/* Left: Narrative (kept first on mobile) */}
+					<div className="lg:col-span-7 text-center lg:text-left order-1">
+						<motion.div
+							{...fadeUp(0)}
+							className="mb-4 inline-flex justify-center lg:justify-start"
+						>
+							<div className="hero-badge inline-flex items-center gap-2 rounded-full px-3 py-1 bg-[rgba(124,58,237,0.06)] text-sm">
 								<Sparkles className="w-4 h-4 text-accent-1" />
 								<span className="font-medium">Learn. Build. Lead.</span>
 							</div>
@@ -46,7 +51,7 @@ const Hero = () => {
 
 						<motion.h1
 							{...fadeUp(0.06)}
-							className="font-display font-extrabold tracking-tighter leading-[1.05] text-4xl sm:text-5xl md:text-6xl"
+							className="font-display font-extrabold tracking-tighter leading-[1.05] text-3xl sm:text-4xl md:text-5xl lg:text-6xl"
 						>
 							<span className="block text-primary">Empowering Students To</span>
 							<span className="block mt-1 brand-text">Build, Lead & Innovate.</span>
@@ -54,22 +59,20 @@ const Hero = () => {
 
 						<motion.p
 							{...fadeUp(0.14)}
-							className="mt-5 text-lg md:text-xl text-secondary max-w-2xl mx-auto lg:mx-0"
+							className="mt-4 text-base md:text-lg text-secondary max-w-2xl mx-auto lg:mx-0"
 						>
 							Syntax is a multidisciplinary student-driven community at LPU where
-							ideas turn into real-world impact.
+							ideas turn into real-world impact through projects, events and
+							mentorship.
 						</motion.p>
 
 						{/* Pillars */}
 						<motion.div
 							{...fadeUp(0.2)}
-							className="mt-8 flex flex-wrap items-center justify-center lg:justify-start gap-x-4 gap-y-2"
+							className="mt-6 flex flex-wrap items-center justify-center lg:justify-start gap-3 text-sm"
 						>
 							{pillars.map((pillar, i) => (
-								<div
-									key={i}
-									className="flex items-center gap-2 text-sm text-secondary"
-								>
+								<div key={i} className="flex items-center gap-2 text-secondary">
 									<pillar.icon className="w-4 h-4 text-accent-1" />
 									<span>{pillar.name}</span>
 									{i < pillars.length - 1 && (
@@ -82,15 +85,16 @@ const Hero = () => {
 						{/* CTAs */}
 						<motion.div
 							{...fadeUp(0.28)}
-							className="mt-8 flex flex-col sm:flex-row items-center justify-center lg:justify-start gap-3.5 sm:gap-4 w-full"
+							className="mt-6 flex flex-col sm:flex-row items-center justify-center lg:justify-start gap-3 w-full"
 						>
 							<motion.button
 								whileHover={{ scale: 1.03 }}
 								whileTap={{ scale: 0.97 }}
 								onClick={() => navigate('/join')}
-								className="btn btn-primary w-full sm:w-auto"
+								className="btn btn-primary w-full sm:w-auto flex items-center justify-center gap-2"
+								aria-label="Join Syntax Club"
 							>
-								Join Syntax
+								<span>Join Syntax</span>
 								<ArrowRight className="w-4 h-4" />
 							</motion.button>
 
@@ -102,35 +106,42 @@ const Hero = () => {
 										.getElementById('about-syntax')
 										?.scrollIntoView({ behavior: 'smooth' })
 								}
-								className="btn btn-secondary w-full sm:w-auto"
+								className="btn btn-secondary w-full sm:w-auto flex items-center justify-center gap-2"
+								aria-label="Explore our mission"
 							>
 								<PlayCircle className="w-5 h-5" />
-								Explore Our Mission
+								<span>Explore Our Mission</span>
 							</motion.button>
 						</motion.div>
 
 						{/* Scroll cue */}
 						<motion.div
 							{...fadeUp(0.36)}
-							className="mt-10 flex items-center justify-center lg:justify-start gap-2 text-muted"
+							className="mt-8 flex items-center justify-center lg:justify-start gap-2 text-muted text-sm"
+							aria-hidden
 						>
 							<ChevronsDown className="w-4 h-4" />
-							<span className="text-sm">Scroll to continue the story</span>
+							<span>Scroll to continue the story</span>
 						</motion.div>
 					</div>
 
-					{/* Right: Visual cues */}
-					<motion.div {...fadeUp(0.1)} className="order-1 lg:order-2 lg:col-span-5">
-						<div className="hero-visuals-container min-h-[clamp(340px,45vw,520px)]">
+					{/* Right: Visual cues (placed after narrative on mobile) */}
+					<motion.div {...fadeUp(0.1)} className="lg:col-span-5 order-2">
+						{/* visuals: stack into a responsive grid; reduce size on small screens */}
+						<div
+							className="hero-visuals-container grid grid-cols-1 sm:grid-cols-2 gap-3 lg:gap-4"
+							role="presentation"
+							aria-hidden={prefersReducedMotion}
+						>
 							{/* Card 1 */}
 							<motion.div
-								className="hero-card"
-								initial={{ rotate: -8 }}
+								className="hero-card rounded-lg p-3 border border-[rgba(0,0,0,0.04)] bg-[color-mix(in srgb, var(--card-bg) 60%, transparent)]"
+								initial={{ rotate: -6 }}
 								animate={
 									prefersReducedMotion
 										? {}
 										: {
-												y: [0, -12, 0],
+												y: [0, -10, 0],
 												transition: {
 													duration: 8,
 													repeat: Infinity,
@@ -139,8 +150,8 @@ const Hero = () => {
 										  }
 								}
 							>
-								<div className="flex items-center gap-3 p-3">
-									<div className="flex items-center justify-center w-10 h-10 rounded-lg bg-blue-500/12 border border-blue-500/20">
+								<div className="flex items-center gap-3">
+									<div className="w-10 h-10 rounded-lg bg-blue-500/12 border border-blue-500/20 flex items-center justify-center">
 										<Users className="w-5 h-5 text-blue-400" />
 									</div>
 									<div>
@@ -154,23 +165,23 @@ const Hero = () => {
 
 							{/* Card 2 */}
 							<motion.div
-								className="hero-card"
+								className="hero-card rounded-lg p-3 border border-[rgba(0,0,0,0.04)] bg-[color-mix(in srgb, var(--card-bg) 60%, transparent)]"
 								initial={{ rotate: 6 }}
 								animate={
 									prefersReducedMotion
 										? {}
 										: {
-												y: [0, 15, 0],
+												y: [0, 12, 0],
 												transition: {
 													duration: 10,
 													repeat: Infinity,
 													ease: 'easeInOut',
-													delay: 0.8,
+													delay: 0.6,
 												},
 										  }
 								}
 							>
-								<div className="p-3">
+								<div>
 									<p className="font-mono text-xs text-secondary mb-2">
 										// deploying...
 									</p>
@@ -185,8 +196,8 @@ const Hero = () => {
 
 							{/* Card 3 */}
 							<motion.div
-								className="hero-card"
-								initial={{ rotate: 10 }}
+								className="hero-card rounded-lg p-3 border border-[rgba(0,0,0,0.04)] bg-[color-mix(in srgb, var(--card-bg) 60%, transparent)]"
+								initial={{ rotate: 8 }}
 								animate={
 									prefersReducedMotion
 										? {}
@@ -196,13 +207,13 @@ const Hero = () => {
 													duration: 9,
 													repeat: Infinity,
 													ease: 'easeInOut',
-													delay: 0.4,
+													delay: 0.3,
 												},
 										  }
 								}
 							>
-								<div className="flex items-center gap-3 p-3">
-									<div className="flex items-center justify-center w-10 h-10 rounded-lg bg-pink-500/12 border border-pink-500/20">
+								<div className="flex items-center gap-3">
+									<div className="w-10 h-10 rounded-lg bg-pink-500/12 border border-pink-500/20 flex items-center justify-center">
 										<Palette className="w-5 h-5 text-pink-400" />
 									</div>
 									<div>
@@ -214,7 +225,7 @@ const Hero = () => {
 
 							{/* Card 4 */}
 							<motion.div
-								className="hero-card"
+								className="hero-card rounded-lg p-3 border border-[rgba(0,0,0,0.04)] bg-[color-mix(in srgb, var(--card-bg) 60%, transparent)]"
 								initial={{ rotate: -2 }}
 								animate={
 									prefersReducedMotion
@@ -225,13 +236,13 @@ const Hero = () => {
 													duration: 11,
 													repeat: Infinity,
 													ease: 'easeInOut',
-													delay: 1.2,
+													delay: 0.9,
 												},
 										  }
 								}
 							>
-								<div className="flex items-center gap-3 p-3">
-									<div className="flex items-center justify-center w-10 h-10 rounded-lg bg-purple-500/12 border border-purple-500/20">
+								<div className="flex items-center gap-3">
+									<div className="w-10 h-10 rounded-lg bg-purple-500/12 border border-purple-500/20 flex items-center justify-center">
 										<Rocket className="w-5 h-5 text-purple-400" />
 									</div>
 									<div>
