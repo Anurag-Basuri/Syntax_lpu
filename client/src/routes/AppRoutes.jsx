@@ -46,9 +46,8 @@ const AppRoutes = () => {
 				<Route path="/team" element={<TeamPage />} />
 				<Route path="/contact" element={<ContactPage />} />
 				<Route path="/socials" element={<SocialsPage />} />
-				<Route path="/policies/cookie" element={<CookiePolicy />} />
 				<Route path="/policies/privacy" element={<PrivacyPolicy />} />
-				<Route path="/policy/terms" element={<TermsPolicy />} />
+				<Route path="/policies/terms" element={<TermsPolicy />} />
 				<Route path="/policy/refund" element={<RefundPolicy />} />
 
 				{/* Auth routes */}
