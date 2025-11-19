@@ -35,11 +35,11 @@ import {
 	bulkDeleteMedia as svcBulkDeleteMedia,
 } from '../../services/arvantisServices.js';
 import { Download, Trash2, ArrowUp, ArrowDown } from 'lucide-react';
-import EmptyState from '../../components/arvantis/EmptyState';
-import LoadingSpinner from '../../components/arvantis/LoadingSpinner';
-import Badge from '../../components/arvantis/Badge';
-import PartnerQuickAdd from '../../components/arvantis/PartnerQuickAdd';
-import Toast from '../../components/arvantis/Toast';
+import EmptyState from '../../components/arvantis/EmptyState.jsx';
+import LoadingSpinner from '../../components/arvantis/LoadingSpinner.jsx';
+import Badge from '../../components/arvantis/Badge.jsx';
+import PartnerQuickAdd from '../../components/arvantis/PartnerQuickAdd.jsx';
+import Toast from '../../components/arvantis/Toast.jsx';
 
 const MAX_FILE_SIZE = 10 * 1024 * 1024;
 const FILE_TYPES_IMAGES = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp'];
