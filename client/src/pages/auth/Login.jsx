@@ -109,14 +109,23 @@ const LoginPage = () => {
 					<div className="logo">SC</div>
 					<div className="brand-text">
 						<h1>Member Login</h1>
-						<p className="muted">Only club members may sign in. Not a member yet?</p>
-						{/* prominent join CTA for non-members */}
+						<p className="muted">
+							Members only — access events, resources and your profile.
+						</p>
+
+						<ul className="auth-benefits" aria-hidden>
+							<li>Priority access to tickets & events</li>
+							<li>Mentorship, projects & workshops</li>
+							<li>Member-only resources & community</li>
+						</ul>
+
+						{/* Apply CTA */}
 						<button
 							className="link-cta"
 							onClick={() => navigate('/join')}
-							aria-label="Join the club"
+							aria-label="Apply to join the club"
 						>
-							Join the Club
+							Apply to Join
 						</button>
 					</div>
 				</aside>

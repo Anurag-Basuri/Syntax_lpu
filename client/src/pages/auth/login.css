@@ -21,17 +21,16 @@
 	align-items: center;
 	justify-content: center;
 	padding: 2rem 1rem;
-	background: var(--bg-1);
-	background-attachment: fixed;
+	background: transparent; /* was gradient — now transparent per request */
 }
 
 /* Shell holds brand + card for slightly wider layout on desktop */
 .auth-shell {
 	width: 100%;
-	max-width: 980px;
+	max-width: 920px;
 	display: grid;
-	grid-template-columns: 320px 1fr;
-	gap: 2rem;
+	grid-template-columns: 300px 1fr;
+	gap: 1.25rem;
 	align-items: center;
 }
 
@@ -75,7 +74,8 @@
 	backdrop-filter: blur(8px);
 	border: 1px solid var(--glass-border);
 	border-radius: 16px;
-	padding: 1.25rem 1.25rem;
+	padding: 1rem;
+	max-width: 680px;
 	box-shadow: 0 20px 60px rgba(2, 6, 23, 0.35);
 	color: var(--text);
 }
@@ -318,5 +318,19 @@ button:focus {
 	margin-bottom: 0.75rem;
 }
 .auth-brand .link-cta {
-	margin-top: 0.5rem;
+	margin-top: 0.6rem;
+}
+
+/* Benefits list in login brand (matches join) */
+.auth-benefits {
+	margin: 0.6rem 0 0;
+	padding-left: 1rem;
+	color: var(--muted);
+	display: flex;
+	flex-direction: column;
+	gap: 0.25rem;
+	font-size: 0.95rem;
+}
+.auth-benefits li::marker {
+	color: var(--accent-1);
 }
