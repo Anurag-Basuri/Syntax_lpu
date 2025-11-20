@@ -6,6 +6,7 @@ import { ApiResponse } from '../utils/ApiResponse.js';
 import { uploadFile, deleteFile, deleteFiles } from '../utils/cloudinary.js';
 import mongoose from 'mongoose';
 import { Parser } from 'json2csv';
+import { getHeroMedia, getFirstPoster } from '../utils/arvantisMedia.js';
 
 /* helpers */
 const slugify = (str = '') =>
@@ -24,7 +25,8 @@ const findFestBySlugOrYear = async (identifier, populate = false) => {
 	// try by ObjectId first
 	if (mongoose.isValidObjectId(idStr)) {
 		let q = Arvantis.findById(idStr);
-		if (populate) q = q.populate({ path: 'events', select: 'title eventDate category slug' });
+		if (populate)
+			q = q.populate({ path: 'events', select: 'title eventDate category slug description' });
 		const doc = await q.exec();
 		if (doc) return doc;
 		// fallthrough
@@ -35,7 +37,8 @@ const findFestBySlugOrYear = async (identifier, populate = false) => {
 	const query = isYear ? { year: parseInt(idStr, 10) } : { slug: idStr };
 
 	let q = Arvantis.findOne(query);
-	if (populate) q = q.populate({ path: 'events', select: 'title eventDate category slug' });
+	if (populate)
+		q = q.populate({ path: 'events', select: 'title eventDate category slug description' });
 	const fest = await q.exec();
 	if (!fest) throw new ApiError.NotFound(`Fest with identifier '${identifier}' not found.`);
 	return fest;
@@ -65,12 +68,8 @@ const getLatestFest = asyncHandler(async (req, res) => {
 
 	if (!fest) return ApiResponse.success(res, null, 'No fest data available.');
 
-	// build rich payload (ensure no sensitive/large fields are leaked)
 	const obj = fest.toObject ? fest.toObject() : fest;
-	const hero =
-		(obj.hero && { ...obj.hero }) ||
-		(obj.poster && { ...obj.poster }) ||
-		(obj.gallery && obj.gallery.length ? obj.gallery[0] : null);
+	const hero = getHeroMedia(obj) || null;
 
 	const durationDays =
 		obj.startDate && obj.endDate
@@ -144,7 +143,6 @@ const createFest = asyncHandler(async (req, res) => {
 		name: name || 'Arvantis',
 		year: y,
 		description,
-		description,
 		tagline: tagline || undefined,
 		startDate,
 		endDate,
@@ -174,7 +172,7 @@ const getAllFests = asyncHandler(async (req, res) => {
 				status: 1,
 				startDate: 1,
 				endDate: 1,
-				poster: 1,
+				poster: { $arrayElemAt: ['$posters', 0] },
 				totalPartners: { $size: { $ifNull: ['$partners', []] } },
 				totalEvents: { $size: { $ifNull: ['$events', []] } },
 			},
@@ -927,7 +925,7 @@ const addTrack = asyncHandler(async (req, res) => {
 	return ApiResponse.success(res, track, 'Track added', 201);
 });
 
-// Update track
+// Update track / remove track
 const removeTrack = asyncHandler(async (req, res) => {
 	const { identifier, trackKey } = req.params;
 	const fest = await findFestBySlugOrYear(identifier);
@@ -1013,7 +1011,7 @@ const addGuideline = asyncHandler(async (req, res) => {
 		throw new ApiError.BadRequest('title or details is required to create a guideline.');
 	fest.guidelines = fest.guidelines || [];
 
-	// ensure each subdocument has a stable id (string) so frontend can reference it
+	// stable id
 	const guid = {
 		id: mongoose.Types.ObjectId().toString(),
 		title: String(title).trim(),
@@ -1028,6 +1026,25 @@ const addGuideline = asyncHandler(async (req, res) => {
 	return ApiResponse.success(res, added, 'Guideline added', 201);
 });
 
+const updateGuideline = asyncHandler(async (req, res) => {
+	const { identifier, guidelineId } = req.params;
+	const fest = await findFestBySlugOrYear(identifier);
+
+	const idx = (fest.guidelines || []).findIndex(
+		(g) => String(g.id || g._id) === String(guidelineId)
+	);
+	if (idx === -1) throw new ApiError.NotFound('Guideline not found.');
+
+	const sub = fest.guidelines[idx];
+	const { title, details, order } = req.body;
+	if (title !== undefined) sub.title = String(title).trim();
+	if (details !== undefined) sub.details = String(details).trim();
+	if (order !== undefined) sub.order = Number(order);
+	fest.markModified('guidelines');
+	await fest.save();
+	return ApiResponse.success(res, sub, 'Guideline updated', 200);
+});
+
 /* Remove guideline */
 const removeGuideline = asyncHandler(async (req, res) => {
 	const { identifier, guidelineId } = req.params;
@@ -1036,7 +1053,6 @@ const removeGuideline = asyncHandler(async (req, res) => {
 	if (!fest.guidelines || fest.guidelines.length === 0)
 		throw new ApiError.NotFound('No guidelines found.');
 
-	// support both legacy _id and new string id
 	const idx = (fest.guidelines || []).findIndex(
 		(g) => String(g.id || g._id) === String(guidelineId)
 	);
@@ -1079,7 +1095,7 @@ const addPrize = asyncHandler(async (req, res) => {
 	const fest = await findFestBySlugOrYear(req.params.identifier);
 	const { title = '', position = '', amount, currency = 'INR', description = '' } = req.body;
 
-	if (!title && !position && !amount)
+	if (!title && !position && (amount === undefined || amount === null))
 		throw new ApiError.BadRequest(
 			'At least one of title, position or amount is required to create a prize.'
 		);
@@ -1089,7 +1105,7 @@ const addPrize = asyncHandler(async (req, res) => {
 		id: mongoose.Types.ObjectId().toString(),
 		title: String(title).trim(),
 		position: String(position).trim(),
-		amount: amount !== undefined ? Number(amount) : undefined,
+		amount: amount !== undefined && amount !== null ? Number(amount) : undefined,
 		currency: String(currency).trim(),
 		description: String(description).trim(),
 	};
@@ -1098,6 +1114,25 @@ const addPrize = asyncHandler(async (req, res) => {
 	const added = fest.prizes[fest.prizes.length - 1];
 
 	return ApiResponse.success(res, added, 'Prize added', 201);
+});
+
+const updatePrize = asyncHandler(async (req, res) => {
+	const { identifier, prizeId } = req.params;
+	const fest = await findFestBySlugOrYear(identifier);
+
+	const idx = (fest.prizes || []).findIndex((p) => String(p.id || p._id) === String(prizeId));
+	if (idx === -1) throw new ApiError.NotFound('Prize not found.');
+
+	const sub = fest.prizes[idx];
+	const { title, position, amount, currency, description } = req.body;
+	if (title !== undefined) sub.title = String(title).trim();
+	if (position !== undefined) sub.position = String(position).trim();
+	if (amount !== undefined) sub.amount = Number(amount);
+	if (currency !== undefined) sub.currency = String(currency).trim();
+	if (description !== undefined) sub.description = String(description).trim();
+	fest.markModified('prizes');
+	await fest.save();
+	return ApiResponse.success(res, sub, 'Prize updated', 200);
 });
 
 /* Remove prize */
@@ -1236,9 +1271,11 @@ export {
 	reorderFAQs,
 	setVisibility,
 	addGuideline,
+	updateGuideline,
 	removeGuideline,
 	reorderGuidelines,
 	addPrize,
+	updatePrize,
 	removePrize,
 	reorderPrizes,
 	addGuest,
