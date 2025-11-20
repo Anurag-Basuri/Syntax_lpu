@@ -36,6 +36,15 @@ import {
 	removeFAQ,
 	reorderFAQs,
 	setVisibility,
+	addGuideline,
+	removeGuideline,
+	reorderGuidelines,
+	addPrize,
+	removePrize,
+	reorderPrizes,
+	addGuest,
+	updateGuest,
+	removeGuest,
 } from '../controllers/arvantis.controller.js';
 import { authMiddleware } from '../middlewares/auth.middleware.js';
 import { uploadFile } from '../middlewares/multer.middleware.js';
@@ -167,8 +176,7 @@ router.post(
 	validate([
 		param('identifier').notEmpty().withMessage('Fest identifier is required'),
 		body('name').notEmpty().trim().withMessage('Partner name is required'),
-		body('tier')
-			.optional(),
+		body('tier').optional(),
 		body('website').optional().isURL().withMessage('Must be a valid URL'),
 		body('description').optional().trim(),
 	]),
@@ -364,6 +372,107 @@ router.patch(
 		body('order').isArray().withMessage('order must be an array of faq ids'),
 	]),
 	reorderFAQs
+);
+
+/* -----------------------------
+   Guidelines (admin)
+   ----------------------------- */
+router.post(
+	'/:identifier/guidelines',
+	validate([
+		param('identifier').notEmpty().withMessage('Fest identifier is required'),
+		body('title').optional().trim(),
+		body('details').optional().trim(),
+		body('order').optional().isInt().toInt(),
+	]),
+	addGuideline
+);
+
+router.delete(
+	'/:identifier/guidelines/:guidelineId',
+	validate([
+		param('identifier').notEmpty().withMessage('Fest identifier is required'),
+		param('guidelineId').notEmpty().withMessage('Guideline id is required'),
+	]),
+	removeGuideline
+);
+
+router.patch(
+	'/:identifier/guidelines/reorder',
+	validate([
+		param('identifier').notEmpty().withMessage('Fest identifier is required'),
+		body('order').isArray().withMessage('order must be an array of guideline ids'),
+	]),
+	reorderGuidelines
+);
+
+/* -----------------------------
+   Prizes (admin)
+   ----------------------------- */
+router.post(
+	'/:identifier/prizes',
+	validate([
+		param('identifier').notEmpty().withMessage('Fest identifier is required'),
+		body('title').optional().trim(),
+		body('position').optional().trim(),
+		body('amount').optional().isNumeric().toFloat(),
+		body('currency').optional().trim(),
+		body('description').optional().trim(),
+	]),
+	addPrize
+);
+
+router.delete(
+	'/:identifier/prizes/:prizeId',
+	validate([
+		param('identifier').notEmpty().withMessage('Fest identifier is required'),
+		param('prizeId').notEmpty().withMessage('Prize id is required'),
+	]),
+	removePrize
+);
+
+router.patch(
+	'/:identifier/prizes/reorder',
+	validate([
+		param('identifier').notEmpty().withMessage('Fest identifier is required'),
+		body('order').isArray().withMessage('order must be an array of prize ids'),
+	]),
+	reorderPrizes
+);
+
+/* -----------------------------
+   Guests (admin)
+   ----------------------------- */
+router.post(
+	'/:identifier/guests',
+	validate([
+		param('identifier').notEmpty().withMessage('Fest identifier is required'),
+		body('name').notEmpty().trim().withMessage('Guest name is required'),
+		body('bio').optional().trim(),
+		body('socialLinks').optional().isObject(),
+	]),
+	addGuest
+);
+
+router.patch(
+	'/:identifier/guests/:guestId',
+	validate([
+		param('identifier').notEmpty().withMessage('Fest identifier is required'),
+		param('guestId').notEmpty().withMessage('Guest id is required'),
+		body('name').optional().trim(),
+		body('bio').optional().trim(),
+		body('socialLinks').optional().isObject(),
+	]),
+	updateGuest
+);
+
+router.delete(
+	'/:identifier/guests/:guestId',
+	validate([
+		param('identifier').notEmpty().withMessage('Fest identifier is required'),
+		param('guestId').notEmpty().withMessage('Guest id is required'),
+	]),
+	removeGuest
 );
 
 export default router;
