@@ -51,6 +51,9 @@ import GlassCard from '../../components/Arvantis/GlassCard.jsx';
 import Badge from '../../components/Arvantis/Badge.jsx';
 import PartnerQuickAdd from '../../components/Arvantis/PartnerQuickAdd.jsx';
 import Toast from '../../components/Arvantis/Toast.jsx';
+import EditGuidelines from '../../components/Arvantis/EditGuidelines.jsx';
+import EditPrizes from '../../components/Arvantis/EditPrizes.jsx';
+import EditGuests from '../../components/Arvantis/EditGuests.jsx';
 
 const MAX_FILE_SIZE = 10 * 1024 * 1024;
 const FILE_TYPES_IMAGES = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp'];
@@ -1784,239 +1787,47 @@ const EditArvantis = ({ setDashboardError = () => {} }) => {
 						</div>
 
 						{/* Guidelines */}
-						<div className="mb-4">
-							<div className="flex items-center justify-between mb-2">
-								<h4 className="font-semibold text-white">
-									Guidelines ({(editForm.guidelines || []).length})
-								</h4>
-								<div className="flex items-center gap-2">
-									<input
-										value={guidelineQuickTitle}
-										onChange={(e) => setGuidelineQuickTitle(e.target.value)}
-										placeholder="Title"
-										className="p-2 bg-white/5 rounded w-44"
-									/>
-									<input
-										value={guidelineQuickDetails}
-										onChange={(e) => setGuidelineQuickDetails(e.target.value)}
-										placeholder="Details"
-										className="p-2 bg-white/5 rounded w-64"
-									/>
-									<button
-										onClick={handleAddGuideline}
-										disabled={actionBusy}
-										className="px-3 py-1 rounded bg-emerald-600 text-white text-sm"
-									>
-										Add
-									</button>
-								</div>
-							</div>
-							<div className="space-y-2">
-								{(editForm.guidelines || []).map((g, idx) => (
-									<div
-										key={String(g._id || g.id || idx)}
-										className="flex items-center justify-between p-3 bg-white/3 rounded"
-									>
-										<div className="flex-1">
-											<div className="font-medium text-white">
-												{g.title || '(untitled)'}
-											</div>
-											<div className="text-sm text-gray-400">{g.details}</div>
-										</div>
-										<div className="flex gap-2 items-center">
-											<button
-												onClick={() => handleRemoveGuideline(g._id || g.id)}
-												className="text-red-400"
-											>
-												<Trash2 className="w-5 h-5" />
-											</button>
-											<button
-												onClick={() => reorderGuidelineItems(idx, idx - 1)}
-												disabled={idx === 0 || actionBusy}
-												className="text-gray-400"
-												title="Move up"
-											>
-												<ArrowUp />
-											</button>
-											<button
-												onClick={() => reorderGuidelineItems(idx, idx + 1)}
-												disabled={
-													idx ===
-														(editForm.guidelines || []).length - 1 ||
-													actionBusy
-												}
-												className="text-gray-400"
-												title="Move down"
-											>
-												<ArrowDown />
-											</button>
-										</div>
-									</div>
-								))}
-							</div>
-						</div>
+						<EditGuidelines
+							items={editForm.guidelines || []}
+							quickTitle={guidelineQuickTitle}
+							setQuickTitle={setGuidelineQuickTitle}
+							quickDetails={guidelineQuickDetails}
+							setQuickDetails={setGuidelineQuickDetails}
+							onAdd={handleAddGuideline}
+							onRemove={handleRemoveGuideline}
+							onReorder={reorderGuidelineItems}
+							actionBusy={actionBusy}
+						/>
 
 						{/* Prizes */}
-						<div className="mb-4">
-							<div className="flex items-center justify-between mb-2">
-								<h4 className="font-semibold text-white">
-									Prizes ({(editForm.prizes || []).length})
-								</h4>
-								<div className="flex items-center gap-2">
-									<input
-										value={prizeQuickTitle}
-										onChange={(e) => setPrizeQuickTitle(e.target.value)}
-										placeholder="Title"
-										className="p-2 bg-white/5 rounded w-40"
-									/>
-									<input
-										value={prizeQuickPosition}
-										onChange={(e) => setPrizeQuickPosition(e.target.value)}
-										placeholder="Position"
-										className="p-2 bg-white/5 rounded w-24"
-									/>
-									<input
-										value={prizeQuickAmount}
-										onChange={(e) => setPrizeQuickAmount(e.target.value)}
-										placeholder="Amount"
-										className="p-2 bg-white/5 rounded w-24"
-									/>
-									<select
-										value={prizeQuickCurrency}
-										onChange={(e) => setPrizeQuickCurrency(e.target.value)}
-										className="p-2 bg-white/5 rounded"
-									>
-										<option>INR</option>
-										<option>USD</option>
-										<option>EUR</option>
-									</select>
-									<button
-										onClick={handleAddPrize}
-										disabled={actionBusy}
-										className="px-3 py-1 rounded bg-emerald-600 text-white text-sm"
-									>
-										Add
-									</button>
-								</div>
-							</div>
-							<div className="space-y-2">
-								{(editForm.prizes || []).map((p, idx) => (
-									<div
-										key={String(p._id || p.id || idx)}
-										className="flex items-center justify-between p-3 bg-white/3 rounded"
-									>
-										<div>
-											<div className="font-medium text-white">
-												{p.title || p.position || '(prize)'}
-											</div>
-											<div className="text-sm text-gray-400">
-												{p.position}{' '}
-												{p.amount
-													? `— ${p.amount} ${p.currency || 'INR'}`
-													: ''}
-											</div>
-										</div>
-										<div className="flex gap-2 items-center">
-											<button
-												onClick={() => handleRemovePrize(p._id || p.id)}
-												className="text-red-400"
-											>
-												Remove
-											</button>
-											<button
-												onClick={() => reorderPrizeItems(idx, idx - 1)}
-												disabled={idx === 0 || actionBusy}
-												className="text-gray-400"
-												title="Move up"
-											>
-												<ArrowUp />
-											</button>
-											<button
-												onClick={() => reorderPrizeItems(idx, idx + 1)}
-												disabled={
-													idx === (editForm.prizes || []).length - 1 ||
-													actionBusy
-												}
-												className="text-gray-400"
-												title="Move down"
-											>
-												<ArrowDown />
-											</button>
-										</div>
-									</div>
-								))}
-							</div>
-						</div>
+						<EditPrizes
+							items={editForm.prizes || []}
+							quickTitle={prizeQuickTitle}
+							setQuickTitle={setPrizeQuickTitle}
+							quickPosition={prizeQuickPosition}
+							setQuickPosition={setPrizeQuickPosition}
+							quickAmount={prizeQuickAmount}
+							setQuickAmount={setPrizeQuickAmount}
+							quickCurrency={prizeQuickCurrency}
+							setQuickCurrency={setPrizeQuickCurrency}
+							onAdd={handleAddPrize}
+							onRemove={handleRemovePrize}
+							onReorder={reorderPrizeItems}
+							actionBusy={actionBusy}
+						/>
 
 						{/* Guests */}
-						<div className="mb-4">
-							<div className="flex items-center justify-between mb-2">
-								<h4 className="font-semibold text-white">
-									Guests ({(editForm.guests || []).length})
-								</h4>
-								<div className="flex items-center gap-2">
-									<input
-										value={guestQuickName}
-										onChange={(e) => setGuestQuickName(e.target.value)}
-										placeholder="Name"
-										className="p-2 bg-white/5 rounded w-44"
-									/>
-									<input
-										value={guestQuickBio}
-										onChange={(e) => setGuestQuickBio(e.target.value)}
-										placeholder="Bio (short)"
-										className="p-2 bg-white/5 rounded w-64"
-									/>
-									<button
-										onClick={handleAddGuest}
-										disabled={actionBusy}
-										className="px-3 py-1 rounded bg-emerald-600 text-white text-sm"
-									>
-										Add
-									</button>
-								</div>
-							</div>
-							<div className="space-y-2">
-								{(editForm.guests || []).map((g, idx) => (
-									<div
-										key={String(g._id || g.id || idx)}
-										className="flex items-center justify-between p-3 bg-white/3 rounded"
-									>
-										<div className="flex items-center gap-3">
-											{g.photo?.url ? (
-												<img
-													src={g.photo.url}
-													alt={g.name}
-													className="w-10 h-10 object-cover rounded"
-												/>
-											) : (
-												<div className="w-10 h-10 bg-gray-700 rounded" />
-											)}
-											<div>
-												<div className="font-medium text-white">
-													{g.name}
-												</div>
-												<div className="text-sm text-gray-400">{g.bio}</div>
-											</div>
-										</div>
-										<div className="flex gap-2 items-center">
-											<button
-												onClick={() => handleUpdateGuest(g._id || g.id)}
-												className="text-blue-400"
-											>
-												Edit
-											</button>
-											<button
-												onClick={() => handleRemoveGuest(g._id || g.id)}
-												className="text-red-400"
-											>
-												Remove
-											</button>
-										</div>
-									</div>
-								))}
-							</div>
-						</div>
+						<EditGuests
+							items={editForm.guests || []}
+							quickName={guestQuickName}
+							setQuickName={setGuestQuickName}
+							quickBio={guestQuickBio}
+							setQuickBio={setGuestQuickBio}
+							onAdd={handleAddGuest}
+							onUpdate={handleUpdateGuest}
+							onRemove={handleRemoveGuest}
+							actionBusy={actionBusy}
+						/>
 
 						{/* Toast */}
 						{toast && (
