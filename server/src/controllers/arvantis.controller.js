@@ -44,7 +44,6 @@ const findFestBySlugOrYear = async (identifier, populate = false) => {
 	return fest;
 };
 
-/* --- Landing / Latest fest improved --- */
 // Get latest fest (ongoing/upcoming preferred, else latest completed, else most recent)
 const getLatestFest = asyncHandler(async (req, res) => {
 	const currentYear = new Date().getFullYear();
@@ -89,6 +88,7 @@ const getLatestFest = asyncHandler(async (req, res) => {
 	const payload = {
 		fest: {
 			_id: obj._id,
+			id: obj._id?.toString(),
 			name: obj.name,
 			year: obj.year,
 			slug: obj.slug,
@@ -99,11 +99,17 @@ const getLatestFest = asyncHandler(async (req, res) => {
 			status: obj.status,
 			location: obj.location || null,
 			contactEmail: obj.contactEmail || null,
+			contactPhone: obj.contactPhone || null,
 			themeColors: obj.themeColors || {},
 			socialLinks: obj.socialLinks || {},
 			visibility: obj.visibility || 'public',
 			tracks: obj.tracks || [],
 			faqs: obj.faqs || [],
+			guidelines: obj.guidelines || [],
+			prizes: obj.prizes || [],
+			guests: obj.guests || [],
+			posters: obj.posters || [],
+			gallery: obj.gallery || [],
 		},
 		hero,
 		events: obj.events || [],
@@ -111,7 +117,9 @@ const getLatestFest = asyncHandler(async (req, res) => {
 			name: p.name,
 			tier: p.tier,
 			website: p.website,
-			logo: p.logo ? { url: p.logo.url, caption: p.logo.caption } : undefined,
+			logo: p.logo
+				? { url: p.logo.url, caption: p.logo.caption, publicId: p.logo.publicId }
+				: undefined,
 		})),
 		computed: {
 			durationDays,
@@ -194,10 +202,11 @@ const updateFestDetails = asyncHandler(async (req, res) => {
 	const fest = await findFestBySlugOrYear(req.params.identifier);
 
 	// prevent changing critical fields via this route
-	['name', 'location', 'slug', 'year'].forEach((k) => {
+	['slug', 'year'].forEach((k) => {
 		if (k in req.body) delete req.body[k];
 	});
 
+	// allow updating name/location/contact/etc through this route
 	Object.assign(fest, req.body);
 	await fest.save({ validateBeforeSave: true });
 	return ApiResponse.success(res, fest, 'Fest details updated successfully');
@@ -236,6 +245,14 @@ const deleteFest = asyncHandler(async (req, res) => {
 			mediaToDelete.push({
 				public_id: p.logo.publicId,
 				resource_type: p.logo.resource_type || 'image',
+			});
+	});
+	// guests photos
+	(fest.guests || []).forEach((g) => {
+		if (g.photo?.publicId)
+			mediaToDelete.push({
+				public_id: g.photo.publicId,
+				resource_type: g.photo.resource_type || 'image',
 			});
 	});
 
@@ -307,7 +324,7 @@ const removePartner = asyncHandler(async (req, res) => {
 	return ApiResponse.success(res, null, 'Partner removed successfully');
 });
 
-/* Link / Unlink events */
+/* Link an event to the fest */
 const linkEventToFest = asyncHandler(async (req, res) => {
 	const { eventId } = req.body;
 	const fest = await findFestBySlugOrYear(req.params.identifier);
@@ -325,6 +342,7 @@ const linkEventToFest = asyncHandler(async (req, res) => {
 	return ApiResponse.success(res, fest.events, 'Event linked successfully');
 });
 
+/* Unlink an event from the fest */
 const unlinkEventFromFest = asyncHandler(async (req, res) => {
 	const { identifier, eventId } = req.params;
 	const fest = await findFestBySlugOrYear(identifier);
@@ -354,6 +372,7 @@ const addGalleryMedia = asyncHandler(async (req, res) => {
 		url: u.url,
 		publicId: u.publicId,
 		resource_type: u.resource_type,
+		caption: undefined,
 	}));
 
 	fest.gallery.push(...items);
@@ -390,7 +409,6 @@ const addFestPoster = asyncHandler(async (req, res) => {
 	if (!req.files || req.files.length === 0)
 		throw new ApiError.BadRequest('At least one media file is required.');
 
-	// upload to posters folder (separate from gallery)
 	const uploadPromises = req.files.map((f) =>
 		uploadFile(f, { folder: `arvantis/${fest.year}/posters` })
 	);
@@ -400,9 +418,9 @@ const addFestPoster = asyncHandler(async (req, res) => {
 		url: u.url,
 		publicId: u.publicId,
 		resource_type: u.resource_type,
+		caption: req.body.caption || undefined,
 	}));
 
-	// ensure posters array exists
 	fest.posters = fest.posters || [];
 	fest.posters.push(...items);
 	await fest.save();
@@ -410,10 +428,8 @@ const addFestPoster = asyncHandler(async (req, res) => {
 });
 
 // Remove fest poster (by publicId)
-// Accepts :publicId param or publicId in body for flexibility
 const removeFestPoster = asyncHandler(async (req, res) => {
 	const { identifier } = req.params;
-	// support both routes: /:identifier/posters/:publicId and /:identifier/poster (body)
 	const publicId = req.params.publicId || req.body.publicId;
 	if (!publicId) throw new ApiError.BadRequest('publicId of poster is required.');
 
@@ -599,7 +615,7 @@ const reorderTracks = asyncHandler(async (req, res) => {
 	return ApiResponse.success(res, fest.tracks, 'Tracks reordered successfully', 200);
 });
 
-// Bulk delete media items (gallery, partner logos, posters, hero)
+// Bulk delete media items (gallery, partner logos, posters, hero, guest photos)
 const bulkDeleteMedia = asyncHandler(async (req, res) => {
 	const { identifier } = req.params;
 	const { publicIds } = req.body;
@@ -625,7 +641,6 @@ const bulkDeleteMedia = asyncHandler(async (req, res) => {
 				public_id: p.logo.publicId,
 				resource_type: p.logo.resource_type || 'image',
 			});
-			// return partner without logo
 			const plain = p.toObject ? p.toObject() : { ...p };
 			plain.logo = undefined;
 			return plain;
@@ -650,6 +665,20 @@ const bulkDeleteMedia = asyncHandler(async (req, res) => {
 		});
 		fest.heroMedia = undefined;
 	}
+
+	// guest photos
+	fest.guests = (fest.guests || []).map((g) => {
+		if (g.photo?.publicId && publicIds.includes(g.photo.publicId)) {
+			toDelete.push({
+				public_id: g.photo.publicId,
+				resource_type: g.photo.resource_type || 'image',
+			});
+			const plain = g.toObject ? g.toObject() : { ...g };
+			plain.photo = undefined;
+			return plain;
+		}
+		return g;
+	});
 
 	// attempt cloudinary deletions (best-effort)
 	if (toDelete.length > 0) {
@@ -689,7 +718,7 @@ const duplicateFest = asyncHandler(async (req, res) => {
 		name: data.name ? `${data.name} ${y}` : `Arvantis ${y}`,
 		startDate: null,
 		endDate: null,
-		// new model uses posters array
+		// do not copy media/events
 		posters: [],
 		heroMedia: undefined,
 		gallery: [],
@@ -700,6 +729,11 @@ const duplicateFest = asyncHandler(async (req, res) => {
 			tier: p.tier,
 			description: p.description,
 		})),
+		tracks: data.tracks || [],
+		faqs: data.faqs || [],
+		guidelines: data.guidelines || [],
+		prizes: data.prizes || [],
+		guests: data.guests || [],
 	};
 
 	const created = await Arvantis.create(copy);
@@ -863,6 +897,10 @@ const generateFestReport = asyncHandler(async (req, res) => {
 			tier: p.tier,
 			website: p.website,
 		})),
+		analytics: {
+			totalPartners: (fest.partners || []).length,
+			totalEvents: (fest.events || []).length,
+		},
 	};
 	return ApiResponse.success(res, report, 'Fest report generated successfully');
 });
@@ -1011,8 +1049,8 @@ const addGuideline = asyncHandler(async (req, res) => {
 		throw new ApiError.BadRequest('title or details is required to create a guideline.');
 	fest.guidelines = fest.guidelines || [];
 
-	// stable id
 	const guid = {
+		// no _id (subdocs in schema set _id:false) but we keep an id virtual via ObjectId string for client
 		id: mongoose.Types.ObjectId().toString(),
 		title: String(title).trim(),
 		details: String(details).trim(),
@@ -1056,7 +1094,6 @@ const removeGuideline = asyncHandler(async (req, res) => {
 	const idx = (fest.guidelines || []).findIndex(
 		(g) => String(g.id || g._id) === String(guidelineId)
 	);
-
 	if (idx === -1) throw new ApiError.NotFound('Guideline not found.');
 	fest.guidelines.splice(idx, 1);
 	await fest.save();
@@ -1187,6 +1224,7 @@ const addGuest = asyncHandler(async (req, res) => {
 		id: mongoose.Types.ObjectId().toString(),
 		name: String(name).trim(),
 		bio: String(bio).trim(),
+		photo: undefined,
 		socialLinks: typeof socialLinks === 'object' ? socialLinks : {},
 	};
 	fest.guests.push(guest);
